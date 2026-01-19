@@ -250,11 +250,11 @@ async def upload(canvas_id):
     user_id = cvs["user_id"]
     files = await request.files
     
-    # 上传文件扩容添加
+    # 上传文件扩容
     file_list = files.getlist("file") if files else []
     if len(file_list) > 50:
         return get_data_error_result(message="Maximum 50 files allowed per upload.")
-    ）
+    
     MAX_FILE_SIZE = 100 * 1024 * 1024 
     for file_obj in file_list:
         if file_obj:
