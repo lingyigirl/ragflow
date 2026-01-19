@@ -40,6 +40,7 @@ export enum PromptRole {
 
 import {
   CloudUpload,
+  FileText,
   ListOrdered,
   OptionIcon,
   TextCursorInput,
@@ -752,6 +753,7 @@ export enum BeginQueryType {
   File = 'file',
   Integer = 'integer',
   Boolean = 'boolean',
+  PDF = 'pdf',
 }
 
 export const BeginQueryTypeIconMap = {
@@ -761,6 +763,7 @@ export const BeginQueryTypeIconMap = {
   [BeginQueryType.File]: CloudUpload,
   [BeginQueryType.Integer]: ListOrdered,
   [BeginQueryType.Boolean]: ToggleLeft,
+  [BeginQueryType.PDF]: FileText,
 };
 
 export const NoDebugOperatorsList = [

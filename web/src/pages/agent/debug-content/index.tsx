@@ -178,6 +178,28 @@ const DebugContent = ({
             />
           </React.Fragment>
         ),
+        [BeginQueryType.PDF]: (
+          <React.Fragment key={idx}>
+            <FormField
+              control={form.control}
+              name={props.name}
+              render={({ field }) => (
+                <div className="space-y-6">
+                  <FormItem className="w-full">
+                    <FormLabel>{props.label}</FormLabel>
+                    <FormControl>
+                      <FileUploadDirectUpload
+                        value={field.value}
+                        onChange={field.onChange}
+                      ></FileUploadDirectUpload>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </div>
+              )}
+            />
+          </React.Fragment>
+        ),
         [BeginQueryType.Integer]: (
           <FormField
             control={form.control}
