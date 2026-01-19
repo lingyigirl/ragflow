@@ -69,15 +69,28 @@ export function FileUploadDirectUpload({
     });
   }, []);
 
+  const totalSize = React.useMemo(() => {
+    return files.reduce((sum, file) => sum + file.size, 0);
+  }, [files]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
   return (
     <FileUpload
       value={files}
       onValueChange={setFiles}
       onUpload={onUpload}
       onFileReject={onFileReject}
-      maxFiles={1}
+      maxFiles={50}
+      maxSize={100 * 1024 * 1024}
       className="w-full"
-      multiple={false}
+      multiple={true}
     >
       <FileUploadDropzone>
         <div className="flex flex-col items-center gap-1 text-center">
@@ -86,7 +99,7 @@ export function FileUploadDirectUpload({
           </div>
           <p className="font-medium text-sm">Drag & drop files here</p>
           <p className="text-muted-foreground text-xs">
-            Or click to browse (max 1 files)
+            Or click to browse (max 50 files, each up to 100MB)
           </p>
         </div>
         <FileUploadTrigger asChild>
@@ -95,22 +108,31 @@ export function FileUploadDirectUpload({
           </Button>
         </FileUploadTrigger>
       </FileUploadDropzone>
-      <FileUploadList>
-        {files.map((file, index) => (
-          <FileUploadItem key={index} value={file} className="flex-col">
-            <div className="flex w-full items-center gap-2">
-              <FileUploadItemPreview />
-              <FileUploadItemMetadata />
-              <FileUploadItemDelete asChild>
-                <Button variant="ghost" size="icon" className="size-7">
-                  <X />
-                </Button>
-              </FileUploadItemDelete>
-            </div>
-            <FileUploadItemProgress />
-          </FileUploadItem>
-        ))}
-      </FileUploadList>
+      {files.length > 0 && (
+        <div className="mt-2 px-2 py-1.5 text-xs text-muted-foreground border rounded-md bg-muted/50">
+          <span className="font-medium">已添加 {files.length} 个文件</span>
+          <span className="mx-2">•</span>
+          <span>总大小: {formatFileSize(totalSize)}</span>
+        </div>
+      )}
+      <div className="mt-4 max-h-[300px] overflow-y-auto pr-2">
+        <FileUploadList>
+          {files.map((file, index) => (
+            <FileUploadItem key={index} value={file} className="flex-col">
+              <div className="flex w-full items-center gap-2">
+                <FileUploadItemPreview />
+                <FileUploadItemMetadata />
+                <FileUploadItemDelete asChild>
+                  <Button variant="ghost" size="icon" className="size-7">
+                    <X />
+                  </Button>
+                </FileUploadItemDelete>
+              </div>
+              <FileUploadItemProgress />
+            </FileUploadItem>
+          ))}
+        </FileUploadList>
+      </div>
     </FileUpload>
   );
 }
