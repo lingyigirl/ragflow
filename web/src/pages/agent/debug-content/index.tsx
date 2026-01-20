@@ -65,6 +65,15 @@ const DebugContent = ({
           value = false;
         } else if (type === BeginQueryType.Integer || type === 'float') {
           fieldSchema = z.coerce.number();
+        } else if (
+          type === BeginQueryType.File ||
+          type === BeginQueryType.PDF
+        ) {
+          // 文件类型支持单个对象或对象数组
+          fieldSchema = z.union([
+            z.record(z.any()),
+            z.array(z.record(z.any())),
+          ]);
         } else {
           fieldSchema = z.record(z.any());
         }

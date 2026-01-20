@@ -19,12 +19,13 @@ import * as React from 'react';
 import { toast } from 'sonner';
 
 type FileUploadDirectUploadProps = {
-  value: Record<string, any>;
-  onChange(value: Record<string, any>): void;
+  value?: Record<string, any> | Record<string, any>[] | null;
+  onChange(value: Record<string, any> | Record<string, any>[]): void;
 };
 
 export function FileUploadDirectUpload({
   onChange,
+  value,
 }: FileUploadDirectUploadProps) {
   const [files, setFiles] = React.useState<File[]>([]);
 
@@ -33,34 +34,61 @@ export function FileUploadDirectUpload({
   const onUpload: NonNullable<FileUploadProps['onUpload']> = React.useCallback(
     async (files, { onSuccess, onError }) => {
       try {
-        const uploadPromises = files.map(async (file) => {
-          const handleError = (error?: any) => {
-            onError(
-              file,
-              error instanceof Error ? error : new Error('Upload failed'),
-            );
-          };
-          try {
-            const ret = await uploadCanvasFile([file]);
-            if (ret.code === 0) {
-              onSuccess(file);
-              onChange(ret.data);
-            } else {
-              handleError();
-            }
-          } catch (error) {
-            handleError(error);
-          }
-        });
+        // 累积所有上传成功的文件信息
+        // 使用函数式更新，确保获取最新的 value
+        const currentValue = value;
+        const uploadedFiles: any[] = Array.isArray(currentValue)
+          ? [...currentValue]
+          : currentValue
+            ? [currentValue]
+            : [];
 
-        // Wait for all uploads to complete
-        await Promise.all(uploadPromises);
+        // 使用 Promise.allSettled 确保所有文件都处理完成，即使有些失败
+        const uploadResults = await Promise.allSettled(
+          files.map(async (file) => {
+            try {
+              const ret = await uploadCanvasFile([file]);
+              if (ret.code === 0) {
+                onSuccess(file);
+                return ret.data; // 返回文件信息
+              } else {
+                onError(file, new Error('Upload failed'));
+                return null;
+              }
+            } catch (error) {
+              onError(
+                file,
+                error instanceof Error ? error : new Error('Upload failed'),
+              );
+              return null;
+            }
+          }),
+        );
+
+        // 收集所有成功上传的文件信息
+        const successfulUploads = uploadResults
+          .filter(
+            (result): result is PromiseFulfilledResult<any> =>
+              result.status === 'fulfilled' && result.value !== null,
+          )
+          .map((result) => result.value);
+
+        // 将新上传的文件信息添加到数组中
+        uploadedFiles.push(...successfulUploads);
+
+        // 所有文件上传完成后，一次性更新所有文件信息
+        // 如果只有一个文件，返回单个对象；如果有多个文件，返回数组
+        if (uploadedFiles.length === 1) {
+          onChange(uploadedFiles[0]);
+        } else if (uploadedFiles.length > 1) {
+          onChange(uploadedFiles);
+        }
       } catch (error) {
         // This handles any error that might occur outside the individual upload processes
         console.error('Unexpected error during upload:', error);
       }
     },
-    [onChange, uploadCanvasFile],
+    [onChange, uploadCanvasFile, value],
   );
 
   const onFileReject = React.useCallback((file: File, message: string) => {

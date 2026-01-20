@@ -82,7 +82,27 @@ class Begin(UserFillUp):
                         if not pdf_parser_config:
                             pdf_parser_config = None
                     
-                    v = FileService.get_files([v["value"]], pdf_parser_config)
+                    # 支持多个文件：如果 value 是数组，直接使用；如果是单个对象，包装成数组
+                    file_value = v["value"]
+                    if isinstance(file_value, list):
+                        # 已经是数组，直接使用
+                        file_list = file_value
+                    else:
+                        # 单个文件对象，包装成数组
+                        file_list = [file_value]
+                    
+                    # 解析所有文件，返回字符串列表
+                    parsed_results = FileService.get_files(file_list, pdf_parser_config)
+                    
+                    # 将多个文件的解析结果合并成一个字符串，用双换行符分隔
+                    # 这样 Message 节点可以正确显示所有文件的内容
+                    if len(parsed_results) == 1:
+                        v = parsed_results[0]
+                    elif len(parsed_results) > 1:
+                        # 合并所有文件的解析结果
+                        v = "\n\n".join(parsed_results)
+                    else:
+                        v = ""
 
             self.set_output(k, v)
             self.set_input_value(k, v)

@@ -151,7 +151,8 @@ class Message(ComponentBase):
             elif inspect.isawaitable(v):
                 v = await v
             elif isinstance(v, list):
-                if (v[0].startswith('$') or '\\' in v[0]) and len(v) == 1 and isinstance(v[0], str):
+                if isinstance(v[0], str) and (v[0].startswith('$') or '\\' in v[0]):
+                # if (v[0].startswith('$') or '\\' in v[0]) and len(v) == 1 and isinstance(v[0], str):
                     v = v[0]
                 else:
                     try:
