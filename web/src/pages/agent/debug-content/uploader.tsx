@@ -19,12 +19,13 @@ import * as React from 'react';
 import { toast } from 'sonner';
 
 type FileUploadDirectUploadProps = {
-  value: Record<string, any>;
-  onChange(value: Record<string, any>): void;
+  value?: Record<string, any> | Record<string, any>[] | null;
+  onChange(value: Record<string, any> | Record<string, any>[]): void;
 };
 
 export function FileUploadDirectUpload({
   onChange,
+  value,
 }: FileUploadDirectUploadProps) {
   const [files, setFiles] = React.useState<File[]>([]);
 
@@ -33,34 +34,61 @@ export function FileUploadDirectUpload({
   const onUpload: NonNullable<FileUploadProps['onUpload']> = React.useCallback(
     async (files, { onSuccess, onError }) => {
       try {
-        const uploadPromises = files.map(async (file) => {
-          const handleError = (error?: any) => {
-            onError(
-              file,
-              error instanceof Error ? error : new Error('Upload failed'),
-            );
-          };
-          try {
-            const ret = await uploadCanvasFile([file]);
-            if (ret.code === 0) {
-              onSuccess(file);
-              onChange(ret.data);
-            } else {
-              handleError();
-            }
-          } catch (error) {
-            handleError(error);
-          }
-        });
+        // 累积所有上传成功的文件信息
+        // 使用函数式更新，确保获取最新的 value
+        const currentValue = value;
+        const uploadedFiles: any[] = Array.isArray(currentValue)
+          ? [...currentValue]
+          : currentValue
+            ? [currentValue]
+            : [];
 
-        // Wait for all uploads to complete
-        await Promise.all(uploadPromises);
+        // 使用 Promise.allSettled 确保所有文件都处理完成，即使有些失败
+        const uploadResults = await Promise.allSettled(
+          files.map(async (file) => {
+            try {
+              const ret = await uploadCanvasFile([file]);
+              if (ret.code === 0) {
+                onSuccess(file);
+                return ret.data; // 返回文件信息
+              } else {
+                onError(file, new Error('Upload failed'));
+                return null;
+              }
+            } catch (error) {
+              onError(
+                file,
+                error instanceof Error ? error : new Error('Upload failed'),
+              );
+              return null;
+            }
+          }),
+        );
+
+        // 收集所有成功上传的文件信息
+        const successfulUploads = uploadResults
+          .filter(
+            (result): result is PromiseFulfilledResult<any> =>
+              result.status === 'fulfilled' && result.value !== null,
+          )
+          .map((result) => result.value);
+
+        // 将新上传的文件信息添加到数组中
+        uploadedFiles.push(...successfulUploads);
+
+        // 所有文件上传完成后，一次性更新所有文件信息
+        // 如果只有一个文件，返回单个对象；如果有多个文件，返回数组
+        if (uploadedFiles.length === 1) {
+          onChange(uploadedFiles[0]);
+        } else if (uploadedFiles.length > 1) {
+          onChange(uploadedFiles);
+        }
       } catch (error) {
         // This handles any error that might occur outside the individual upload processes
         console.error('Unexpected error during upload:', error);
       }
     },
-    [onChange, uploadCanvasFile],
+    [onChange, uploadCanvasFile, value],
   );
 
   const onFileReject = React.useCallback((file: File, message: string) => {
@@ -69,15 +97,28 @@ export function FileUploadDirectUpload({
     });
   }, []);
 
+  const totalSize = React.useMemo(() => {
+    return files.reduce((sum, file) => sum + file.size, 0);
+  }, [files]);
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
+  };
+
   return (
     <FileUpload
       value={files}
       onValueChange={setFiles}
       onUpload={onUpload}
       onFileReject={onFileReject}
-      maxFiles={1}
+      maxFiles={50}
+      maxSize={100 * 1024 * 1024}
       className="w-full"
-      multiple={false}
+      multiple={true}
     >
       <FileUploadDropzone>
         <div className="flex flex-col items-center gap-1 text-center">
@@ -86,7 +127,7 @@ export function FileUploadDirectUpload({
           </div>
           <p className="font-medium text-sm">Drag & drop files here</p>
           <p className="text-muted-foreground text-xs">
-            Or click to browse (max 1 files)
+            Or click to browse (max 50 files, each up to 100MB)
           </p>
         </div>
         <FileUploadTrigger asChild>
@@ -95,22 +136,31 @@ export function FileUploadDirectUpload({
           </Button>
         </FileUploadTrigger>
       </FileUploadDropzone>
-      <FileUploadList>
-        {files.map((file, index) => (
-          <FileUploadItem key={index} value={file} className="flex-col">
-            <div className="flex w-full items-center gap-2">
-              <FileUploadItemPreview />
-              <FileUploadItemMetadata />
-              <FileUploadItemDelete asChild>
-                <Button variant="ghost" size="icon" className="size-7">
-                  <X />
-                </Button>
-              </FileUploadItemDelete>
-            </div>
-            <FileUploadItemProgress />
-          </FileUploadItem>
-        ))}
-      </FileUploadList>
+      {files.length > 0 && (
+        <div className="mt-2 px-2 py-1.5 text-xs text-muted-foreground border rounded-md bg-muted/50">
+          <span className="font-medium">已添加 {files.length} 个文件</span>
+          <span className="mx-2">•</span>
+          <span>总大小: {formatFileSize(totalSize)}</span>
+        </div>
+      )}
+      <div className="mt-4 max-h-[300px] overflow-y-auto pr-2">
+        <FileUploadList>
+          {files.map((file, index) => (
+            <FileUploadItem key={index} value={file} className="flex-col">
+              <div className="flex w-full items-center gap-2">
+                <FileUploadItemPreview />
+                <FileUploadItemMetadata />
+                <FileUploadItemDelete asChild>
+                  <Button variant="ghost" size="icon" className="size-7">
+                    <X />
+                  </Button>
+                </FileUploadItemDelete>
+              </div>
+              <FileUploadItemProgress />
+            </FileUploadItem>
+          ))}
+        </FileUploadList>
+      </div>
     </FileUpload>
   );
 }

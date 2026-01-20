@@ -198,7 +198,6 @@ class Graph:
         root_key = parts[0]
         rest = parts[1] if len(parts) > 1 else ""
         root_val = cpn["obj"].output(root_key)
-
         if not rest:
             return root_val
         return self.get_variable_param_value(root_val,rest)

@@ -1,6 +1,16 @@
 import { WebhookJWTAlgorithmList } from '@/constants/agent';
 import { z } from 'zod';
 
+const FieldTypeSchema = z.enum([
+  'line',
+  'paragraph',
+  'integer',
+  'boolean',
+  'options',
+  'file',
+  'pdf',
+]);
+
 export const BeginFormSchema = z.object({
   enablePrologue: z.boolean().optional(),
   prologue: z.string().trim().optional(),
@@ -9,11 +19,27 @@ export const BeginFormSchema = z.object({
     .array(
       z.object({
         key: z.string(),
-        type: z.string(),
-        value: z.string(),
+        type: FieldTypeSchema,
+        value: z.union([z.string(), z.record(z.any()), z.array(z.any())]), // 支持字符串、对象或数组（用于文件类型）
         optional: z.boolean(),
         name: z.string(),
         options: z.array(z.union([z.number(), z.string(), z.boolean()])),
+        parse_method: z.string().optional(),
+
+        mineru_parse_method: z.enum(['auto', 'txt', 'ocr']).optional(),
+        mineru_formula_enable: z.boolean().optional(),
+        mineru_table_enable: z.boolean().optional(),
+        mineru_lang: z.string().optional(),
+
+        tcadp_table_result_type: z.string().optional(),
+        tcadp_markdown_image_response_type: z.string().optional(),
+
+        lang: z.string().optional(),
+
+        chunk_token_num: z.number().optional(),
+        delimiter: z.string().optional(),
+        enable_children: z.boolean().optional(),
+        children_delimiter: z.string().optional(),
       }),
     )
     .optional(),
@@ -48,7 +74,7 @@ export const BeginFormSchema = z.object({
         .array(
           z.object({
             key: z.string(),
-            type: z.string(),
+            type: FieldTypeSchema,
             required: z.boolean(),
           }),
         )
@@ -57,7 +83,7 @@ export const BeginFormSchema = z.object({
         .array(
           z.object({
             key: z.string(),
-            type: z.string(),
+            type: FieldTypeSchema,
             required: z.boolean(),
           }),
         )
@@ -66,7 +92,7 @@ export const BeginFormSchema = z.object({
         .array(
           z.object({
             key: z.string(),
-            type: z.string(),
+            type: FieldTypeSchema,
             required: z.boolean(),
           }),
         )
@@ -76,9 +102,6 @@ export const BeginFormSchema = z.object({
   response: z
     .object({
       status: z.number(),
-      // headers_template: z.array(
-      //   z.object({ key: z.string(), value: z.string() }),
-      // ),
       body_template: z.string().optional(),
     })
     .optional(),

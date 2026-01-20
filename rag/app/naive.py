@@ -134,7 +134,14 @@ def by_docling(filename, binary=None, from_page=0, to_page=100000, lang="Chinese
 
 
 def by_tcadp(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", callback=None, pdf_cls=None, **kwargs):
-    tcadp_parser = TCADPParser()
+    parser_config = kwargs.get("parser_config", {})
+    table_result_type = kwargs.get("table_result_type") or parser_config.get("tcadp_table_result_type", "1")
+    markdown_image_response_type = kwargs.get("markdown_image_response_type") or parser_config.get("tcadp_markdown_image_response_type", "1")
+    
+    tcadp_parser = TCADPParser(
+        table_result_type=table_result_type,
+        markdown_image_response_type=markdown_image_response_type
+    )
 
     if not tcadp_parser.check_installation():
         callback(-1, "TCADP parser not available. Please check Tencent Cloud API configuration.")

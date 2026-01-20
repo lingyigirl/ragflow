@@ -64,11 +64,49 @@ class UserFillUp(ComponentBase):
         for k, v in kwargs.get("inputs", {}).items():
             if self.check_if_canceled("UserFillUp processing"):
                 return
-            if isinstance(v, dict) and v.get("type", "").lower().find("file") >=0:
+            if isinstance(v, dict) and (
+                v.get("type", "").lower().find("file") >= 0 or 
+                v.get("type", "").lower() == "pdf"
+            ):
                 if v.get("optional") and v.get("value", None) is None:
                     v = None
                 else:
-                    v = FileService.get_files([v["value"]])
+                    pdf_parser_config = None
+                    if v.get("type", "").lower() == "pdf":
+                        pdf_parser_config = {}
+
+                        if v.get("parse_method"):
+                            pdf_parser_config["parse_method"] = v.get("parse_method")
+                        if v.get("mineru_parse_method"):
+                            pdf_parser_config["mineru_parse_method"] = v.get("mineru_parse_method")
+                        if v.get("mineru_formula_enable") is not None:
+                            pdf_parser_config["mineru_formula_enable"] = v.get("mineru_formula_enable")
+                        if v.get("mineru_table_enable") is not None:
+                            pdf_parser_config["mineru_table_enable"] = v.get("mineru_table_enable")
+                        if v.get("mineru_lang"):
+                            pdf_parser_config["mineru_lang"] = v.get("mineru_lang")
+
+                        if v.get("tcadp_table_result_type"):
+                            pdf_parser_config["tcadp_table_result_type"] = v.get("tcadp_table_result_type")
+                        if v.get("tcadp_markdown_image_response_type"):
+                            pdf_parser_config["tcadp_markdown_image_response_type"] = v.get("tcadp_markdown_image_response_type")
+
+                        if v.get("lang"):
+                            pdf_parser_config["lang"] = v.get("lang")
+
+                        if v.get("chunk_token_num") is not None:
+                            pdf_parser_config["chunk_token_num"] = v.get("chunk_token_num")
+                        if v.get("delimiter"):
+                            pdf_parser_config["delimiter"] = v.get("delimiter")
+                        if v.get("enable_children") is not None:
+                            pdf_parser_config["enable_children"] = v.get("enable_children")
+                        if v.get("children_delimiter"):
+                            pdf_parser_config["children_delimiter"] = v.get("children_delimiter")
+
+                        if not pdf_parser_config:
+                            pdf_parser_config = None
+                    
+                    v = FileService.get_files([v["value"]], pdf_parser_config)
             else:
                 v = v.get("value")
             self.set_output(k, v)
