@@ -97,6 +97,7 @@ services:
     # If you use Docker Desktop, the --add-host flag is optional. This flag ensures that the host's internal IP is exposed to the Prometheus container.
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "mineru-api:host-gateway"
     deploy:
       resources:
         reservations:
