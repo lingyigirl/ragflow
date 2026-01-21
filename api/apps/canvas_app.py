@@ -249,6 +249,24 @@ async def upload(canvas_id):
 
     user_id = cvs["user_id"]
     files = await request.files
+    
+    # 上传文件扩容
+    file_list = files.getlist("file") if files else []
+    if len(file_list) > 50:
+        return get_data_error_result(message="Maximum 50 files allowed per upload.")
+    
+    MAX_FILE_SIZE = 100 * 1024 * 1024 
+    for file_obj in file_list:
+        if file_obj:
+            current_pos = file_obj.tell()
+            file_obj.seek(0, 2) 
+            file_size = file_obj.tell()
+            file_obj.seek(current_pos)
+            if file_size > MAX_FILE_SIZE:
+                return get_data_error_result(
+                    message=f"File '{file_obj.filename}' exceeds 100MB size limit."
+                )
+    
     file = files['file'] if files and files.get("file") else None
     try:
         return get_json_result(data=FileService.upload_info(user_id, file, request.args.get("url")))

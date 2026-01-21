@@ -65,6 +65,15 @@ const DebugContent = ({
           value = false;
         } else if (type === BeginQueryType.Integer || type === 'float') {
           fieldSchema = z.coerce.number();
+        } else if (
+          type === BeginQueryType.File ||
+          type === BeginQueryType.PDF
+        ) {
+          // 文件类型支持单个对象或对象数组
+          fieldSchema = z.union([
+            z.record(z.any()),
+            z.array(z.record(z.any())),
+          ]);
         } else {
           fieldSchema = z.record(z.any());
         }
@@ -165,6 +174,28 @@ const DebugContent = ({
                 <div className="space-y-6">
                   <FormItem className="w-full">
                     <FormLabel>{t('assistantAvatar')}</FormLabel>
+                    <FormControl>
+                      <FileUploadDirectUpload
+                        value={field.value}
+                        onChange={field.onChange}
+                      ></FileUploadDirectUpload>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                </div>
+              )}
+            />
+          </React.Fragment>
+        ),
+        [BeginQueryType.PDF]: (
+          <React.Fragment key={idx}>
+            <FormField
+              control={form.control}
+              name={props.name}
+              render={({ field }) => (
+                <div className="space-y-6">
+                  <FormItem className="w-full">
+                    <FormLabel>{props.label}</FormLabel>
                     <FormControl>
                       <FileUploadDirectUpload
                         value={field.value}

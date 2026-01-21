@@ -511,7 +511,7 @@ class FileService(CommonService):
         return "\n\n".join(res)
 
     @staticmethod
-    def parse(filename, blob, img_base64=True, tenant_id=None):
+    def parse(filename, blob, img_base64=True, tenant_id=None, pdf_parser_config=None):
         from rag.app import audio, email, naive, picture, presentation
         from api.apps import current_user
 
@@ -520,7 +520,48 @@ class FileService(CommonService):
 
         FACTORY = {ParserType.PRESENTATION.value: presentation, ParserType.PICTURE.value: picture, ParserType.AUDIO.value: audio, ParserType.EMAIL.value: email}
         parser_config = {"chunk_token_num": 16096, "delimiter": "\n!?;。；！？", "layout_recognize": "Plain Text"}
-        kwargs = {"lang": "English", "callback": dummy, "parser_config": parser_config, "from_page": 0, "to_page": 100000, "tenant_id": current_user.id if current_user else tenant_id}
+
+        if pdf_parser_config:
+            if pdf_parser_config.get("parse_method"):
+                parser_config["layout_recognize"] = pdf_parser_config["parse_method"]
+
+            if pdf_parser_config.get("mineru_parse_method"):
+                parser_config["mineru_parse_method"] = pdf_parser_config["mineru_parse_method"]
+            if pdf_parser_config.get("mineru_formula_enable") is not None:
+                parser_config["mineru_formula_enable"] = pdf_parser_config["mineru_formula_enable"]
+            if pdf_parser_config.get("mineru_table_enable") is not None:
+                parser_config["mineru_table_enable"] = pdf_parser_config["mineru_table_enable"]
+            if pdf_parser_config.get("mineru_lang"):
+                parser_config["mineru_lang"] = pdf_parser_config["mineru_lang"]
+
+            if pdf_parser_config.get("tcadp_table_result_type"):
+                parser_config["tcadp_table_result_type"] = pdf_parser_config["tcadp_table_result_type"]
+            if pdf_parser_config.get("tcadp_markdown_image_response_type"):
+                parser_config["tcadp_markdown_image_response_type"] = pdf_parser_config["tcadp_markdown_image_response_type"]
+
+            if pdf_parser_config.get("chunk_token_num") is not None:
+                parser_config["chunk_token_num"] = pdf_parser_config["chunk_token_num"]
+            if pdf_parser_config.get("delimiter"):
+                parser_config["delimiter"] = pdf_parser_config["delimiter"]
+            if pdf_parser_config.get("enable_children") is not None:
+                parser_config["enable_children"] = pdf_parser_config["enable_children"]
+            if pdf_parser_config.get("children_delimiter"):
+                parser_config["children_delimiter"] = pdf_parser_config["children_delimiter"]
+        
+
+        lang = "English"
+        if pdf_parser_config and pdf_parser_config.get("lang"):
+            lang = pdf_parser_config["lang"]
+        elif pdf_parser_config and pdf_parser_config.get("mineru_lang"):
+            lang = pdf_parser_config["mineru_lang"]
+        
+
+        if pdf_parser_config and pdf_parser_config.get("tcadp_table_result_type"):
+            kwargs["table_result_type"] = pdf_parser_config["tcadp_table_result_type"]
+        if pdf_parser_config and pdf_parser_config.get("tcadp_markdown_image_response_type"):
+            kwargs["markdown_image_response_type"] = pdf_parser_config["tcadp_markdown_image_response_type"]
+        
+        kwargs = {"lang": lang, "callback": dummy, "parser_config": parser_config, "from_page": 0, "to_page": 100000, "tenant_id": current_user.id if current_user else tenant_id}
         file_type = filename_type(filename)
         if img_base64 and file_type == FileType.VISUAL.value:
             return GptV4.image2base64(blob)
@@ -655,7 +696,7 @@ class FileService(CommonService):
         return structured(file.filename, filename_type(file.filename), file.read(), file.content_type)
 
     @staticmethod
-    def get_files(files: Union[None, list[dict]]) -> list[str]:
+    def get_files(files: Union[None, list[dict]], pdf_parser_config: Union[None, dict] = None) -> list[str]:
         if not files:
             return  []
         def image_to_base64(file):
@@ -667,6 +708,9 @@ class FileService(CommonService):
             if file["mime_type"].find("image") >=0:
                 threads.append(exe.submit(image_to_base64, file))
                 continue
-            threads.append(exe.submit(FileService.parse, file["name"], FileService.get_blob(file["created_by"], file["id"]), True, file["created_by"]))
+            if file["mime_type"].find("pdf") >= 0 and pdf_parser_config:
+                threads.append(exe.submit(FileService.parse, file["name"], FileService.get_blob(file["created_by"], file["id"]), True, file["created_by"], pdf_parser_config))
+            else:
+                threads.append(exe.submit(FileService.parse, file["name"], FileService.get_blob(file["created_by"], file["id"]), True, file["created_by"]))
         return [th.result() for th in threads]
 

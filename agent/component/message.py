@@ -124,6 +124,7 @@ class Message(ComponentBase):
                 continue
 
             v = self._canvas.get_variable_value(exp)
+           
             if v is None:
                 v = ""
             if isinstance(v, partial):
@@ -149,6 +150,15 @@ class Message(ComponentBase):
                 continue
             elif inspect.isawaitable(v):
                 v = await v
+            elif isinstance(v, list):
+                if isinstance(v[0], str) and (v[0].startswith('$') or '\\' in v[0]):
+                # if (v[0].startswith('$') or '\\' in v[0]) and len(v) == 1 and isinstance(v[0], str):
+                    v = v[0]
+                else:
+                    try:
+                        v = json.dumps(v, ensure_ascii=False)
+                    except Exception:
+                        v = str(v)
             elif not isinstance(v, str):
                 try:
                     v = json.dumps(v, ensure_ascii=False)
@@ -165,7 +175,7 @@ class Message(ComponentBase):
 
             all_content += rand_cnt[s: ]
             yield rand_cnt[s: ]
-
+       
         self.set_output("content", all_content)
         self._convert_content(all_content)
         await self._save_to_memory(all_content)

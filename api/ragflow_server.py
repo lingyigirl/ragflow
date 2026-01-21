@@ -41,6 +41,7 @@ from common.versions import get_ragflow_version
 from common.config_utils import show_configs
 from common.mcp_tool_call_conn import shutdown_all_mcp_sessions
 from rag.utils.redis_conn import RedisDistributedLock
+from api.utils.nacos_registry import nacos_registry
 
 stop_event = threading.Event()
 
@@ -67,6 +68,15 @@ def update_progress():
 def signal_handler(sig, frame):
     logging.info("Received interrupt signal, shutting down...")
     shutdown_all_mcp_sessions()
+
+    # 从 Nacos 注销服务
+    try:
+        logging.info("Deregistering service from Nacos...")
+        nacos_registry.stop_heartbeat()
+        nacos_registry.deregister_service()
+    except Exception as e:
+        logging.error(f"Error during Nacos deregistration: {e}")
+
     stop_event.set()
     stop_event.wait(1)
     sys.exit(0)
@@ -128,6 +138,17 @@ if __name__ == '__main__':
     RuntimeConfig.init_config(JOB_SERVER_HOST=settings.HOST_IP, HTTP_PORT=settings.HOST_PORT)
 
     GlobalPluginManager.load_plugins()
+
+    # 注册到 Nacos
+    if nacos_registry.is_available():
+        logging.info("Registering service to Nacos...")
+        if nacos_registry.register_service():
+            nacos_registry.start_heartbeat()
+            logging.info("Service registered to Nacos successfully")
+        else:
+            logging.warning("Failed to register service to Nacos, continuing anyway...")
+    else:
+        logging.info("Nacos integration is disabled, skipping service registration")
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

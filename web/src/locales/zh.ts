@@ -1258,6 +1258,7 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       file: '文件',
       integer: '数字',
       boolean: '布尔值',
+      pdf: 'PDF',
       name: '名称',
       singleLineText: '单行文本',
       variableSettings: '变量设置',
