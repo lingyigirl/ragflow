@@ -61,6 +61,7 @@ dependencies = [
     "mistralai==0.4.2",
     "moodlepy>=0.23.0",
     "mypy-boto3-s3==1.40.26",
+    "nacos-sdk-python<2.0.0",
     "Office365-REST-Python-Client==2.6.2",
     "ollama>=0.5.0",
     "onnxruntime==1.19.2; sys_platform == 'darwin' or platform_machine != 'x86_64'",
