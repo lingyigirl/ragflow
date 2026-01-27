@@ -41,7 +41,7 @@ from common.versions import get_ragflow_version
 from common.config_utils import show_configs
 from common.mcp_tool_call_conn import shutdown_all_mcp_sessions
 from rag.utils.redis_conn import RedisDistributedLock
-from api.utils.nacos_registry import nacos_registry
+from api.utils.nacos_registry import get_nacos_registry
 
 stop_event = threading.Event()
 
@@ -72,8 +72,9 @@ def signal_handler(sig, frame):
     # 从 Nacos 注销服务
     try:
         logging.info("Deregistering service from Nacos...")
-        nacos_registry.stop_heartbeat()
-        nacos_registry.deregister_service()
+        registry = get_nacos_registry()
+        registry.stop_heartbeat()
+        registry.deregister_service()
     except Exception as e:
         logging.error(f"Error during Nacos deregistration: {e}")
 
@@ -140,6 +141,7 @@ if __name__ == '__main__':
     GlobalPluginManager.load_plugins()
 
     # 注册到 Nacos
+    nacos_registry = get_nacos_registry()
     if nacos_registry.is_available():
         logging.info("Registering service to Nacos...")
         if nacos_registry.register_service():

@@ -378,5 +378,22 @@ class NacosRegistry:
             return []
 
 
-# 全局 Nacos 注册实例
-nacos_registry = NacosRegistry()
+# 全局 Nacos 注册实例（延迟初始化，确保环境变量已加载）
+_nacos_registry_instance = None
+_nacos_lock = threading.Lock()
+
+def get_nacos_registry() -> NacosRegistry:
+    """获取 Nacos 注册实例（单例模式，延迟初始化）
+
+    第一次调用时才创建实例，确保环境变量已加载。
+
+    Returns:
+        NacosRegistry: Nacos 注册实例
+    """
+    global _nacos_registry_instance
+    if _nacos_registry_instance is None:
+        with _nacos_lock:
+            # 双重检查锁定
+            if _nacos_registry_instance is None:
+                _nacos_registry_instance = NacosRegistry()
+    return _nacos_registry_instance
