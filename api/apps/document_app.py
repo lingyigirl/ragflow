@@ -47,6 +47,12 @@ from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
 from common import settings
+import requests
+import os
+import tempfile
+import zipfile
+import base64
+import shutil
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
@@ -908,3 +914,229 @@ async def upload_info():
         return get_json_result(data=FileService.upload_info(current_user.id, file, request.args.get("url")))
     except Exception as e:
         return  server_error_response(e)
+
+
+@manager.route("/mineru_parse", methods=["POST"])  # noqa: F821
+@login_required
+async def mineru_parse():
+    try:
+        mineru_api = os.environ.get("MINERU_APISERVER", "").rstrip("/")
+        if not mineru_api:
+            return get_json_result(
+                data=False,
+                message="MinerU API server not configured. Please set MINERU_APISERVER environment variable.",
+                code=RetCode.SERVER_ERROR
+            )
+
+        files_data = await request.files
+        if "file" not in files_data:
+            return get_json_result(
+                data=False,
+                message="No file part! Please provide a PDF file.",
+                code=RetCode.ARGUMENT_ERROR
+            )
+
+        file_obj = files_data["file"]
+        if file_obj.filename == "":
+            return get_json_result(
+                data=False,
+                message="No file selected!",
+                code=RetCode.ARGUMENT_ERROR
+            )
+        form = await request.form
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+        file_content = await asyncio.to_thread(file_obj.read)
+        files = {
+            "files": (
+                file_obj.filename,
+                file_content,
+                "application/pdf"
+            )
+        }
+        data = {
+            "output_dir": form.get("output_dir", "./output"),
+            "lang_list": form.get("lang_list") or None, 
+            "backend": form.get("backend", "pipeline"),
+            "parse_method": form.get("parse_method", "auto"), 
+            "formula_enable": form.get("formula_enable", "true").lower() == "true", 
+            "table_enable": form.get("table_enable", "true").lower() == "true", 
+            "server_url": form.get("server_url") or None, 
+            "return_md": form.get("return_md", "true").lower() == "true", 
+            "return_middle_json": form.get("return_middle_json", "true").lower() == "true", 
+            "return_model_output": form.get("return_model_output", "true").lower() == "true", 
+            "return_content_list": form.get("return_content_list", "true").lower() == "true",
+            "return_images": form.get("return_images", "true").lower() == "true", 
+            "response_format_zip": form.get("response_format_zip", "true").lower() == "true", 
+            "start_page_id": int(form.get("start_page_id", 0)), 
+            "end_page_id": int(form.get("end_page_id", 99999)), 
+        }
+
+        if not data["server_url"]:
+            mineru_server_url = os.environ.get("MINERU_SERVER_URL", "").rstrip("/")
+            if mineru_server_url:
+                data["server_url"] = mineru_server_url
+
+        headers = {"Accept": "application/json"}
+        mineru_api_url = f"{mineru_api}/file_parse"
+        response = requests.post(
+            url=mineru_api_url,
+            files=files,
+            data=data,
+            headers=headers,
+            timeout=1800 
+        )
+
+        response.raise_for_status()
+        content_type = response.headers.get("Content-Type", "")
+        
+        if "application/zip" in content_type:
+            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename)
+            return get_json_result(data=result_data)
+        else:
+            try:
+                json_data = response.json()
+                return get_json_result(data=json_data)
+            except json.JSONDecodeError:
+                return get_json_result(data={"content": response.text})
+
+    except requests.exceptions.RequestException as e:
+        return get_json_result(
+            data=False,
+            message=f"MinerU API request failed: {str(e)}",
+            code=RetCode.SERVER_ERROR
+        )
+    except Exception as e:
+        return server_error_response(e)
+
+
+def _process_mineru_zip_response(zip_content: bytes, original_filename: str) -> dict:
+    temp_dir = tempfile.mkdtemp(prefix="mineru_parse_")
+    zip_path = os.path.join(temp_dir, "response.zip")
+    extract_dir = os.path.join(temp_dir, "extracted")
+    
+    try:
+        with open(zip_path, "wb") as f:
+            f.write(zip_content)
+        
+        os.makedirs(extract_dir, exist_ok=True)
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(extract_dir)
+        
+        extract_path = Path(extract_dir)
+        content_list = None
+        content_list_file = None
+        file_stem = Path(original_filename).stem.replace(" ", "")
+        
+        possible_names = [
+            f"{file_stem}_content_list.json",
+            f"{Path(original_filename).stem}_content_list.json",
+        ]
+        
+        for name in possible_names:
+            for json_file in extract_path.rglob(name):
+                with open(json_file, "r", encoding="utf-8") as f:
+                    content_list = json.load(f)
+                    content_list_file = json_file
+                    break
+            if content_list:
+                break
+        
+        if not content_list:
+            for json_file in extract_path.rglob("*_content_list.json"):
+                with open(json_file, "r", encoding="utf-8") as f:
+                    content_list = json.load(f)
+                    content_list_file = json_file
+                    break
+        
+        markdown_content = None
+        for md_file in extract_path.rglob("*.md"):
+            with open(md_file, "r", encoding="utf-8") as f:
+                markdown_content = f.read()
+                break
+        
+        images = []
+        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+        processed_image_paths = set()
+        
+        if content_list and content_list_file:
+            for item in content_list:
+                for img_key in ["img_path", "table_img_path", "equation_img_path"]:
+                    if img_key in item and item[img_key]:
+                        img_path_str = item[img_key]
+                        if os.path.isabs(img_path_str):
+                            img_path = Path(img_path_str)
+                        else:
+                            img_path = content_list_file.parent / img_path_str
+                        
+                        if not img_path.exists():
+                            img_filename = Path(img_path_str).name
+                            found_img = None
+                            for possible_img in extract_path.rglob(img_filename):
+                                found_img = possible_img
+                                break
+                            if found_img:
+                                img_path = found_img
+                        
+                        if img_path.exists() and img_path.suffix.lower() in image_extensions:
+                            img_relative_path = str(img_path.relative_to(extract_path))
+                            
+                            if img_relative_path not in processed_image_paths:
+                                processed_image_paths.add(img_relative_path)
+                                
+                                with open(img_path, "rb") as img_file:
+                                    img_data = img_file.read()
+                                    img_base64 = base64.b64encode(img_data).decode("utf-8")
+                                    
+                                    images.append({
+                                        "path": img_relative_path,
+                                        "base64": f"data:image/{img_path.suffix[1:]};base64,{img_base64}",
+                                        "size": len(img_data),
+                                        "source_key": img_key,
+                                        "content_type": item.get("type", "unknown"),
+                                        "page_idx": item.get("page_idx", -1)
+                                    })
+        
+        for img_file in extract_path.rglob("*"):
+            if img_file.is_file() and img_file.suffix.lower() in image_extensions:
+                img_relative_path = str(img_file.relative_to(extract_path))
+                
+                if img_relative_path not in processed_image_paths:
+                    processed_image_paths.add(img_relative_path)
+                    
+                    with open(img_file, "rb") as f:
+                        img_data = f.read()
+                        img_base64 = base64.b64encode(img_data).decode("utf-8")
+                        images.append({
+                            "path": img_relative_path,
+                            "base64": f"data:image/{img_file.suffix[1:]};base64,{img_base64}",
+                            "size": len(img_data),
+                            "source_key": "standalone",
+                            "content_type": "image",
+                            "page_idx": -1
+                        })
+        
+        result = {
+            "content_list": content_list or [],
+            "count": len(content_list) if content_list else 0,
+            "markdown": markdown_content or "",
+            "images": images,
+            "image_count": len(images)
+        }
+        
+        return result
+        
+    except Exception as e:
+        return {
+            "content_list": [],
+            "count": 0,
+            "markdown": "",
+            "images": [],
+            "image_count": 0,
+            "error": f"Failed to process ZIP response: {str(e)}"
+        }
+    finally:
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
