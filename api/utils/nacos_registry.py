@@ -207,8 +207,14 @@ class NacosRegistry:
                 return False
 
         try:
+            # Nacos SDK 的 add_naming_instance 不会自动转换 service_name 格式
+            # 需要手动转换为 groupName@@serviceName 格式
+            service_name_with_group = self.service_name
+            if "@@" not in service_name_with_group and self.nacos_group:
+                service_name_with_group = f"{self.nacos_group}@@{self.service_name}"
+
             self.client.add_naming_instance(
-                service_name=self.service_name,
+                service_name=service_name_with_group,
                 ip=self.service_ip,
                 port=self.service_port,
                 cluster_name=self.cluster_name,
@@ -243,8 +249,13 @@ class NacosRegistry:
             return True
 
         try:
+            # 使用与注册相同的 service_name 格式
+            service_name_with_group = self.service_name
+            if "@@" not in service_name_with_group and self.nacos_group:
+                service_name_with_group = f"{self.nacos_group}@@{self.service_name}"
+
             self.client.remove_naming_instance(
-                service_name=self.service_name,
+                service_name=service_name_with_group,
                 ip=self.service_ip,
                 port=self.service_port,
                 group_name=self.nacos_group
@@ -273,10 +284,15 @@ class NacosRegistry:
             return False
 
         try:
+            # 传递 group_name 参数，确保心跳发送到正确的分组
             self.client.send_heartbeat(
                 service_name=self.service_name,
                 ip=self.service_ip,
-                port=self.service_port
+                port=self.service_port,
+                cluster_name=self.cluster_name,
+                weight=self.service_weight,
+                ephemeral=True,
+                group_name=self.nacos_group
             )
             return True
         except Exception as e:
