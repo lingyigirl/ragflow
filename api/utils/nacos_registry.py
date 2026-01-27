@@ -121,6 +121,20 @@ class NacosRegistry:
         self.cluster_name = get_config("NACOS_CLUSTER_NAME", "cluster_name", "DEFAULT")
         self.service_weight = get_config("NACOS_SERVICE_WEIGHT", "service_weight", "1.0", float)
 
+        # 输出实际生效的配置（包含环境变量覆盖）
+        if self._enabled:
+            logging.info(
+                f"Nacos configuration loaded (env > YAML > default):\n"
+                f"  server_addr: {self.nacos_server}\n"
+                f"  service_name: {self.service_name}\n"
+                f"  namespace: {self.nacos_namespace or 'empty'}\n"
+                f"  group: {self.nacos_group}\n"
+                f"  cluster: {self.cluster_name}\n"
+                f"  weight: {self.service_weight}\n"
+                f"  heartbeat_interval: {self.heartbeat_interval}s\n"
+                f"  enabled: {self._enabled}"
+            )
+
     def _get_local_ip(self) -> str:
         """获取本机 IP 地址
 
