@@ -34,6 +34,14 @@ except ImportError:
     NACOS_AVAILABLE = False
     logging.warning("nacos-sdk-python not installed, Nacos integration disabled")
 
+try:
+    from common.config_utils import get_base_config
+    CONFIG_UTILS_AVAILABLE = True
+except ImportError:
+    CONFIG_UTILS_AVAILABLE = False
+    get_base_config = lambda key, default=None: default
+    logging.warning("config_utils not available, using environment variables only")
+
 
 class NacosRegistry:
     """Nacos 服务注册管理类
@@ -44,15 +52,37 @@ class NacosRegistry:
     - 健康检查
     - 服务实例管理
 
+    配置优先级（从高到低）：
+        1. 环境变量
+        2. YAML 配置文件 (conf/service_conf.yaml)
+        3. 代码默认值
+
     环境变量配置：
         NACOS_SERVER_ADDR: Nacos 服务器地址（默认：127.0.0.1:8848）
         NACOS_SERVICE_NAME: 注册的服务名称（默认：ragflow-service）
         NACOS_NAMESPACE: 命名空间（默认：空字符串）
         NACOS_USERNAME: 认证用户名（默认：nacos）
         NACOS_PASSWORD: 认证密码（默认：nacos）
+        NACOS_GROUP: 服务分组（默认：DEFAULT_GROUP）
         SERVICE_IP: 服务实例 IP（默认：自动获取本机 IP）
         SERVICE_PORT: 服务端口（默认：9380）
         NACOS_ENABLED: 启用 Nacos 注册（默认：true）
+        NACOS_HEARTBEAT_INTERVAL: 心跳间隔秒数（默认：5）
+        NACOS_CLUSTER_NAME: 集群名称（默认：DEFAULT）
+        NACOS_SERVICE_WEIGHT: 服务权重（默认：1.0）
+
+    YAML 配置示例 (conf/service_conf.yaml):
+        nacos:
+          server_addr: '127.0.0.1:8848'
+          service_name: 'ragflow-service'
+          namespace: ''
+          username: 'nacos'
+          password: 'nacos'
+          group: 'DEFAULT_GROUP'
+          enabled: true
+          heartbeat_interval: 5
+          cluster_name: 'DEFAULT'
+          service_weight: 1.0
     """
 
     def __init__(self):
@@ -61,20 +91,35 @@ class NacosRegistry:
         self._heartbeat_thread: Optional[threading.Thread] = None
         self._stop_heartbeat = threading.Event()
 
-        # 从环境变量读取配置
-        self._enabled = os.environ.get("NACOS_ENABLED", "true").lower() == "true"
-        self.service_name = os.environ.get("NACOS_SERVICE_NAME", "ragflow-service")
-        self.nacos_server = os.environ.get("NACOS_SERVER_ADDR", "127.0.0.1:8848")
-        self.nacos_namespace = os.environ.get("NACOS_NAMESPACE", "")
-        self.nacos_username = os.environ.get("NACOS_USERNAME", "nacos")
-        self.nacos_password = os.environ.get("NACOS_PASSWORD", "nacos")
-        self.service_ip = os.environ.get("SERVICE_IP", self._get_local_ip())
-        self.service_port = int(os.environ.get("SERVICE_PORT", "9380"))
-        self.heartbeat_interval = int(os.environ.get("NACOS_HEARTBEAT_INTERVAL", "5"))
+        # 从 YAML 加载 nacos 配置（如果可用）
+        nacos_config = get_base_config("nacos", {}) if CONFIG_UTILS_AVAILABLE else {}
+
+        # 辅助函数：按优先级获取配置（环境变量 > YAML 配置 > 默认值）
+        def get_config(env_key: str, yaml_key: Optional[str], default, type_conv=str):
+            env_val = os.environ.get(env_key)
+            if env_val is not None:
+                return type_conv(env_val)
+            if yaml_key and nacos_config:
+                val = nacos_config.get(yaml_key, default)
+                if val is not None:
+                    return type_conv(val) if type_conv else val
+            return default
+
+        # 从配置读取（优先级：环境变量 > YAML > 默认值）
+        self._enabled = get_config("NACOS_ENABLED", "enabled", "true").lower() == "true"
+        self.service_name = get_config("NACOS_SERVICE_NAME", "service_name", "ragflow-service")
+        self.nacos_server = get_config("NACOS_SERVER_ADDR", "server_addr", "127.0.0.1:8848")
+        self.nacos_namespace = get_config("NACOS_NAMESPACE", "namespace", "")
+        self.nacos_username = get_config("NACOS_USERNAME", "username", "nacos")
+        self.nacos_password = get_config("NACOS_PASSWORD", "password", "nacos")
+        self.nacos_group = get_config("NACOS_GROUP", "group", "DEFAULT_GROUP")
+        self.service_ip = get_config("SERVICE_IP", None, self._get_local_ip())
+        self.service_port = get_config("SERVICE_PORT", None, "9380", int)
+        self.heartbeat_interval = get_config("NACOS_HEARTBEAT_INTERVAL", "heartbeat_interval", "5", int)
 
         # 集群配置
-        self.cluster_name = os.environ.get("NACOS_CLUSTER_NAME", "DEFAULT")
-        self.service_weight = float(os.environ.get("NACOS_SERVICE_WEIGHT", "1.0"))
+        self.cluster_name = get_config("NACOS_CLUSTER_NAME", "cluster_name", "DEFAULT")
+        self.service_weight = get_config("NACOS_SERVICE_WEIGHT", "service_weight", "1.0", float)
 
     def _get_local_ip(self) -> str:
         """获取本机 IP 地址
@@ -157,12 +202,13 @@ class NacosRegistry:
                 ephemeral=True,  # 临时实例，需要心跳维持
                 healthy=True,
                 enable=True,
-                group_name='DEFAULT_GROUP'
+                group_name=self.nacos_group
             )
             logging.info(
                 f"Service registered to Nacos successfully: "
                 f"name={self.service_name}, "
                 f"address={self.service_ip}:{self.service_port}, "
+                f"group={self.nacos_group}, "
                 f"cluster={self.cluster_name}, "
                 f"weight={self.service_weight}"
             )
@@ -186,12 +232,14 @@ class NacosRegistry:
             self.client.remove_naming_instance(
                 service_name=self.service_name,
                 ip=self.service_ip,
-                port=self.service_port
+                port=self.service_port,
+                group_name=self.nacos_group
             )
             logging.info(
                 f"Service deregistered from Nacos: "
                 f"name={self.service_name}, "
-                f"address={self.service_ip}:{self.service_port}"
+                f"address={self.service_ip}:{self.service_port}, "
+                f"group={self.nacos_group}"
             )
             return True
         except Exception as e:

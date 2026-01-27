@@ -50,6 +50,18 @@ user_default_llm:
     embedding_model:
       api_key: 'xxx'
       base_url: 'http://localhost:6380'
+
+nacos:
+  server_addr: '127.0.0.1:8848'
+  service_name: 'ragflow-service'
+  namespace: ''
+  username: 'nacos'
+  password: 'nacos'
+  group: 'DEFAULT_GROUP'
+  enabled: true
+  heartbeat_interval: 5
+  cluster_name: 'DEFAULT'
+  service_weight: 1.0
 # postgres:
 #   name: 'rag_flow'
 #   user: 'rag_flow'
