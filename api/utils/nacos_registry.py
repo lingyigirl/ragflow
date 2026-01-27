@@ -121,6 +121,20 @@ class NacosRegistry:
         self.cluster_name = get_config("NACOS_CLUSTER_NAME", "cluster_name", "DEFAULT")
         self.service_weight = get_config("NACOS_SERVICE_WEIGHT", "service_weight", "1.0", float)
 
+        # 输出实际生效的配置（包含环境变量覆盖）
+        if self._enabled:
+            logging.info(
+                f"Nacos configuration loaded (env > YAML > default):\n"
+                f"  server_addr: {self.nacos_server}\n"
+                f"  service_name: {self.service_name}\n"
+                f"  namespace: {self.nacos_namespace or 'empty'}\n"
+                f"  group: {self.nacos_group}\n"
+                f"  cluster: {self.cluster_name}\n"
+                f"  weight: {self.service_weight}\n"
+                f"  heartbeat_interval: {self.heartbeat_interval}s\n"
+                f"  enabled: {self._enabled}"
+            )
+
     def _get_local_ip(self) -> str:
         """获取本机 IP 地址
 
@@ -193,8 +207,14 @@ class NacosRegistry:
                 return False
 
         try:
+            # Nacos SDK 的 add_naming_instance 不会自动转换 service_name 格式
+            # 需要手动转换为 groupName@@serviceName 格式
+            service_name_with_group = self.service_name
+            if "@@" not in service_name_with_group and self.nacos_group:
+                service_name_with_group = f"{self.nacos_group}@@{self.service_name}"
+
             self.client.add_naming_instance(
-                service_name=self.service_name,
+                service_name=service_name_with_group,
                 ip=self.service_ip,
                 port=self.service_port,
                 cluster_name=self.cluster_name,
@@ -229,8 +249,13 @@ class NacosRegistry:
             return True
 
         try:
+            # 使用与注册相同的 service_name 格式
+            service_name_with_group = self.service_name
+            if "@@" not in service_name_with_group and self.nacos_group:
+                service_name_with_group = f"{self.nacos_group}@@{self.service_name}"
+
             self.client.remove_naming_instance(
-                service_name=self.service_name,
+                service_name=service_name_with_group,
                 ip=self.service_ip,
                 port=self.service_port,
                 group_name=self.nacos_group
@@ -259,10 +284,15 @@ class NacosRegistry:
             return False
 
         try:
+            # 传递 group_name 参数，确保心跳发送到正确的分组
             self.client.send_heartbeat(
                 service_name=self.service_name,
                 ip=self.service_ip,
-                port=self.service_port
+                port=self.service_port,
+                cluster_name=self.cluster_name,
+                weight=self.service_weight,
+                ephemeral=True,
+                group_name=self.nacos_group
             )
             return True
         except Exception as e:
@@ -364,5 +394,22 @@ class NacosRegistry:
             return []
 
 
-# 全局 Nacos 注册实例
-nacos_registry = NacosRegistry()
+# 全局 Nacos 注册实例（延迟初始化，确保环境变量已加载）
+_nacos_registry_instance = None
+_nacos_lock = threading.Lock()
+
+def get_nacos_registry() -> NacosRegistry:
+    """获取 Nacos 注册实例（单例模式，延迟初始化）
+
+    第一次调用时才创建实例，确保环境变量已加载。
+
+    Returns:
+        NacosRegistry: Nacos 注册实例
+    """
+    global _nacos_registry_instance
+    if _nacos_registry_instance is None:
+        with _nacos_lock:
+            # 双重检查锁定
+            if _nacos_registry_instance is None:
+                _nacos_registry_instance = NacosRegistry()
+    return _nacos_registry_instance
