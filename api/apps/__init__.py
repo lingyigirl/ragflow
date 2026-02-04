@@ -112,7 +112,6 @@ def _load_user():
 
     try:
         access_token = str(jwt.loads(authorization))
-
         if not access_token or not access_token.strip():
             logging.warning("Authentication attempt with empty access token")
             return None

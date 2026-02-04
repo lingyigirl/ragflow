@@ -920,6 +920,75 @@ async def upload_info():
 @login_required
 async def mineru_parse():
     try:
+        form = await request.form
+        files_data = await request.files
+        has_file = "file" in files_data and files_data["file"] and getattr(files_data["file"], "filename", "") != ""
+        doc_id = (form.get("doc_id") or "").strip()
+        kb_id = (form.get("kb_id") or "").strip()
+        has_doc_kb = bool(doc_id and kb_id)
+
+        if not has_file and has_doc_kb:
+            e, kb = KnowledgebaseService.get_by_id(kb_id)
+            if not e:
+                return get_json_result(data=False, message="知识库不存在", code=RetCode.NOT_FOUND)
+            check_kb_team_permission(kb, current_user.id)
+            e, doc = DocumentService.get_by_id(doc_id)
+            if not e or not doc:
+                return get_json_result(data=False, message="文档不存在", code=RetCode.NOT_FOUND)
+            if str(doc.kb_id) != str(kb_id):
+                return get_json_result(data=False, message="文档不属于该知识库", code=RetCode.ARGUMENT_ERROR)
+            content_list_location = f"{doc_id}/content_list.json"
+            if not settings.STORAGE_IMPL.obj_exist(kb_id, content_list_location):
+                return get_json_result(
+                    data=False,
+                    message="该文档暂无 MinerU 解析产物（未解析或非 MinerU 解析）",
+                    code=RetCode.NOT_FOUND
+                )
+            def _minio_path(bkt, key):
+                return f"{bkt}/{key}"
+
+            content_list_url = _minio_path(kb_id, content_list_location)
+            markdown_url = None
+            image_urls = []
+            list_fn = getattr(settings.STORAGE_IMPL, "list_objects", None)
+            if callable(list_fn):
+                keys = list_fn(kb_id, f"{doc_id}/")
+                image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+                for key in keys:
+                    key_lower = key.lower()
+                    if key_lower.endswith(".md") and markdown_url is None:
+                        markdown_url = _minio_path(kb_id, key)
+                    elif any(key_lower.endswith(ext) for ext in image_extensions):
+                        image_urls.append({
+                            "url": _minio_path(kb_id, key),
+                            "path": key,
+                            "filename": Path(key).name,
+                            "location": key,
+                            "size": 0,
+                            "source_key": "image",
+                            "content_type": "image",
+                            "page_idx": -1,
+                        })
+            try:
+                content_list_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, content_list_location)
+                content_list = json.loads((content_list_bin or b"[]").decode("utf-8")) if content_list_bin else []
+            except Exception:
+                content_list = []
+            return get_json_result(data={
+                "content_list_url": content_list_url,
+                "markdown_url": markdown_url,
+                "image_urls": image_urls,
+                "image_count": len(image_urls),
+                "count": len(content_list),
+                "source": "kb_doc",
+            })
+
+        if not has_file:
+            return get_json_result(
+                data=False,
+                message="请提供 PDF 文件（file）或文档 id 与知识库 id（doc_id、kb_id）",
+                code=RetCode.ARGUMENT_ERROR
+            )
         mineru_api = os.environ.get("MINERU_APISERVER", "").rstrip("/")
         if not mineru_api:
             return get_json_result(
@@ -928,22 +997,7 @@ async def mineru_parse():
                 code=RetCode.SERVER_ERROR
             )
 
-        files_data = await request.files
-        if "file" not in files_data:
-            return get_json_result(
-                data=False,
-                message="No file part! Please provide a PDF file.",
-                code=RetCode.ARGUMENT_ERROR
-            )
-
         file_obj = files_data["file"]
-        if file_obj.filename == "":
-            return get_json_result(
-                data=False,
-                message="No file selected!",
-                code=RetCode.ARGUMENT_ERROR
-            )
-        form = await request.form
         if hasattr(file_obj, 'seek'):
             file_obj.seek(0)
         file_content = await asyncio.to_thread(file_obj.read)
@@ -990,8 +1044,176 @@ async def mineru_parse():
         response.raise_for_status()
         content_type = response.headers.get("Content-Type", "")
         
+        user_id = current_user.id
+        
+        def _process_mineru_zip_response(zip_content: bytes, original_filename: str, user_id: str) -> dict:
+            temp_dir = tempfile.mkdtemp(prefix="mineru_parse_")
+            zip_path = os.path.join(temp_dir, "response.zip")
+            extract_dir = os.path.join(temp_dir, "extracted")
+            
+            try:
+                parse_id = get_uuid()
+                base_prefix = f"mineru_parse/{parse_id}"
+                
+                with open(zip_path, "wb") as f:
+                    f.write(zip_content)
+                
+                os.makedirs(extract_dir, exist_ok=True)
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(extract_dir)
+                
+                extract_path = Path(extract_dir)
+                content_list = None
+                content_list_file = None
+                file_stem = Path(original_filename).stem.replace(" ", "")
+                
+                possible_names = [
+                    f"{file_stem}_content_list.json",
+                    f"{Path(original_filename).stem}_content_list.json",
+                ]
+                
+                for name in possible_names:
+                    for json_file in extract_path.rglob(name):
+                        with open(json_file, "r", encoding="utf-8") as f:
+                            content_list = json.load(f)
+                            content_list_file = json_file
+                            break
+                    if content_list:
+                        break
+                
+                if not content_list:
+                    for json_file in extract_path.rglob("*_content_list.json"):
+                        with open(json_file, "r", encoding="utf-8") as f:
+                            content_list = json.load(f)
+                            content_list_file = json_file
+                            break
+                
+                content_list_url = None
+                if content_list and content_list_file:
+                    content_list_location = f"{base_prefix}/content_list.json"
+                    content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
+                    settings.STORAGE_IMPL.put(user_id, content_list_location, content_list_json_str.encode("utf-8"))
+
+                    content_list_location_encoded = base64.urlsafe_b64encode(content_list_location.encode("utf-8")).decode("utf-8").rstrip("=")
+                    content_list_url = f"/v1/document/download/{content_list_location_encoded}?ext=json"
+                
+
+                markdown_url = None
+                markdown_file = None
+                for md_file in extract_path.rglob("*.md"):
+                    markdown_file = md_file
+                    with open(md_file, "r", encoding="utf-8") as f:
+                        markdown_content = f.read()
+
+                        markdown_location = f"{base_prefix}/{md_file.name}"
+                        settings.STORAGE_IMPL.put(user_id, markdown_location, markdown_content.encode("utf-8"))
+
+                        markdown_location_encoded = base64.urlsafe_b64encode(markdown_location.encode("utf-8")).decode("utf-8").rstrip("=")
+                        markdown_url = f"/v1/document/download/{markdown_location_encoded}?ext=markdown"
+                        break
+                
+                image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+                processed_image_paths = set()
+                image_files_to_upload = []
+                
+
+                if content_list and content_list_file:
+                    for item in content_list:
+                        for img_key in ["img_path", "table_img_path", "equation_img_path"]:
+                            if img_key in item and item[img_key]:
+                                img_path_str = item[img_key]
+                                if os.path.isabs(img_path_str):
+                                    img_path = Path(img_path_str)
+                                else:
+                                    img_path = content_list_file.parent / img_path_str
+                                
+                                if not img_path.exists():
+                                    img_filename = Path(img_path_str).name
+                                    found_img = None
+                                    for possible_img in extract_path.rglob(img_filename):
+                                        found_img = possible_img
+                                        break
+                                    if found_img:
+                                        img_path = found_img
+                                
+                                if img_path.exists() and img_path.suffix.lower() in image_extensions:
+                                    img_relative_path = str(img_path.relative_to(extract_path))
+                                    
+                                    if img_relative_path not in processed_image_paths:
+                                        processed_image_paths.add(img_relative_path)
+                                        image_files_to_upload.append({
+                                            "path": img_path,
+                                            "relative_path": img_relative_path,
+                                            "source_key": img_key,
+                                            "content_type": item.get("type", "unknown"),
+                                            "page_idx": item.get("page_idx", -1)
+                                        })
+                
+                for img_file in extract_path.rglob("*"):
+                    if img_file.is_file() and img_file.suffix.lower() in image_extensions:
+                        img_relative_path = str(img_file.relative_to(extract_path))
+                        
+                        if img_relative_path not in processed_image_paths:
+                            processed_image_paths.add(img_relative_path)
+                            image_files_to_upload.append({
+                                "path": img_file,
+                                "relative_path": img_relative_path,
+                                "source_key": "standalone",
+                                "content_type": "image",
+                                "page_idx": -1
+                            })
+                
+                image_urls = []
+                for img_info in image_files_to_upload:
+                    img_path = img_info["path"]
+                    img_filename = img_path.name
+                    
+                    with open(img_path, "rb") as img_file:
+                        img_data = img_file.read()
+                    
+                    img_location = f"{base_prefix}/images/{img_filename}"
+                    settings.STORAGE_IMPL.put(user_id, img_location, img_data)
+                    
+                    img_location_encoded = base64.urlsafe_b64encode(img_location.encode("utf-8")).decode("utf-8").rstrip("=")
+                    img_url = f"/v1/document/download/{img_location_encoded}?ext={img_path.suffix[1:] if img_path.suffix else 'png'}"
+                    image_urls.append({
+                        "url": img_url,
+                        "path": img_info["relative_path"],
+                        "filename": img_filename,
+                        "location": img_location, 
+                        "size": len(img_data),
+                        "source_key": img_info["source_key"],
+                        "content_type": img_info["content_type"],
+                        "page_idx": img_info["page_idx"]
+                    })
+                
+                result = {
+                    "content_list_url": content_list_url,
+                    "markdown_url": markdown_url,
+                    "image_urls": image_urls,
+                    "image_count": len(image_urls),
+                    "count": len(content_list) if content_list else 0,
+                    "source": "file_parse",
+                }
+                return result
+                
+            except Exception as e:
+                return {
+                    "content_list_url": None,
+                    "markdown_url": None,
+                    "image_urls": [],
+                    "image_count": 0,
+                    "count": 0,
+                    "error": f"Failed to process ZIP response: {str(e)}"
+                }
+            finally:
+                try:
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                except Exception:
+                    pass        
+
         if "application/zip" in content_type:
-            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename)
+            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename, user_id)
             return get_json_result(data=result_data)
         else:
             try:
@@ -1009,134 +1231,3 @@ async def mineru_parse():
     except Exception as e:
         return server_error_response(e)
 
-
-def _process_mineru_zip_response(zip_content: bytes, original_filename: str) -> dict:
-    temp_dir = tempfile.mkdtemp(prefix="mineru_parse_")
-    zip_path = os.path.join(temp_dir, "response.zip")
-    extract_dir = os.path.join(temp_dir, "extracted")
-    
-    try:
-        with open(zip_path, "wb") as f:
-            f.write(zip_content)
-        
-        os.makedirs(extract_dir, exist_ok=True)
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(extract_dir)
-        
-        extract_path = Path(extract_dir)
-        content_list = None
-        content_list_file = None
-        file_stem = Path(original_filename).stem.replace(" ", "")
-        
-        possible_names = [
-            f"{file_stem}_content_list.json",
-            f"{Path(original_filename).stem}_content_list.json",
-        ]
-        
-        for name in possible_names:
-            for json_file in extract_path.rglob(name):
-                with open(json_file, "r", encoding="utf-8") as f:
-                    content_list = json.load(f)
-                    content_list_file = json_file
-                    break
-            if content_list:
-                break
-        
-        if not content_list:
-            for json_file in extract_path.rglob("*_content_list.json"):
-                with open(json_file, "r", encoding="utf-8") as f:
-                    content_list = json.load(f)
-                    content_list_file = json_file
-                    break
-        
-        markdown_content = None
-        for md_file in extract_path.rglob("*.md"):
-            with open(md_file, "r", encoding="utf-8") as f:
-                markdown_content = f.read()
-                break
-        
-        images = []
-        image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
-        processed_image_paths = set()
-        
-        if content_list and content_list_file:
-            for item in content_list:
-                for img_key in ["img_path", "table_img_path", "equation_img_path"]:
-                    if img_key in item and item[img_key]:
-                        img_path_str = item[img_key]
-                        if os.path.isabs(img_path_str):
-                            img_path = Path(img_path_str)
-                        else:
-                            img_path = content_list_file.parent / img_path_str
-                        
-                        if not img_path.exists():
-                            img_filename = Path(img_path_str).name
-                            found_img = None
-                            for possible_img in extract_path.rglob(img_filename):
-                                found_img = possible_img
-                                break
-                            if found_img:
-                                img_path = found_img
-                        
-                        if img_path.exists() and img_path.suffix.lower() in image_extensions:
-                            img_relative_path = str(img_path.relative_to(extract_path))
-                            
-                            if img_relative_path not in processed_image_paths:
-                                processed_image_paths.add(img_relative_path)
-                                
-                                with open(img_path, "rb") as img_file:
-                                    img_data = img_file.read()
-                                    img_base64 = base64.b64encode(img_data).decode("utf-8")
-                                    
-                                    images.append({
-                                        "path": img_relative_path,
-                                        "base64": f"data:image/{img_path.suffix[1:]};base64,{img_base64}",
-                                        "size": len(img_data),
-                                        "source_key": img_key,
-                                        "content_type": item.get("type", "unknown"),
-                                        "page_idx": item.get("page_idx", -1)
-                                    })
-        
-        for img_file in extract_path.rglob("*"):
-            if img_file.is_file() and img_file.suffix.lower() in image_extensions:
-                img_relative_path = str(img_file.relative_to(extract_path))
-                
-                if img_relative_path not in processed_image_paths:
-                    processed_image_paths.add(img_relative_path)
-                    
-                    with open(img_file, "rb") as f:
-                        img_data = f.read()
-                        img_base64 = base64.b64encode(img_data).decode("utf-8")
-                        images.append({
-                            "path": img_relative_path,
-                            "base64": f"data:image/{img_file.suffix[1:]};base64,{img_base64}",
-                            "size": len(img_data),
-                            "source_key": "standalone",
-                            "content_type": "image",
-                            "page_idx": -1
-                        })
-        
-        result = {
-            "content_list": content_list or [],
-            "count": len(content_list) if content_list else 0,
-            "markdown": markdown_content or "",
-            "images": images,
-            "image_count": len(images)
-        }
-        
-        return result
-        
-    except Exception as e:
-        return {
-            "content_list": [],
-            "count": 0,
-            "markdown": "",
-            "images": [],
-            "image_count": 0,
-            "error": f"Failed to process ZIP response: {str(e)}"
-        }
-    finally:
-        try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
-        except Exception:
-            pass

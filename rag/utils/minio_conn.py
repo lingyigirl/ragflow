@@ -138,6 +138,35 @@ class RAGFlowMinio:
         except Exception:
             logging.exception(f"Fail to remove {bucket}/{fnm}:")
 
+    def list_objects(self, bucket, prefix, recursive=True):
+        try:
+            orig_bucket = bucket
+            actual_bucket = self.bucket if self.bucket else bucket
+            if self.bucket:
+                if self.prefix_path:
+                    full_prefix = f"{self.prefix_path}/{orig_bucket}/{prefix}"
+                else:
+                    full_prefix = f"{orig_bucket}/{prefix}"
+            else:
+                full_prefix = f"{self.prefix_path}/{prefix}" if self.prefix_path else prefix
+            objects = self.conn.list_objects(actual_bucket, prefix=full_prefix, recursive=recursive)
+            keys = []
+            for obj in objects:
+                name = obj.object_name
+                if self.bucket and orig_bucket:
+                    strip = f"{orig_bucket}/"
+                    if self.prefix_path:
+                        strip = f"{self.prefix_path}/{orig_bucket}/"
+                    if name.startswith(strip):
+                        name = name[len(strip):]
+                elif self.prefix_path and name.startswith(self.prefix_path + "/"):
+                    name = name[len(self.prefix_path) + 1:]
+                keys.append(name)
+            return keys
+        except Exception:
+            logging.exception(f"Fail to list_objects {bucket}/{prefix}")
+            return []
+
     @use_default_bucket
     @use_prefix_path
     def get(self, bucket, filename, tenant_id=None):

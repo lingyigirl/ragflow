@@ -1,0 +1,2052 @@
+[
+    {
+        "type": "text",
+        "text": "企业信用报告",
+        "text_level": 1,
+        "bbox": [
+            364,
+            244,
+            631,
+            280
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "（自主查询版）",
+        "text_level": 1,
+        "bbox": [
+            416,
+            306,
+            579,
+            328
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "企业名称： 东莞市讯康电子科技股份有限公司",
+        "bbox": [
+            238,
+            565,
+            833,
+            590
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "中征码： 4419010004167753",
+        "bbox": [
+            240,
+            606,
+            678,
+            625
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "统一社会信用代码： 914419005536339328",
+        "bbox": [
+            238,
+            642,
+            704,
+            662
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "查询机构： 中国银行股份有限公司东莞分行",
+        "bbox": [
+            238,
+            679,
+            805,
+            700
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "报告时间： 2024-08-29T09:09:45",
+        "bbox": [
+            240,
+            714,
+            700,
+            736
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "雪",
+        "bbox": [
+            75,
+            52,
+            136,
+            95
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "中国人民银行",
+        "bbox": [
+            147,
+            46,
+            302,
+            57
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "征信中心",
+        "bbox": [
+            147,
+            59,
+            302,
+            85
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "CREDIT REFERENCE CENTER, PEOPLES BANK OF CHINA",
+        "bbox": [
+            149,
+            87,
+            302,
+            105
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "header",
+        "text": "NO.2024082909094543881634",
+        "bbox": [
+            600,
+            60,
+            929,
+            79
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "page_number",
+        "text": "第1页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 0
+    },
+    {
+        "type": "text",
+        "text": "报告说明",
+        "text_level": 1,
+        "bbox": [
+            440,
+            51,
+            554,
+            73
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "list",
+        "sub_type": "text",
+        "list_items": [
+            "1. 本报告由中国人民银行征信中心出具，依据截止报告时间征信系统记录的信息生成。除征信中心标注外，信息均由相关数据提供机构和信息主体提供，征信中心不保证其真实性和准确性，但承诺在信息汇总、加工、整合的全过程中保持客观、中立的地位。",
+            "2. 本报告所展示的基本信息来自征信系统对不同数据来源提供的同一个信息主体基本信息进行整合后的结果。",
+            "3. 本报告中信贷交易包括借贷交易和担保交易。",
+            "4. 本报告中借贷交易包括各种形式的贷款，也包括以各种其他名义融资但实质上是借贷的行为，即融资方负有明确还款责任的交易。常见的产品种类包括：贷款、贸易融资、票据贴现、保理、透支、融资租赁、回购、垫款、黄金证券借贷、公司信用债等。",
+            "5. 本报告中担保交易指第三人和债权人约定，当债务人不履行债务时，第三人按约定履行债务的行为。包括名义上没有担保合同约定但当债务人违约时、第三人实质上要代偿的行为。常见的产品种类包括：银行承兑汇票、信用证、银行保函、融资担保公司提供的担保服务，保险公司提供的信用保证保险服务。",
+            "6. 本报告中被追偿业务是指剩余本息处于催收状态（即债权人要求债务人尽快归还全部借款）的借贷交易。常见的产品种类包括：由资产管理公司处置的债务、垫款（含担保代偿）。",
+            "7. 本报告中的短期借款、中长期借款是指借贷交易中除被追偿业务、循环透支、贴现之外的业务，按照“借款期限分类”划分，分别对应其中的短期、中期和长期。",
+            "8. 本报告中借贷交易的正常类是指除被追偿业务之外，五级分类为正常或者五级分类为“未分类”且逾期天数为0的业务；关注类是指除被追偿业务之外，五级分类为关注或者五级分类为“未分类”且逾期0至90天的业务；不良类是指除被追偿业务之外，五级分类为“次级”、“可疑”、“损失”、“违约”或者五级分类为“未分类”且逾期90天以上的业务。",
+            "9. 本报告中担保交易的正常类、关注类、不良类分别对应五级分类为正常、关注和后三类的业务。",
+            "10. 本报告中信息概要部分中的负债历史信息，其中负债是指由信贷交易所产生的债务；逾期总额、逾期本金是指除被追偿业务之外的借贷交易的逾期总额（含欠息）合计及逾期本金合计。",
+            "11. 本报告仅展示一定期限范围内的已结清信贷信息、非信贷信息、公共信息。",
+            "12. 如无特别说明，本报告中的金额类数据项单位均为万元。",
+            "13. 如无特别说明，本报告中的金额类汇总数据项均为人民币计价。外币折人民币的计算依据国家外汇管理局当月公布的各种货币对美元折算率表。",
+            "14. 如信息记录斜体展示，则说明信息主体对此条记录存在异议。",
+            "15. 数据提供机构说明是报数机构对报告中的信息记录或对信息主体所作的补充说明。",
+            "16. 征信中心说明是征信中心对报告中的信息记录或对信息主体所作的说明。",
+            "17. 信息主体声明是信息主体对报数机构提供的信息记录所作的简要说明。",
+            "18. 信息主体有权对本报告中的内容提出异议。如有异议，可联系报数机构，也可到当地信用报告查询网点（具体地址可查询征信中心网站www.pbccrc.org.cn）提出异议申请。",
+            "19. 本报告仅向信息主体提供，不为金融机构授信管理目的使用，请妥善保管。因保管不当造成信息泄露的，征信中心不承担相关责任。",
+            "20. 更多咨询，请致电全国客户服务热线400-810-8866。"
+        ],
+        "bbox": [
+            63,
+            93,
+            924,
+            539
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "汇率（美元折人民币）：7.13 有效期：2024-08",
+        "bbox": [
+            63,
+            542,
+            426,
+            554
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "page_number",
+        "text": "第2页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 1
+    },
+    {
+        "type": "text",
+        "text": "身份标识",
+        "text_level": 1,
+        "bbox": [
+            442,
+            51,
+            554,
+            73
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/c07ac8ce29e4e03d7c8317cae3e6915cb6d60223bf878ad03376e7191368f1ee.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>企业名称</td><td>东莞市讯康电子科技股份有限公司</td></tr><tr><td>中征码</td><td>4419010004167753</td></tr><tr><td>统一社会信用代码</td><td>914419005536339328</td></tr><tr><td>组织机构代码</td><td>553633932</td></tr><tr><td>工商注册号</td><td>914419005536339328</td></tr><tr><td>纳税人识别号（国税）</td><td>914419005536339328</td></tr><tr><td>纳税人识别号（地税）</td><td>914419005536339328</td></tr></table>",
+        "bbox": [
+            65,
+            90,
+            931,
+            251
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "text",
+        "text": "信息概要",
+        "text_level": 1,
+        "bbox": [
+            442,
+            282,
+            554,
+            304
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/b53023bbd1ed1c9437fe2d126a12953f5013cffbc181c71855f999a23b69703c.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>首次有信贷交易的年份</td><td>发生信贷交易的机构数</td><td>当前有未结清信贷\n交易的机构数</td><td>首次有相关还款\n责任的年份</td></tr><tr><td>2012</td><td>3</td><td>1</td><td>2022</td></tr></table>",
+        "bbox": [
+            65,
+            321,
+            931,
+            380
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/9bed53a73a39d70aba125471ad4c3d198455db0e439312f609ff59c74b9e9e02.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td colspan=\"2\">借贷交易</td><td colspan=\"2\">担保交易</td></tr><tr><td>余额</td><td>0</td><td>余额</td><td>0</td></tr><tr><td>其中:被追偿余额</td><td>0</td><td>其中:关注类余额</td><td>0</td></tr><tr><td>关注类余额</td><td>0</td><td>不良类余额</td><td>0</td></tr><tr><td>不良类余额</td><td>0</td><td></td><td></td></tr></table>",
+        "bbox": [
+            65,
+            399,
+            931,
+            514
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/e739ef0a6e22136c314118d97d8b7d0ceddac293396d57ea2f5a5d8ae2d962dd.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>非信贷交易账户数</td><td>欠税记录条数</td><td>民事判决记录条数</td><td>强制执行记录条数</td><td>行政处罚记录条数</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>",
+        "bbox": [
+            65,
+            534,
+            931,
+            581
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/3c5661c401abc0b5e6ff0abdf6f66e98f8a4a71df70657485ddf12523bda4f19.jpg",
+        "table_caption": [
+            "未结清信贷及授信信息概要"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\"></td><td colspan=\"2\">正常类</td><td colspan=\"2\">关注类</td><td colspan=\"2\">不良类</td><td colspan=\"2\">合计</td></tr><tr><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td></tr><tr><td>中长期借款</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td><td>0</td></tr><tr><td>短期借款</td><td>3</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>3</td><td>0</td></tr><tr><td>合计</td><td>4</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>4</td><td>0</td></tr></table>",
+        "bbox": [
+            65,
+            628,
+            931,
+            744
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/6ac0f1b8953f6f00a7ece90cd9e9153c75c6ea4eb42f2306a90200dcbe25f66b.jpg",
+        "table_caption": [
+            "相关还款责任信息概要"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">责任类型</td><td colspan=\"3\">被追偿业务</td><td colspan=\"5\">其他借贷交易</td></tr><tr><td>还款责任金额</td><td>账户数</td><td>余额</td><td>还款责任金额</td><td>账户数</td><td>余额</td><td>关注类余额</td><td>不良类余额</td></tr><tr><td>保证人/反担保人</td><td>0</td><td>0</td><td>0</td><td>500</td><td>1</td><td>500</td><td>0</td><td>0</td></tr><tr><td>合计</td><td>0</td><td>0</td><td>0</td><td>500</td><td>1</td><td>500</td><td>0</td><td>0</td></tr></table>",
+        "bbox": [
+            65,
+            790,
+            931,
+            894
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "page_number",
+        "text": "第3页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 2
+    },
+    {
+        "type": "table",
+        "img_path": "images/cdcf9cef8afdc9a454d4851f9f15b7adae450fa360e950bf92bf095c3a702d8b.jpg",
+        "table_caption": [
+            "已结清信贷信息概要"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td></td><td>正常类账户数</td><td>关注类账户数</td><td>不良类账户数</td><td>合计</td></tr><tr><td>中长期借款</td><td>3</td><td>0</td><td>0</td><td>3</td></tr><tr><td>短期借款</td><td>15</td><td>0</td><td>0</td><td>15</td></tr><tr><td>合计</td><td>18</td><td>0</td><td>0</td><td>18</td></tr></table>",
+        "bbox": [
+            65,
+            67,
+            931,
+            161
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "images/051ada28632dff859d4a464b4a70714e2019c201d9a8a71785dcae3ede2759ae.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td></td><td>正常类账户数</td><td>关注类账户数</td><td>不良类账户数</td><td>合计</td></tr><tr><td>银行承兑汇票</td><td>284</td><td>0</td><td>0</td><td>284</td></tr><tr><td>合计</td><td>284</td><td>0</td><td>0</td><td>284</td></tr></table>",
+        "bbox": [
+            65,
+            179,
+            931,
+            250
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "text",
+        "text": "基本信息",
+        "text_level": 1,
+        "bbox": [
+            442,
+            281,
+            554,
+            302
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "images/7d8d2a2db01678ec73f81902c7abe5d9c253357c9239ab63b27bb7abd6fe365e.jpg",
+        "table_caption": [
+            "基本概况信息"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>经济类型</td><td>内资</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>组织机构类型</td><td>企业</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>企业规模</td><td>小型企业</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>所属行业</td><td>电阻电容电感元件制造</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>成立年份</td><td>2010</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>登记证书有效截止日期</td><td>长期</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>登记地址</td><td>中国广东省东莞市市辖区塘厦镇林村里牙塘工业区145号</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>办公/经营地址</td><td>中国广东省东莞市塘厦镇林村里牙塘工业区145号</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr><tr><td>存续状态</td><td>正常营业</td><td>信息来源机构</td><td>中国银行股份有限公司东莞分行</td></tr></table>",
+        "bbox": [
+            65,
+            347,
+            931,
+            649
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "images/f14fd7364cc02d6bc08509fe2fcf248ed90b98e001fd11f68dc1ca40813e69c0.jpg",
+        "table_caption": [
+            "注册资本及主要出资人信息",
+            "注册资本折人民币合计2460万元"
+        ],
+        "table_footnote": [
+            "信息来源机构：中国邮政储蓄银行股份有限公司东莞市分行",
+            "更新日期：2022-12-16"
+        ],
+        "table_body": "<table><tr><td>类型</td><td>出资方</td><td>身份标识类型</td><td>身份标识号码</td><td>出资比例</td></tr><tr><td>股东</td><td>杨逢春</td><td>身份证</td><td>362102197804120010</td><td>75.23%</td></tr><tr><td>股东</td><td>东莞市康瑞企业管理合伙企业</td><td>组织机构代码</td><td>MA4UUD051</td><td>10.34%</td></tr><tr><td>股东</td><td>赖美娟</td><td>身份证</td><td>362102198011150046</td><td>8.67%</td></tr></table>",
+        "bbox": [
+            65,
+            710,
+            931,
+            814
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "images/a12dfb4c48bc6966f873dbbb33cdba00d047ba6eb5fc73ea735267083ac00668.jpg",
+        "table_caption": [
+            "主要组成人员信息"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>职位</td><td>姓名</td><td>证件类型</td><td>证件号码</td></tr><tr><td>财务负责人</td><td>刘丽青</td><td>身份证</td><td>360781199008253686</td></tr><tr><td>法定代表人/非法人组织负责人</td><td>杨逢春</td><td>身份证</td><td>362102197804120010</td></tr><tr><td colspan=\"4\">信息来源机构：中国银行股份有限公司东莞分行 更新日期：2023-12-05</td></tr></table>",
+        "bbox": [
+            65,
+            883,
+            931,
+            931
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "page_number",
+        "text": "第4页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 3
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            65,
+            39,
+            931,
+            100
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/8b3ad432c2a4c58df4a48ba6fb91f9591562bcc038635ad909eb367b71cb14fe.jpg",
+        "table_caption": [
+            "实际控制人"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>名称</td><td>身份标识类型</td><td>身份标识号码</td></tr><tr><td>杨逢春</td><td>身份证</td><td>362102197804120010</td></tr><tr><td colspan=\"3\">信息来源机构：中国邮政储蓄银行股份有限公司东莞市分行 更新日期：2022-12-16</td></tr></table>",
+        "bbox": [
+            65,
+            144,
+            931,
+            214
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "信贷记录明细",
+        "text_level": 1,
+        "bbox": [
+            415,
+            245,
+            581,
+            268
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "text",
+        "text": "未结清信贷",
+        "text_level": 1,
+        "bbox": [
+            65,
+            294,
+            196,
+            311
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/23bc948c7d2dea3cecb0692c25880bffedeeefc4ed97fec692d5b1cbaf90521b.jpg",
+        "table_caption": [
+            "中长期借款",
+            "共1笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"3\">账户编号</td><td>授信机构</td><td>业务种类</td><td>开立日期</td><td>到期日</td><td>币种</td><td>借款金额</td><td>发放形式</td></tr><tr><td>担保方式</td><td>余额</td><td>五级分类</td><td>逾期总额</td><td>逾期本金</td><td>逾期月数</td><td>最近一次还款日期</td></tr><tr><td>最近一次还款总额</td><td>最近一次还款形式</td><td>特定交易提示</td><td>授信协议编号</td><td>历史表现</td><td colspan=\"2\">信息报告日期</td></tr><tr><td rowspan=\"3\">B10311 000H00 017146 726496 57</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2019-12-13</td><td>2022-11-11</td><td>人民币元</td><td>700</td><td>新增</td></tr><tr><td>信用/无担保</td><td>0</td><td>正常</td><td>0</td><td>0</td><td>0</td><td>2022-11-11</td></tr><tr><td>547.40</td><td>正常还款</td><td>--</td><td>B10311000H 00010000003 0011890156</td><td>见附件</td><td colspan=\"2\">2024-07-31</td></tr></table>",
+        "bbox": [
+            65,
+            338,
+            931,
+            530
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "images/c44a99a9a0bd2d1b5db698b98180dca6061a17ea1128332fa1a7d138d0146319.jpg",
+        "table_caption": [
+            "短期借款",
+            "共3笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"3\">账户编号</td><td>授信机构</td><td>业务种类</td><td>开立日期</td><td>到期日</td><td>币种</td><td>借款金额</td><td>发放形式</td></tr><tr><td>担保方式</td><td>余额</td><td>五级分类</td><td>逾期总额</td><td>逾期本金</td><td>逾期月数</td><td>最近一次还款日期</td></tr><tr><td>最近一次还款总额</td><td>最近一次还款形式</td><td>特定交易提示</td><td>授信协议编号</td><td>历史表现</td><td colspan=\"2\">信息报告日期</td></tr><tr><td rowspan=\"3\">B10311000H0001647073798013</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2020-10-13</td><td>2021-10-12</td><td>人民币元</td><td>300</td><td>新增</td></tr><tr><td>保证</td><td>0</td><td>正常</td><td>0</td><td>0</td><td>0</td><td>2021-10-12</td></tr><tr><td>300.67</td><td>正常还款</td><td>--</td><td>B10311000H000100000030012268746</td><td>见附件</td><td colspan=\"2\">2024-07-31</td></tr><tr><td rowspan=\"3\">B10311000H0001702975026761</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2021-10-15</td><td>2022-10-13</td><td>人民币元</td><td>300</td><td>收回再贷</td></tr><tr><td>信用/无担保</td><td>0</td><td>正常</td><td>0</td><td>0</td><td>0</td><td>2022-10-13</td></tr><tr><td>300.72</td><td>正常还款</td><td>--</td><td>B10311000H000100000030012852450</td><td>见附件</td><td colspan=\"2\">2024-07-31</td></tr><tr><td rowspan=\"2\">B10311000H00017198767043</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2023-01-10</td><td>2024-01-05</td><td>人民币元</td><td>300</td><td>新增</td></tr><tr><td>信用/无担保</td><td>0</td><td>正常</td><td>0</td><td>0</td><td>0</td><td>2023-10-10</td></tr><tr><td>72</td><td>300.59</td><td>正常还款</td><td>提前还款</td><td>B10311000H\n00010000003\n0013760362</td><td>见附件</td><td>2024-07-31</td></tr></table>",
+        "bbox": [
+            65,
+            576,
+            931,
+            922
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "page_number",
+        "text": "第5页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 4
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            65,
+            40,
+            931,
+            87
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "text",
+        "text": "已结清信贷",
+        "text_level": 1,
+        "bbox": [
+            65,
+            114,
+            194,
+            131
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/7ab66d3b885948a6ec30e3f5928b0a30b18c8c5423226d8309d6fa5b9b336041.jpg",
+        "table_caption": [
+            "中长期借款",
+            "共3笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">账户编号</td><td>授信机构</td><td>业务种类</td><td>开立日期</td><td colspan=\"2\">到期日</td><td>币种</td><td>借款金额</td></tr><tr><td>关闭日期</td><td>五级分类</td><td colspan=\"2\">最后一次还款日期</td><td colspan=\"2\">最后一次还款形式</td><td>历史表现</td></tr><tr><td rowspan=\"2\">700370327714</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2018-06-08</td><td colspan=\"2\">2021-06-07</td><td>人民币元</td><td>700</td></tr><tr><td>2019-11-14</td><td>正常</td><td colspan=\"2\">2019-11-14</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">693869748180</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2018-01-29</td><td colspan=\"2\">2021-01-28</td><td>人民币元</td><td>500</td></tr><tr><td>2019-09-10</td><td>正常</td><td colspan=\"2\">2019-09-10</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">696470002877</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2018-04-02</td><td colspan=\"2\">2021-03-27</td><td>人民币元</td><td>100</td></tr><tr><td>2018-06-04</td><td>正常</td><td colspan=\"2\">2018-06-04</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr></table>",
+        "bbox": [
+            65,
+            159,
+            932,
+            408
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "images/7b6889513ce972ce6f5a9867421eb827968f9e847a2fc22ecad42307bb6bd943.jpg",
+        "table_caption": [
+            "短期借款",
+            "共15笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">账户编号</td><td>授信机构</td><td>业务种类</td><td>开立日期</td><td colspan=\"2\">到期日</td><td>币种</td><td>借款金额</td></tr><tr><td>关闭日期</td><td>五级分类</td><td colspan=\"2\">最后一次还款日期</td><td colspan=\"2\">最后一次还款形式</td><td>历史表现</td></tr><tr><td rowspan=\"2\">B11911000H00 0106440014442 2031517320061 0030</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2022-03-15</td><td colspan=\"2\">2023-03-14</td><td>人民币元</td><td>500</td></tr><tr><td>2023-03-14</td><td>正常</td><td colspan=\"2\">2023-03-14</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">B11911000H00 0102440014442 10207000100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2021-02-07</td><td colspan=\"2\">2022-02-06</td><td>人民币元</td><td>500</td></tr><tr><td>2022-02-06</td><td>正常</td><td colspan=\"2\">2022-02-06</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">719872306488</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2019-09-20</td><td colspan=\"2\">2020-09-19</td><td>人民币元</td><td>300</td></tr><tr><td>2020-09-21</td><td>正常</td><td colspan=\"2\">2020-09-21</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">0244001444190 904002100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2019-09-04</td><td colspan=\"2\">2020-09-03</td><td>人民币元</td><td>500</td></tr><tr><td>2020-09-03</td><td>正常</td><td colspan=\"2\">2020-09-03</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">2902201801040 03034N</td><td>平安银行股份有限公司东莞分行</td><td>流动资金贷款</td><td>2018-01-04</td><td colspan=\"2\">2018-04-04</td><td>人民币元</td><td>23.92</td></tr><tr><td>2018-04-04</td><td>正常</td><td colspan=\"2\">2018-04-04</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">2902201801040 02126N</td><td>平安银行股份有限公司东莞分行</td><td>流动资金贷款</td><td>2018-01-04</td><td colspan=\"2\">2018-04-04</td><td>人民币元</td><td>76</td></tr><tr><td>2018-04-04</td><td>正常</td><td colspan=\"2\">2018-04-04</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">0244001444170 412000100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2017-04-12</td><td colspan=\"2\">2018-04-11</td><td>人民币元</td><td>90</td></tr><tr><td>2018-04-03</td><td>正常</td><td colspan=\"2\">2018-04-03</td><td colspan=\"2\">正常还款</td><td>见附件</td></tr><tr><td rowspan=\"2\">0244001444170328005100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2017-03-29</td><td colspan=\"2\">2018-03-27</td><td>人民币元</td><td>180</td></tr><tr><td>2018-03-27</td><td>正常</td><td colspan=\"2\">2018-03-27</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">290220171221000122N</td><td>平安银行股份有限公司东莞分行</td><td>流动资金贷款</td><td>2017-12-21</td><td colspan=\"2\">2018-03-21</td><td>人民币元</td><td>200</td></tr><tr><td>2018-03-21</td><td>正常</td><td colspan=\"2\">2018-03-21</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">0244001444170120007100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2017-01-22</td><td colspan=\"2\">2018-01-19</td><td>人民币元</td><td>180</td></tr><tr><td>2018-01-19</td><td>正常</td><td colspan=\"2\">2018-01-19</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">0244001444160203002100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2016-02-03</td><td colspan=\"2\">2017-02-02</td><td>人民币元</td><td>90</td></tr><tr><td>2017-02-02</td><td>正常</td><td colspan=\"2\">2017-02-02</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">0244001444160125002100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2016-01-27</td><td colspan=\"2\">2017-01-24</td><td>人民币元</td><td>180</td></tr><tr><td>2017-01-24</td><td>正常</td><td colspan=\"2\">2017-01-24</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">0244001444160114000100</td><td>中国邮政储蓄银行股份有限公司东莞市分行</td><td>流动资金贷款</td><td>2016-01-15</td><td colspan=\"2\">2017-01-13</td><td>人民币元</td><td>180</td></tr><tr><td>2017-01-13</td><td>正常</td><td colspan=\"2\">2017-01-13</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">689964396772</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2014-10-24</td><td colspan=\"2\">2015-10-20</td><td>人民币元</td><td>10</td></tr><tr><td>2015-10-20</td><td>正常</td><td colspan=\"2\">2015-10-20</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr><tr><td rowspan=\"2\">630162170152</td><td>中国银行股份有限公司东莞塘厦支行</td><td>流动资金贷款</td><td>2013-11-21</td><td colspan=\"2\">2014-11-20</td><td>人民币元</td><td>10</td></tr><tr><td>2014-10-23</td><td>正常</td><td colspan=\"2\">2014-10-23</td><td colspan=\"2\">正常还款</td><td colspan=\"1\">见附件</td></tr></table>",
+        "bbox": [
+            65,
+            451,
+            932,
+            945
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "page_number",
+        "text": "第6页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 5
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            36,
+            934,
+            567
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/7e4ee2e24ed2940d477345a2d30b717cb2a1c78effde68e5ca4b4ee05b7046bf.jpg",
+        "table_caption": [
+            "银行承兑汇票和信用证",
+            "共284笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>授信机构</td><td>业务种类</td><td>五级分类</td><td>账户数</td><td>垫款标志</td></tr><tr><td>中国邮政储蓄银行股份有限公司</td><td>银行承兑汇票</td><td>正常</td><td>194</td><td>否</td></tr><tr><td>中国银行股份有限公司</td><td>银行承兑汇票</td><td>正常</td><td>90</td><td>否</td></tr></table>",
+        "bbox": [
+            65,
+            609,
+            932,
+            682
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "相关还款责任",
+        "text_level": 1,
+        "bbox": [
+            65,
+            707,
+            215,
+            724
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "为其他借款人承担的相关还款责任",
+        "text_level": 1,
+        "bbox": [
+            68,
+            733,
+            354,
+            750
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "table",
+        "img_path": "images/92376e018d689535847b61616e34aed7b32e421958a876eba97b43aadfda8631.jpg",
+        "table_caption": [
+            "除贴现外的其他业务",
+            "共1笔"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">账户编号</td><td>责任类型</td><td>保证合同编号</td><td>币种</td><td>还款责任金额</td><td>授信机构/债权机构</td><td>业务种类</td><td>开立日期/接收日期</td><td>到期日</td><td>币种</td></tr><tr><td>借款金额/信用额度</td><td>余额</td><td>五级分类</td><td>逾期总额</td><td>逾期本金</td><td>逾期月数/还款状态</td><td>剩余还款月数</td><td colspan=\"2\">信息报告日期</td></tr><tr><td rowspan=\"2\">B1031100\n0H00011\n97758670\n281</td><td>保证人/反担保人</td><td>B1031100\n0H00016\n00000000\n16325521</td><td>人民币元</td><td>500</td><td>中国银行股份有限公司赣州市分行</td><td>流动资金贷款</td><td>2024-02-04</td><td>2025-02-04</td><td>人民币元</td></tr><tr><td>500</td><td>500</td><td>正常</td><td>0</td><td>0</td><td>0</td><td>--</td><td colspan=\"2\">2024-06-21</td></tr></table>",
+        "bbox": [
+            65,
+            774,
+            932,
+            922
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "page_number",
+        "text": "第7页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 6
+    },
+    {
+        "type": "text",
+        "text": "公共记录明细",
+        "text_level": 1,
+        "bbox": [
+            415,
+            51,
+            581,
+            73
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "table",
+        "img_path": "images/2881f8ff7ce6613a0e703782ff0e53eee3d48ed44b848401eb0d42ea6969af90.jpg",
+        "table_caption": [
+            "获得许可记录"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>许可部门</td><td>许可类型</td><td>许可日期</td><td>截止日期</td><td>许可内容</td></tr><tr><td>东莞市生态环境局</td><td>普通</td><td>2020-04-27</td><td>2099-12-31</td><td>http://121.10.6.194/CPASITE/UploadFiles/20200427/ffcc3fc3-c5d0-45e1-895c-e0ad0b2d2bb2东莞市讯康电子科技股份有限公司（扩建）.doc</td></tr><tr><td>东莞市市场监督管理局</td><td>登记</td><td>2010-04-15</td><td>2099-12-31</td><td>产销：电子产品、金属制品、变压器、滤波器、电感线圈、电脑周边产品、连接器、线缆组件、光电产品、电子元器件、电源产品、照明灯具、五金制品、塑料制品、光伏逆变器和控制器、通讯电源、不间断电源、应急电源、蓄电池管理装置、通信机柜及配套产品、低压成套开关设备；移动终端设备研发、销售；通信系统设计、安装、调试；批发和零售业；货物或技术进出口（国家禁止或涉及行政审批的货物和技术进出口除外）。</td></tr><tr><td>东莞市市场监督管理局</td><td>登记</td><td>2010-04-15</td><td>2099-12-31</td><td>产销：电子产品、金属制品、变压器、滤波器、电感线圈、电脑周边产品、连接器、线缆组件、光电产品、电子元器件、电源产品、照明灯具、五金制品、塑料制品、日用口罩（非医用）、光伏逆变器和控制器、通讯电源、不间断电源、应急电源、蓄电池管理装置、通信机柜及配套产品、低压成套开关设备；移动终端设备研发、销售；通信系统设计、安装、调试；批发和零售业；货物或技术进出口（国家禁止或涉及行政审批的货物和技术进出口除外）。</td></tr></table>",
+        "bbox": [
+            65,
+            119,
+            931,
+            520
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "page_number",
+        "text": "第8页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 7
+    },
+    {
+        "type": "text",
+        "text": "一、信贷记录",
+        "text_level": 1,
+        "bbox": [
+            55,
+            100,
+            203,
+            119
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "（一）中长期借款的历史表现",
+        "text_level": 1,
+        "bbox": [
+            67,
+            129,
+            324,
+            148
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "1.未结清账户编号",
+        "bbox": [
+            68,
+            153,
+            211,
+            167
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": ": B10311000H0001714672649657 东莞塘厦支行",
+        "bbox": [
+            68,
+            167,
+            465,
+            179
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国银行股份有限公司",
+        "bbox": [
+            354,
+            152,
+            621,
+            167
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "text",
+        "text": "业务种类：流动资金贷款",
+        "bbox": [
+            643,
+            152,
+            840,
+            167
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "table",
+        "img_path": "images/9635983e9df168adf2d16c08051da84eaf75fc67eb61b4386ee4d5553498e2e3.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2024-07-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-06-30</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-05-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-04-30</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-03-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-02-29</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-01-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-12-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-11-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-10-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-09-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-08-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-07-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-06-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-05-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td>2023-04-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td></td><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-03-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-02-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-01-01</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-12-31</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-11-11</td><td>0</td><td>2022-11-11</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-11</td><td>547.40</td><td>2022-11-11</td><td>547.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-10-21</td><td>546</td><td>2022-08-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-21</td><td>2.00</td><td>2022-10-21</td><td>2.00</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-09-21</td><td>546</td><td>2022-08-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-09-21</td><td>2.07</td><td>2022-09-21</td><td>2.07</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-08-22</td><td>546</td><td>2022-08-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-08-22</td><td>16.12</td><td>2022-08-22</td><td>16.12</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-07-21</td><td>560</td><td>2022-05-23</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-07-21</td><td>2.05</td><td>2022-07-21</td><td>2.05</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-06-21</td><td>560</td><td>2022-05-23</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-06-21</td><td>2.13</td><td>2022-06-21</td><td>2.13</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-05-23</td><td>560</td><td>2022-05-23</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-05-22</td><td>16.10</td><td>2022-05-23</td><td>16.10</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-04-21</td><td>574</td><td>2022-02-21</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-04-20</td><td>2.17</td><td>2022-04-21</td><td>2.17</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-03-21</td><td>574</td><td>2022-02-21</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-03-20</td><td>1.96</td><td>2022-03-21</td><td>1.96</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-02-21</td><td>574</td><td>2022-02-21</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-02-20</td><td>16.23</td><td>2022-02-21</td><td>16.23</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-01-21</td><td>588</td><td>2021-11-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-01-20</td><td>2.23</td><td>2022-01-21</td><td>2.23</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-12-21</td><td>588</td><td>2021-11-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-12-20</td><td>2.16</td><td>2021-12-21</td><td>2.16</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-11-22</td><td>588</td><td>2021-11-22</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-11-21</td><td>16.28</td><td>2021-11-22</td><td>16.28</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-10-21</td><td>602</td><td>2021-08-23</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-20</td><td>2.21</td><td>2021-10-21</td><td>2.21</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-09-22</td><td>602</td><td>2021-08-23</td><td>正常</td><td>2019-12-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-09-21</td><td>2.28</td><td>2021-09-22</td><td>2.28</td><td colspan=\"1\">正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            176,
+            932,
+            947
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "header",
+        "text": "附件1：信用记录补充信息",
+        "bbox": [
+            55,
+            51,
+            371,
+            74
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "page_number",
+        "text": "第9页/共28页",
+        "bbox": [
+            450,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 8
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            932,
+            923
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "page_number",
+        "text": "第10页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 9
+    },
+    {
+        "type": "table",
+        "img_path": "images/a86d11f216767cc649717bfa729beaba2e38e675bb361948ec153613d2ef90dc.jpg",
+        "table_caption": [
+            "2.已结清账户编号：700370327714",
+            "授信机构：中国银行股份有限公司",
+            "业务种类：流动资金贷款",
+            "东莞塘厦支行"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2019-11-14</td><td>0</td><td>2019-11-14</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2019-11-14</td><td>569</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            71,
+            931,
+            182
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "table",
+        "img_path": "images/00882c87d53edfe0bc1e1681a0382b9db4c98747c3d74c3cf6cb7981910084df.jpg",
+        "table_caption": [
+            "3.已结清账户编号：693869748180 授信机构：中国银行股份有限公司 业务种类：流动资金贷款东莞塘厦支行"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2021-01-28</td><td>0</td><td>2019-09-10</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2019-09-10</td><td>410</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            212,
+            931,
+            325
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "table",
+        "img_path": "images/4b5a365fa7ce97d6f6f4b29aafb048177af5547c6eaf221aea7eefe998201669.jpg",
+        "table_caption": [
+            "4.已结清账户编号：696470002877 授信机构：中国银行股份有限公司 业务种类：流动资金贷款东莞塘厦支行"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2021-03-27</td><td>0</td><td>2018-06-04</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-06-04</td><td>100</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            353,
+            931,
+            467
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "text",
+        "text": "（二）短期借款的历史表现",
+        "text_level": 1,
+        "bbox": [
+            68,
+            472,
+            302,
+            490
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "table",
+        "img_path": "images/4d9c13420a2a220543225f886ec52029a6398e4b24faf414f358d3763c18fba4.jpg",
+        "table_caption": [
+            "1.未结清账户编号",
+            "授信机构：中国银行股份有限公司 业务种类：流动资金贷款",
+            ": B10311000H0001647073798013 东莞塘厦支行"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2024-07-31</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-06-30</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-05-31</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-04-30</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-03-31</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-02-29</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-01-31</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-12-31</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-11-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-10-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-09-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-08-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-07-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-06-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-05-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-04-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-03-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-02-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-01-01</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-10-12</td><td>0</td><td>2021-10-12</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-11</td><td>300.67</td><td>2021-10-12</td><td>300.67</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-09-22</td><td>300</td><td>2020-10-13</td><td>正常</td><td>2020-10-13</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-09-21</td><td>2.95</td><td>2021-09-22</td><td>2.95</td><td colspan=\"1\">正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            522,
+            931,
+            951
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "page_number",
+        "text": "第11页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 10
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            36,
+            932,
+            629
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "table",
+        "img_path": "images/b3c7bc1e7297c50eef70152cef8a57c7e94b5fe550210c3b9bce4f137539c510.jpg",
+        "table_caption": [
+            "2.未结清账户编号",
+            "授信机构：中国银行股份有限公司 业务种类：流动资金贷款",
+            ": B10311000H0001702975026761 东莞塘厦支行"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2024-07-31</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-06-30</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-05-31</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-04-30</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-03-31</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-02-29</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2024-01-31</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-12-31</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-11-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-10-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-09-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-08-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-07-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-06-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-05-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-04-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-03-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-02-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2023-01-01</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-10-13</td><td>0</td><td>2022-10-13</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-10-13</td><td>300.72</td><td>2022-10-13</td><td>300.72</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-09-21</td><td>300</td><td>2021-10-15</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-09-21</td><td>3.03</td><td>2022-09-21</td><td>3.03</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-06-21</td><td>300</td><td>2021-10-15</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-06-21</td><td>3.03</td><td>2022-06-21</td><td>3.03</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-03-21</td><td>300</td><td>2021-10-15</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-03-20</td><td>2.96</td><td>2022-03-21</td><td>2.96</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-12-21</td><td>300</td><td>2021-10-15</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-12-20</td><td>2.21</td><td>2021-12-21</td><td>2.21</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2021-10-15</td><td>300</td><td>2021-10-15</td><td>正常</td><td>2021-10-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-10-15</td><td>0</td><td>2021-10-15</td><td>0</td><td colspan=\"1\">其他</td></tr></table>",
+        "bbox": [
+            65,
+            657,
+            932,
+            951
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "page_number",
+        "text": "第12页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 11
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            945
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "page_number",
+        "text": "第13页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 12
+    },
+    {
+        "type": "table",
+        "img_path": "images/15deef132763deec3aa5f91986f37cc65ad6a4a1a4212a603c051117cd676afb.jpg",
+        "table_caption": [
+            "3.未结清账户编号",
+            ": B10311000H0001719876704372 东莞塘厦支行",
+            "授信机构：中国银行股份有限公司 业务种类：流动资金贷款"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td colspan=\"2\">余额</td><td colspan=\"2\">余额变化日期</td><td>五级分类</td><td colspan=\"2\">五级分类认定日期</td><td colspan=\"2\">逾期总额</td><td>逾期本金</td></tr><tr><td colspan=\"2\">逾期月数</td><td colspan=\"2\">最近一次约定还款日期</td><td>最近一次应还总额</td><td colspan=\"2\">最近一次实际还款日期</td><td colspan=\"2\">最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2024-07-31</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-06-30</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-05-31</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-04-30</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-03-31</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-02-29</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2024-01-31</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-10-10</td><td colspan=\"2\">0</td><td colspan=\"2\">2023-10-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-10-10</td><td colspan=\"2\">300.59</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-09-21</td><td colspan=\"2\">300</td><td colspan=\"2\">2023-01-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-09-21</td><td>2.88</td><td colspan=\"2\">2023-09-21</td><td colspan=\"2\">2.88</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-06-21</td><td colspan=\"2\">300</td><td colspan=\"2\">2023-01-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-06-21</td><td>2.88</td><td colspan=\"2\">2023-06-21</td><td colspan=\"2\">2.88</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-03-21</td><td colspan=\"2\">300</td><td colspan=\"2\">2023-01-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-03-21</td><td>2.19</td><td colspan=\"2\">2023-03-21</td><td colspan=\"2\">2.19</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-01-10</td><td colspan=\"2\">300</td><td colspan=\"2\">2023-01-10</td><td>正常</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>0</td></tr><tr><td colspan=\"2\">0</td><td colspan=\"2\">2023-01-10</td><td>0</td><td colspan=\"2\">2023-01-10</td><td colspan=\"2\">0</td><td>其他</td></tr><tr><td colspan=\"11\">特定交易提示</td></tr><tr><td colspan=\"2\">交易类型</td><td colspan=\"2\">交易日期</td><td colspan=\"3\">交易金额</td><td colspan=\"2\">到期日期变更月数</td><td colspan=\"2\">交易明细信息</td></tr><tr><td colspan=\"2\">提前还款</td><td colspan=\"2\">2023-10-10</td><td colspan=\"3\">300</td><td colspan=\"2\">0</td><td colspan=\"2\">--</td></tr></table>",
+        "bbox": [
+            65,
+            70,
+            931,
+            749
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "table",
+        "img_path": "images/4a96b033bd0eb23544be513a95e6f138c7c95588764993031e498b043c0ba38d.jpg",
+        "table_caption": [
+            "4.已结清账户编号",
+            ": B11911000H0001064400144422 0315173200610030",
+            "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款",
+            "有限公司东莞市分行"
+        ],
+        "table_footnote": [
+            "5.已结清账户编号",
+            "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款",
+            ": B11911000H0001024400144421",
+            "有限公司东莞市分行",
+            "0207000100"
+        ],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2023-03-14</td><td>0</td><td>2023-03-14</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2023-03-14</td><td>275.81</td><td>2023-03-14</td><td>275.81</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-02-20</td><td>275</td><td>2022-11-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-20</td><td>1.14</td><td>2023-02-20</td><td>1.14</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2023-01-20</td><td>275</td><td>2022-11-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-20</td><td>1.14</td><td>2023-01-20</td><td>1.14</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-12-20</td><td>275</td><td>2022-11-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-20</td><td>1.10</td><td>2022-12-20</td><td>1.10</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-11-20</td><td>275</td><td>2022-11-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-11-20</td><td>76.45</td><td>2022-11-20</td><td>76.45</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-10-20</td><td>350</td><td>2022-08-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-08-20</td><td>162.46</td><td>2022-10-20</td><td>1.40</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-09-20</td><td>350</td><td>2022-08-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-08-20</td><td>161.06</td><td>2022-09-20</td><td>1.45</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-08-20</td><td>350</td><td>2022-08-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-08-20</td><td>159.61</td><td>2022-08-20</td><td>76.76</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-07-20</td><td>425</td><td>2022-05-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-05-20</td><td>82.86</td><td>2022-07-20</td><td>1.70</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-06-20</td><td>425</td><td>2022-05-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-05-20</td><td>81.16</td><td>2022-06-20</td><td>1.76</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-05-20</td><td>425</td><td>2022-05-20</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-05-20</td><td>79.40</td><td>2022-05-20</td><td>77</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-04-20</td><td>500</td><td>2022-03-15</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-03-15</td><td>2.40</td><td>2022-04-20</td><td>2.07</td><td colspan=\"1\">正常还款</td></tr><tr><td rowspan=\"2\">2022-03-20</td><td>500</td><td>2022-03-15</td><td>正常</td><td>2022-03-15</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-03-15</td><td>0.33</td><td>2022-03-20</td><td>0.33</td><td colspan=\"1\">正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            793,
+            931,
+            952
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "page_number",
+        "text": "第14页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 13
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [
+            "",
+            "",
+            "",
+            "",
+            ""
+        ],
+        "bbox": [
+            63,
+            39,
+            931,
+            539
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "table",
+        "img_path": "images/e50ef77d059e7427c14755ffe62cc8542544faa28073fd42783a240895accad7.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2022-02-06</td><td>0</td><td>2022-02-06</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2022-02-06</td><td>350.86</td><td>2022-02-06</td><td>350.86</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2022-01-20</td><td>350</td><td>2021-11-20</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-11-20</td><td>1.57</td><td>2022-01-20</td><td>1.57</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2021-12-20</td><td>350</td><td>2021-11-20</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-11-20</td><td>1.52</td><td>2021-12-20</td><td>1.52</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2021-11-20</td><td>350</td><td>2021-11-20</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-11-20</td><td>51.80</td><td>2021-11-20</td><td>51.80</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2021-10-20</td><td>400</td><td>2021-09-20</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-08-20</td><td>1.74</td><td>2021-10-20</td><td>1.74</td><td>正常还款</td></tr><tr><td rowspan=\"2\">2021-09-27</td><td>400</td><td>2021-09-20</td><td>正常</td><td>2021-09-27</td><td>0</td><td>0</td></tr><tr><td>0</td><td>2021-08-20</td><td>1.80</td><td>2021-09-20</td><td>1.80</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            579,
+            932,
+            919
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "page_number",
+        "text": "第15页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 14
+    },
+    {
+        "type": "text",
+        "text": "6.已结清账户编号：719872306488",
+        "bbox": [
+            68,
+            43,
+            342,
+            59
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国银行股份有限公司",
+        "bbox": [
+            356,
+            43,
+            623,
+            58
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "业务种类：流动资金贷款",
+        "bbox": [
+            643,
+            43,
+            842,
+            58
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "东莞塘厦支行",
+        "bbox": [
+            357,
+            58,
+            465,
+            71
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/3e3187c0ca6b274b79b14064e34ec4a66e7d4e828a293b3e40e7ae3f810f0841.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2020-09-21</td><td>0</td><td>2020-09-21</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2020-09-21</td><td>300</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            71,
+            931,
+            182
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "7.已结清账户编号",
+        "bbox": [
+            68,
+            185,
+            211,
+            199
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444190904002100",
+        "bbox": [
+            68,
+            199,
+            299,
+            212
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款有限公司东莞市分行",
+        "bbox": [
+            357,
+            185,
+            842,
+            212
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/9fcfafb9c4fa6ec97f797fe895be6ba7ebc1a1c0026aad7970984e8aab265144.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2020-09-03</td><td>0</td><td>2020-09-03</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2020-09-03</td><td>275</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            212,
+            931,
+            325
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "8.已结清账户编号",
+        "bbox": [
+            68,
+            327,
+            211,
+            340
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 290220180104003034N",
+        "bbox": [
+            68,
+            340,
+            275,
+            353
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：平安银行股份有限公司 业务种类：流动资金贷款",
+        "bbox": [
+            357,
+            326,
+            842,
+            340
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "东莞分行",
+        "bbox": [
+            357,
+            340,
+            428,
+            353
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/4caf55be1a643bb7ba2aa777eededf87bc46ced3919be74db88968449b089eda.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-04-04</td><td>0</td><td>2018-04-04</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-04-04</td><td>23.92</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            353,
+            931,
+            466
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "9.已结清账户编号",
+        "bbox": [
+            68,
+            467,
+            211,
+            482
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 290220180104002126N",
+        "bbox": [
+            68,
+            482,
+            275,
+            494
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：平安银行股份有限公司 业务种类：流动资金贷款",
+        "bbox": [
+            357,
+            467,
+            842,
+            482
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "东莞分行",
+        "bbox": [
+            357,
+            482,
+            428,
+            494
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/6fd060b359e82122fb2652cfd5cc2430c9026b585418a6ecff4cc4025e914249.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-04-04</td><td>0</td><td>2018-04-04</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-04-04</td><td>76</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            494,
+            931,
+            608
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "10.已结清账户编号",
+        "bbox": [
+            68,
+            609,
+            220,
+            623
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444170412000100",
+        "bbox": [
+            68,
+            623,
+            299,
+            636
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款",
+        "bbox": [
+            357,
+            609,
+            842,
+            623
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "有限公司东莞市分行",
+        "bbox": [
+            357,
+            623,
+            517,
+            636
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/a87b8852f6e5dea65206f12387e3f7d8493a7f22852f1b3aab1f11f9ff5343ab.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-04-03</td><td>0</td><td>2018-04-03</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-04-03</td><td>90</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            636,
+            931,
+            749
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "11.已结清账户编号",
+        "bbox": [
+            68,
+            751,
+            220,
+            764
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444170328005100",
+        "bbox": [
+            68,
+            764,
+            299,
+            777
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款",
+        "bbox": [
+            357,
+            751,
+            842,
+            764
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "有限公司东莞市分行",
+        "bbox": [
+            357,
+            764,
+            517,
+            777
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/d0674ac22b40f6ad1dda4332a1c33293245223752054c728c896861de2f5286e.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-03-27</td><td>0</td><td>2018-03-27</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-03-27</td><td>180</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            777,
+            931,
+            890
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "12.已结清账户编号",
+        "bbox": [
+            68,
+            891,
+            220,
+            906
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": ": 290220171221000122N",
+        "bbox": [
+            68,
+            906,
+            275,
+            919
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "授信机构：平安银行股份有限公司 业务种类：流动资金贷款",
+        "bbox": [
+            357,
+            891,
+            840,
+            907
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "text",
+        "text": "东莞分行",
+        "bbox": [
+            357,
+            907,
+            428,
+            919
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "page_number",
+        "text": "第16页/共28页",
+        "bbox": [
+            443,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 15
+    },
+    {
+        "type": "table",
+        "img_path": "images/2ff51fceb68b0320a80d469236a47c8804f6ece2425f6117cc66c54d09e6e7f4.jpg",
+        "table_caption": [],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-03-21</td><td>0</td><td>2018-03-21</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-03-21</td><td>200</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            65,
+            39,
+            931,
+            154
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444170120007100",
+        "bbox": [
+            70,
+            169,
+            299,
+            182
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款有限公司东莞市分行",
+        "bbox": [
+            357,
+            155,
+            842,
+            182
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/39668b10e4a3e9699d0fde6733c6d8c715ea794131b41036b619ac1a74f2e1e6.jpg",
+        "table_caption": [
+            "13.已结清账户编号"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2018-01-19</td><td>0</td><td>2018-01-19</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2018-01-19</td><td>180</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            182,
+            931,
+            296
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444160203002100",
+        "bbox": [
+            70,
+            311,
+            299,
+            323
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款有限公司东莞市分行",
+        "bbox": [
+            357,
+            296,
+            840,
+            324
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/607f891f22da574d12ab28e8df779b61cb682cd9ac8b59a52e60b1b4ad7e536d.jpg",
+        "table_caption": [
+            "14.已结清账户编号"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2017-02-02</td><td>0</td><td>2017-02-02</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2017-02-02</td><td>90</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            323,
+            931,
+            435
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444160125002100",
+        "bbox": [
+            70,
+            452,
+            299,
+            465
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款有限公司东莞市分行",
+        "bbox": [
+            357,
+            438,
+            840,
+            465
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/cc6030a26ab2ea496ce3920cdab01d76d939575e9aca27e5df05cd6fffbf162f.jpg",
+        "table_caption": [
+            "15.已结清账户编号"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2017-01-24</td><td>0</td><td>2017-01-24</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2017-01-24</td><td>180</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            464,
+            931,
+            578
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": ": 0244001444160114000100",
+        "bbox": [
+            70,
+            593,
+            299,
+            606
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国邮政储蓄银行股份 业务种类：流动资金贷款有限公司东莞市分行",
+        "bbox": [
+            357,
+            580,
+            840,
+            606
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/88ffd3109b0adb8d586335171c0cffeb34de40285c7f4c6ec6ae8d0fe3cb02bb.jpg",
+        "table_caption": [
+            "16.已结清账户编号"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2017-01-13</td><td>0</td><td>2017-01-13</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2017-01-13</td><td>180</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            606,
+            931,
+            719
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国银行股份有限公司 业务种类：流动资金贷款东莞塘厦支行",
+        "bbox": [
+            357,
+            720,
+            840,
+            747
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/ac2ebf396716fca6cdc00b8c0947b2a794dc64a3bc74492a3358b0d38d56b293.jpg",
+        "table_caption": [
+            "17.已结清账户编号：689964396772"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2015-11-03</td><td>0</td><td>2015-10-20</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2015-10-20</td><td>10</td><td>正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            747,
+            931,
+            861
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "text",
+        "text": "授信机构：中国银行股份有限公司 业务种类：流动资金贷款东莞塘厦支行",
+        "bbox": [
+            357,
+            862,
+            840,
+            889
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "images/2d7db2beec8083a585c7ac901daa5cb9d10ae83e39b58279b6f061ff21c4d638.jpg",
+        "table_caption": [
+            "18.已结清账户编号：630162170152"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td rowspan=\"2\">信息报告日期</td><td>余额</td><td>余额变化日期</td><td>五级分类</td><td>五级分类认定日期</td><td>逾期总额</td><td>逾期本金</td></tr><tr><td>逾期月数</td><td>最近一次约定还款日期</td><td>最近一次应还总额</td><td>最近一次实际还款日期</td><td>最近一次实还总额</td><td>最近一次还款形式</td></tr><tr><td rowspan=\"2\">2014-11-20</td><td>0</td><td>2014-10-23</td><td>正常</td><td>--</td><td>--</td><td>--</td></tr><tr><td>--</td><td>--</td><td>--</td><td>2014-10-23</td><td>10</td><td colspan=\"1\">正常还款</td></tr></table>",
+        "bbox": [
+            67,
+            888,
+            931,
+            957
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "page_number",
+        "text": "第17页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 16
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            65,
+            40,
+            931,
+            87
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "text",
+        "text": "（三）银行承兑汇票和信用证的信贷明细",
+        "text_level": 1,
+        "bbox": [
+            67,
+            93,
+            423,
+            112
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "table",
+        "img_path": "images/4023ccbbb9d1e88084969afa33561916ee07953cdd0f9805fe1ecb40e841b844.jpg",
+        "table_caption": [
+            "1.已结清业务",
+            "授信机构：中国邮政储蓄银行股份有限公司",
+            "业务种类：银行承兑汇票",
+            "五级分类：正常"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>账户编号</td><td>开立日期</td><td>到期日</td><td>币种</td><td>金额</td><td>关闭日期</td><td>垫款标志</td></tr><tr><td>20201211792395178</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>28.18</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395135</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>30.54</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395209</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>32.70</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395194</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>16.76</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395143</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>15.22</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395186</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>11.92</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395151</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>26.90</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201211792395160</td><td>2020-12-11</td><td>2021-06-11</td><td>人民币元</td><td>14.54</td><td>2021-06-11</td><td>否</td></tr><tr><td>20201112768164938</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>22.09</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164171</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>29.55</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164632</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>15.34</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164421</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>30</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164807</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>10.60</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164106</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>13.66</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164569</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>11.94</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164704</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>21.87</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164294</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>19.05</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768164472</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>12.50</td><td>2021-05-12</td><td>否</td></tr><tr><td>20201112768165035</td><td>2020-11-12</td><td>2021-05-12</td><td>人民币元</td><td>27.92</td><td>2021-05-12</td><td>否</td></tr><tr><td>20200918726169153</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>92.07</td><td>2021-03-18</td><td>否</td></tr><tr><td>20200918726169008</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>4</td><td>2021-03-18</td><td>否</td></tr><tr><td>20200918726168984</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>63.63</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616886</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>25.97</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8860</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>10.07</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8894</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>49.22</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8976</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>35.18</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8878</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>41.80</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9049</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>70</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9024</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>5</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8950</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>30.38</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8925</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>23.71</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9032</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>8.19</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9090</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>14.81</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 8933</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>19.73</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9016</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>10</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020091872616 9057</td><td>2020-09-21</td><td>2021-03-18</td><td>人民币元</td><td>42.74</td><td>2021-03-18</td><td>否</td></tr><tr><td>2020071467868 4937</td><td>2020-07-14</td><td>2021-01-14</td><td>人民币元</td><td>36.59</td><td>2021-01-14</td><td>否</td></tr><tr><td>2020071467868 4808</td><td>2020-07-14</td><td>2021-01-14</td><td>人民币元</td><td>35.59</td><td>2021-01-14</td><td>否</td></tr><tr><td>2020071467868 4824</td><td>2020-07-14</td><td>2021-01-14</td><td>人民币元</td><td>38.90</td><td>2021-01-14</td><td>否</td></tr><tr><td>2020071467868 4970</td><td>2020-07-14</td><td>2021-01-14</td><td>人民币元</td><td>37.42</td><td>2021-01-14</td><td>否</td></tr><tr><td>2020071467868 4865</td><td>2020-07-14</td><td>2021-01-14</td><td>人民币元</td><td>16.20</td><td>2021-01-14</td><td>否</td></tr><tr><td>2020051263488 4589</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>11.63</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4505</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>19.53</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4530</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>17.31</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4781</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>18.79</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4484</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>21.42</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4521</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>18.46</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020051263488 4597</td><td>2020-05-12</td><td>2020-11-12</td><td>人民币元</td><td>10.15</td><td>2020-11-12</td><td>否</td></tr><tr><td>2020041061490 5638</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>24.72</td><td>2020-10-10</td><td>否</td></tr><tr><td>2020041061490 5620</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>20.64</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905582</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>21.99</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905734</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>10</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905603</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>8.26</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905806</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>25.71</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905783</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>20</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905687</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>10</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905654</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>18.46</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905574</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>26.80</td><td>2020-10-10</td><td>否</td></tr><tr><td>B11911000H000120200410614905679</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>10</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200410614905775</td><td>2020-04-10</td><td>2020-10-10</td><td>人民币元</td><td>10</td><td>2020-10-10</td><td>否</td></tr><tr><td>20200110560892259</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>5.31</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891617</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>18.88</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560890997</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>15.66</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560892023</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>23.85</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891560</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>23.35</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891764</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>13.48</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891480</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>19.45</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891414</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>22.23</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891916</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>20.73</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891334</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>14.17</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891088</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>18.82</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891869</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>19.86</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891391</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>16.22</td><td>2020-07-10</td><td>否</td></tr><tr><td>20200110560891182</td><td>2020-01-13</td><td>2020-07-10</td><td>人民币元</td><td>16.69</td><td>2020-07-10</td><td>否</td></tr><tr><td>20191018496121054</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>17.89</td><td>2020-04-18</td><td>否</td></tr><tr><td>20191018496120977</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>10</td><td>2020-04-18</td><td>否</td></tr><tr><td>20191018496120459</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>10</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849612 0993</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>15.27</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849611 9995</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>23.89</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849611 9874</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>25</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849612 0274</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>10</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849612 0170</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>10</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849611 9823</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>16.21</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019101849611 9770</td><td>2019-10-18</td><td>2020-04-18</td><td>人民币元</td><td>39.40</td><td>2020-04-18</td><td>否</td></tr><tr><td>2019092548132 8461</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>24.48</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548132 9052</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>15.99</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548132 9727</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>12.91</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548133 0180</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>23.44</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548133 0464</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>24.63</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548133 0472</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>12.63</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548133 0569</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>34.63</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548133 0979</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>23.81</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548132 7573</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>28.07</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019092548132 8017</td><td>2019-09-25</td><td>2020-03-25</td><td>人民币元</td><td>22.63</td><td>2020-03-25</td><td>否</td></tr><tr><td>2019091047201 4841</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>15</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 4583</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 4438</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>20</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 4358</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 4518</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>18.04</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 3742</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 3599</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 4296</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 3943</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>10</td><td>2020-03-10</td><td>否</td></tr><tr><td>2019091047201 3332</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>11.12</td><td>2020-03-10</td><td>否</td></tr><tr><td>20190910472013172</td><td>2019-09-10</td><td>2020-03-10</td><td>人民币元</td><td>25.84</td><td>2020-03-10</td><td>否</td></tr><tr><td>20190816455131273</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>12.28</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455133175</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>40</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455132993</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>25</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455132830</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>10.23</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455132619</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>25.19</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455132539</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>8</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455131798</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>38.88</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190816455131579</td><td>2019-08-16</td><td>2020-02-16</td><td>人民币元</td><td>45.75</td><td>2020-02-16</td><td>否</td></tr><tr><td>20190710431904554</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>39.48</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904600</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>5.37</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904683</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>11.65</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904819</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>10.61</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904860</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>30.46</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904909</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>10.82</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904941</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>10.43</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904968</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>3.42</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431905057</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>39.35</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431905112</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>9.82</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431905188</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>94.44</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904634</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>9.13</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431904667</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>6.23</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190710431905240</td><td>2019-07-11</td><td>2020-01-10</td><td>人民币元</td><td>33.69</td><td>2020-01-10</td><td>否</td></tr><tr><td>20190621418437379</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>18.01</td><td>2019-12-21</td><td>否</td></tr><tr><td>20190621418435795</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>18.19</td><td>2019-12-21</td><td>否</td></tr><tr><td>20190621418436169</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>13.99</td><td>2019-12-21</td><td>否</td></tr><tr><td>20190621418435963</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>33.19</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 7104</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>17.04</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 6290</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>12.44</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 7223</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>16.74</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 7153</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>18.22</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 4962</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>10.34</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 5465</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>11.24</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019062141843 5141</td><td>2019-06-21</td><td>2019-12-21</td><td>人民币元</td><td>20.29</td><td>2019-12-21</td><td>否</td></tr><tr><td>2019052239979 1854</td><td>2019-05-22</td><td>2019-11-22</td><td>人民币元</td><td>16.85</td><td>2019-11-22</td><td>否</td></tr><tr><td>2019051639709 1271</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>31.98</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 1378</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>18.32</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 0196</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>15.71</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639708 9987</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>45.84</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 1167</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>15</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 1003</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>15</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 1263</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>10</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 0475</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>6.60</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 0338</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>12.87</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 0776</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>17.23</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051639709 0627</td><td>2019-05-16</td><td>2019-11-16</td><td>人民币元</td><td>8.85</td><td>2019-11-16</td><td>否</td></tr><tr><td>2019051039356 3381</td><td>2019-05-10</td><td>2019-11-10</td><td>人民币元</td><td>37.86</td><td>2019-11-10</td><td>否</td></tr><tr><td>2019051039356 3429</td><td>2019-05-10</td><td>2019-11-10</td><td>人民币元</td><td>27.66</td><td>2019-11-10</td><td>否</td></tr><tr><td>2019051039356 3759</td><td>2019-05-10</td><td>2019-11-10</td><td>人民币元</td><td>18.12</td><td>2019-11-10</td><td>否</td></tr><tr><td>2019051039356 3742</td><td>2019-05-10</td><td>2019-11-10</td><td>人民币元</td><td>16.85</td><td>2019-11-10</td><td>否</td></tr><tr><td>2019051039356 3783</td><td>2019-05-10</td><td>2019-11-10</td><td>人民币元</td><td>35.52</td><td>2019-11-10</td><td>否</td></tr><tr><td>2019041838068 1494</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>15.84</td><td>2019-10-18</td><td>否</td></tr><tr><td>2019041838068 1509</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>20.73</td><td>2019-10-18</td><td>否</td></tr><tr><td>2019041838068 1525</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>65.48</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681283</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>26.13</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681363</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>17.38</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681371</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>49.35</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681398</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>30.73</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681419</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>14.82</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681451</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>42.18</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190418380681460</td><td>2019-04-18</td><td>2019-10-18</td><td>人民币元</td><td>21.09</td><td>2019-10-18</td><td>否</td></tr><tr><td>20190404374255976</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>31.88</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256049</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>33.35</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256112</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>27.62</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256188</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>14.50</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256240</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>19.61</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256354</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>17.89</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256434</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>18.49</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190404374256522</td><td>2019-04-04</td><td>2019-10-04</td><td>人民币元</td><td>27.49</td><td>2019-10-04</td><td>否</td></tr><tr><td>20190312359849806</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>22.09</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359849540</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>24.62</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359849412</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>19.05</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359849357</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>12.22</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359849197</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>29.76</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359849050</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>13.20</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359848926</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>46.21</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359848820</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>27.00</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190312359848731</td><td>2019-03-12</td><td>2019-09-12</td><td>人民币元</td><td>14.66</td><td>2019-09-12</td><td>否</td></tr><tr><td>20190128340534238</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>31.17</td><td>2019-07-28</td><td>否</td></tr><tr><td>20190128340534174</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>17.57</td><td>2019-07-28</td><td>否</td></tr><tr><td>20190128340534447</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>12.17</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 4367</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>18.42</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 4045</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>16.91</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 3778</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>13.91</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 3575</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>13.64</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 3001</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>15.40</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012834053 2742</td><td>2019-01-28</td><td>2019-07-28</td><td>人民币元</td><td>19.17</td><td>2019-07-28</td><td>否</td></tr><tr><td>2019012333409 1720</td><td>2019-01-23</td><td>2019-07-23</td><td>人民币元</td><td>20</td><td>2019-07-23</td><td>否</td></tr><tr><td>2019012333409 1939</td><td>2019-01-23</td><td>2019-07-23</td><td>人民币元</td><td>60</td><td>2019-07-23</td><td>否</td></tr><tr><td>2019012333409 1086</td><td>2019-01-23</td><td>2019-07-23</td><td>人民币元</td><td>70</td><td>2019-07-23</td><td>否</td></tr></table>",
+        "bbox": [
+            65,
+            149,
+            932,
+            940
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "page_number",
+        "text": "第18页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 17
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "page_number",
+        "text": "第19页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 18
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            951
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "page_number",
+        "text": "第20页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 19
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "page_number",
+        "text": "第21页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 20
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "page_number",
+        "text": "第22页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 21
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "page_number",
+        "text": "第23页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 22
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "page_number",
+        "text": "第24页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 23
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            343
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "table",
+        "img_path": "images/f9b41635e9f303171ddf82b7842394d7ac69d528b3c0c0525a29690207a3c910.jpg",
+        "table_caption": [
+            "2.已结清业务",
+            "授信机构：中国银行股份有限公司",
+            "业务种类：银行承兑汇票",
+            "五级分类：正常"
+        ],
+        "table_footnote": [],
+        "table_body": "<table><tr><td>账户编号</td><td>开立日期</td><td>到期日</td><td>币种</td><td>金额</td><td>关闭日期</td><td>垫款标志</td></tr><tr><td>2015052002747 7781</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-23</td><td>否</td></tr><tr><td>2015052002747 7773</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-23</td><td>否</td></tr><tr><td>2015052002747 7765</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-23</td><td>否</td></tr><tr><td>2015052002747 7812</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-20</td><td>否</td></tr><tr><td>2015052002747 7804</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-20</td><td>否</td></tr><tr><td>2015052002747 7790</td><td>2015-05-20</td><td>2015-11-20</td><td>人民币元</td><td>10</td><td>2015-11-20</td><td>否</td></tr><tr><td>2015042102630 4319</td><td>2015-04-21</td><td>2015-10-21</td><td>人民币元</td><td>2.68</td><td>2015-10-21</td><td>否</td></tr><tr><td>2015032602545 4364</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>17.25</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015032602545 4313</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>16.61</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015032602545 4292</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>10</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015032602545 4348</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>10</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015032602545 4356</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>10</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015032602545 4321</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>7.72</td><td>2015-09-28</td><td>否</td></tr><tr><td>2015013002373 4994</td><td>2015-01-30</td><td>2015-07-30</td><td>人民币元</td><td>10.78</td><td>2015-07-30</td><td>否</td></tr><tr><td>2015013002373 4986</td><td>2015-01-30</td><td>2015-07-30</td><td>人民币元</td><td>10.08</td><td>2015-07-30</td><td>否</td></tr><tr><td>2014123002266 0500</td><td>2014-12-30</td><td>2015-06-30</td><td>人民币元</td><td>8.78</td><td>2015-06-30</td><td>否</td></tr><tr><td>2014120102156\n1824</td><td>2014-12-01</td><td>2015-06-01</td><td>人民币元</td><td>7.74</td><td>2015-06-03</td><td>否</td></tr><tr><td>1040005226326\n675</td><td>2014-10-09</td><td>2015-04-09</td><td>人民币元</td><td>36.23</td><td>2015-04-09</td><td>否</td></tr><tr><td>1040005226326\n674</td><td>2014-10-09</td><td>2015-04-09</td><td>人民币元</td><td>28.53</td><td>2015-04-09</td><td>否</td></tr><tr><td>1040005226326\n386</td><td>2014-09-04</td><td>2015-03-04</td><td>人民币元</td><td>18.17</td><td>2015-03-04</td><td>否</td></tr><tr><td>1040005226326\n387</td><td>2014-09-04</td><td>2015-03-04</td><td>人民币元</td><td>30</td><td>2015-03-04</td><td>否</td></tr><tr><td>1040005226326\n038</td><td>2014-08-06</td><td>2015-02-06</td><td>人民币元</td><td>12</td><td>2015-02-06</td><td>否</td></tr><tr><td>1040005226325\n792</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>5</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n793</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>5</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n794</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>5</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n786</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>70</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n787</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>5</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n788</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>5</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n789</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>7</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n790</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>10</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n791</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>19.48</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n795</td><td>2014-06-25</td><td>2014-12-25</td><td>人民币元</td><td>7</td><td>2014-12-25</td><td>否</td></tr><tr><td>1040005226325\n452</td><td>2014-04-23</td><td>2014-10-23</td><td>人民币元</td><td>4.99</td><td>2014-10-23</td><td>否</td></tr><tr><td>1040005226325\n453</td><td>2014-04-23</td><td>2014-10-23</td><td>人民币元</td><td>26</td><td>2014-10-23</td><td>否</td></tr><tr><td>1040005226325\n454</td><td>2014-04-23</td><td>2014-10-23</td><td>人民币元</td><td>20</td><td>2014-10-23</td><td>否</td></tr><tr><td>1040005226325\n455</td><td>2014-04-23</td><td>2014-10-23</td><td>人民币元</td><td>47.04</td><td>2014-10-23</td><td>否</td></tr><tr><td>1040005226325\n432</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>21.99</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n433</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>36.82</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n434</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>10</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n435</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>10</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n436</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>8.80</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n437</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>20</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005226325\n438</td><td>2014-03-21</td><td>2014-09-21</td><td>人民币元</td><td>6.71</td><td>2014-09-22</td><td>否</td></tr><tr><td>1040005225372 384</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>30</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 383</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>22.53</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 385</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>13.93</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 380</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>10</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 379</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>13.10</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 382</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>12</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 381</td><td>2014-02-28</td><td>2014-08-28</td><td>人民币元</td><td>10</td><td>2014-08-28</td><td>否</td></tr><tr><td>1040005225372 261</td><td>2013-12-24</td><td>2014-06-24</td><td>人民币元</td><td>9.80</td><td>2014-06-24</td><td>否</td></tr><tr><td>1040005225372 260</td><td>2013-12-24</td><td>2014-06-24</td><td>人民币元</td><td>10</td><td>2014-06-24</td><td>否</td></tr><tr><td>1040005225372 259</td><td>2013-12-24</td><td>2014-06-24</td><td>人民币元</td><td>5</td><td>2014-06-24</td><td>否</td></tr><tr><td>1040005225372 258</td><td>2013-12-24</td><td>2014-06-24</td><td>人民币元</td><td>16.51</td><td>2014-06-24</td><td>否</td></tr><tr><td>1040005225371 912</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>6.79</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 916</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>4.17</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 915</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>13.20</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 914</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>11.11</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 913</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>10.52</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 911</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>5.40</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 910</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>4.32</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 909</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>17.17</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 908</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>17.01</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 907</td><td>2013-11-22</td><td>2014-05-22</td><td>人民币元</td><td>20.22</td><td>2014-05-22</td><td>否</td></tr><tr><td>1040005225371 694</td><td>2013-10-10</td><td>2014-04-10</td><td>人民币元</td><td>29.86</td><td>2014-04-10</td><td>否</td></tr><tr><td>1040005225371 695</td><td>2013-10-10</td><td>2014-04-10</td><td>人民币元</td><td>11.69</td><td>2014-04-10</td><td>否</td></tr><tr><td>1040005225371 696</td><td>2013-10-10</td><td>2014-04-10</td><td>人民币元</td><td>3.08</td><td>2014-04-10</td><td>否</td></tr><tr><td>1040005225371 697</td><td>2013-10-10</td><td>2014-04-10</td><td>人民币元</td><td>4.35</td><td>2014-04-10</td><td>否</td></tr><tr><td>1040005225371 698</td><td>2013-10-10</td><td>2014-04-10</td><td>人民币元</td><td>10.88</td><td>2014-04-10</td><td>否</td></tr><tr><td>1040005224165 248</td><td>2013-09-13</td><td>2014-03-13</td><td>人民币元</td><td>40.84</td><td>2014-03-13</td><td>否</td></tr><tr><td>1040005224165 247</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>7.24</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 246</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>19.77</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 245</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>7.17</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 243</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>19.85</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 242</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>7.03</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 241</td><td>2013-09-06</td><td>2014-03-06</td><td>人民币元</td><td>8</td><td>2014-03-06</td><td>否</td></tr><tr><td>1040005224165 226</td><td>2013-08-07</td><td>2014-02-07</td><td>人民币元</td><td>14.48</td><td>2014-02-07</td><td>否</td></tr><tr><td>1040005224165 550</td><td>2013-08-07</td><td>2014-02-07</td><td>人民币元</td><td>13.05</td><td>2014-02-07</td><td>否</td></tr><tr><td>1040005224165 225</td><td>2013-05-27</td><td>2013-11-27</td><td>人民币元</td><td>5.67</td><td>2013-11-27</td><td>否</td></tr><tr><td>1040005224165 224</td><td>2013-05-27</td><td>2013-11-27</td><td>人民币元</td><td>10.12</td><td>2013-11-27</td><td>否</td></tr><tr><td>1040005224165 223</td><td>2013-05-27</td><td>2013-11-27</td><td>人民币元</td><td>16.63</td><td>2013-11-27</td><td>否</td></tr><tr><td>1040005224165 527</td><td>2013-06-07</td><td>2013-09-07</td><td>人民币元</td><td>11.94</td><td>2013-09-09</td><td>否</td></tr><tr><td>1040005224135 682</td><td>2012-11-28</td><td>2013-05-28</td><td>人民币元</td><td>2.47</td><td>2013-05-28</td><td>否</td></tr><tr><td>1040005224135 683</td><td>2012-11-28</td><td>2013-05-28</td><td>人民币元</td><td>3.60</td><td>2013-05-28</td><td>否</td></tr><tr><td>1040005224135 681</td><td>2012-11-28</td><td>2013-05-28</td><td>人民币元</td><td>3.31</td><td>2013-05-28</td><td>否</td></tr><tr><td>1040005224135 680</td><td>2012-11-28</td><td>2013-05-28</td><td>人民币元</td><td>2.93</td><td>2013-05-28</td><td>否</td></tr><tr><td>1040005224135 685</td><td>2012-12-07</td><td>2013-03-07</td><td>人民币元</td><td>14.46</td><td>2013-03-07</td><td>否</td></tr><tr><td>2015042102630 4327</td><td>2015-04-21</td><td>2015-10-21</td><td>人民币元</td><td>4.26</td><td>--</td><td>否</td></tr><tr><td>2015032602545 4305</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>4.26</td><td>--</td><td>否</td></tr><tr><td>2015032602545 4330</td><td>2015-03-26</td><td>2015-09-26</td><td>人民币元</td><td>2.68</td><td>--</td><td>否</td></tr></table>",
+        "bbox": [
+            65,
+            375,
+            932,
+            935
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "page_number",
+        "text": "第25页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            982
+        ],
+        "page_idx": 24
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 25
+    },
+    {
+        "type": "page_number",
+        "text": "第26页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 25
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            39,
+            931,
+            940
+        ],
+        "page_idx": 26
+    },
+    {
+        "type": "page_number",
+        "text": "第27页/共28页",
+        "bbox": [
+            442,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 26
+    },
+    {
+        "type": "table",
+        "img_path": "",
+        "table_caption": [],
+        "table_footnote": [],
+        "bbox": [
+            63,
+            36,
+            934,
+            709
+        ],
+        "page_idx": 27
+    },
+    {
+        "type": "page_number",
+        "text": "第28页/共28页",
+        "bbox": [
+            443,
+            969,
+            554,
+            983
+        ],
+        "page_idx": 27
+    }
+]
