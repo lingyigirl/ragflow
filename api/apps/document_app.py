@@ -950,10 +950,12 @@ async def mineru_parse():
             content_list_url = _minio_path(kb_id, content_list_location)
             markdown_url = None
             image_urls = []
+            pdf_minio_path = None
             list_fn = getattr(settings.STORAGE_IMPL, "list_objects", None)
             if callable(list_fn):
                 keys = list_fn(kb_id, f"{doc_id}/")
                 image_extensions = (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")
+                pdf_extensions = (".pdf",)
                 for key in keys:
                     key_lower = key.lower()
                     if key_lower.endswith(".md") and markdown_url is None:
@@ -969,11 +971,14 @@ async def mineru_parse():
                             "content_type": "image",
                             "page_idx": -1,
                         })
+                    elif any(key_lower.endswith(ext) for ext in pdf_extensions) and pdf_minio_path is None:
+                        pdf_minio_path = _minio_path(kb_id, key)
             try:
                 content_list_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, content_list_location)
                 content_list = json.loads((content_list_bin or b"[]").decode("utf-8")) if content_list_bin else []
             except Exception:
                 content_list = []
+            
             return get_json_result(data={
                 "content_list_url": content_list_url,
                 "markdown_url": markdown_url,
@@ -981,6 +986,7 @@ async def mineru_parse():
                 "image_count": len(image_urls),
                 "count": len(content_list),
                 "source": "kb_doc",
+                "pdf_minio_path": pdf_minio_path,
             })
 
         if not has_file:
@@ -1001,6 +1007,21 @@ async def mineru_parse():
         if hasattr(file_obj, 'seek'):
             file_obj.seek(0)
         file_content = await asyncio.to_thread(file_obj.read)
+        
+        user_id = current_user.id
+        parse_id = get_uuid()
+        
+        pdf_minio_path = None
+        try:
+            pdf_location = f"mineru_parse/{parse_id}/original_{file_obj.filename}"
+            settings.STORAGE_IMPL.put(user_id, pdf_location, file_content)
+            pdf_minio_path = f"{user_id}/{pdf_location}"
+        except Exception:
+            pass
+        
+        if hasattr(file_obj, 'seek'):
+            file_obj.seek(0)
+        
         files = {
             "files": (
                 file_obj.filename,
@@ -1044,15 +1065,12 @@ async def mineru_parse():
         response.raise_for_status()
         content_type = response.headers.get("Content-Type", "")
         
-        user_id = current_user.id
-        
-        def _process_mineru_zip_response(zip_content: bytes, original_filename: str, user_id: str) -> dict:
+        def _process_mineru_zip_response(zip_content: bytes, original_filename: str, user_id: str, parse_id: str, pdf_path: str = None) -> dict:
             temp_dir = tempfile.mkdtemp(prefix="mineru_parse_")
             zip_path = os.path.join(temp_dir, "response.zip")
             extract_dir = os.path.join(temp_dir, "extracted")
             
             try:
-                parse_id = get_uuid()
                 base_prefix = f"mineru_parse/{parse_id}"
                 
                 with open(zip_path, "wb") as f:
@@ -1194,6 +1212,7 @@ async def mineru_parse():
                     "image_count": len(image_urls),
                     "count": len(content_list) if content_list else 0,
                     "source": "file_parse",
+                    "pdf_minio_path": pdf_path,
                 }
                 return result
                 
@@ -1204,6 +1223,7 @@ async def mineru_parse():
                     "image_urls": [],
                     "image_count": 0,
                     "count": 0,
+                    "pdf_minio_path": pdf_path,
                     "error": f"Failed to process ZIP response: {str(e)}"
                 }
             finally:
@@ -1213,14 +1233,16 @@ async def mineru_parse():
                     pass        
 
         if "application/zip" in content_type:
-            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename, user_id)
+            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename, user_id, parse_id, pdf_minio_path)
             return get_json_result(data=result_data)
         else:
             try:
                 json_data = response.json()
+                if isinstance(json_data, dict):
+                    json_data["pdf_minio_path"] = pdf_minio_path
                 return get_json_result(data=json_data)
             except json.JSONDecodeError:
-                return get_json_result(data={"content": response.text})
+                return get_json_result(data={"content": response.text, "pdf_minio_path": pdf_minio_path})
 
     except requests.exceptions.RequestException as e:
         return get_json_result(
