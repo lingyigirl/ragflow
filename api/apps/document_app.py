@@ -15,6 +15,7 @@
 #
 import asyncio
 import json
+import logging
 import os.path
 import pathlib
 import re
@@ -698,7 +699,7 @@ async def get(doc_id):
         b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
         data = await asyncio.to_thread(settings.STORAGE_IMPL.get, b, n)
         response = await make_response(data)
-
+        logging.info("开始下载pdf....")
         ext = re.search(r"\.([^.]+)$", doc.name.lower())
         ext = ext.group(1) if ext else None
         if ext:
