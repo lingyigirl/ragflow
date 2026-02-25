@@ -1,0 +1,738 @@
+[
+    [
+        {
+            "type": "header",
+            "bbox": [
+                0.089,
+                0.0,
+                0.252,
+                0.015
+            ],
+            "angle": 0,
+            "content": "企业信用报告展示"
+        },
+        {
+            "type": "page_number",
+            "bbox": [
+                0.821,
+                0.0,
+                0.909,
+                0.015
+            ],
+            "angle": 0,
+            "content": "页码，1/5"
+        },
+        {
+            "type": "title",
+            "bbox": [
+                0.502,
+                0.094,
+                0.875,
+                0.114
+            ],
+            "angle": 0,
+            "content": "保密资料，仅限内部使用，禁止外传"
+        },
+        {
+            "type": "title",
+            "bbox": [
+                0.418,
+                0.119,
+                0.58,
+                0.135
+            ],
+            "angle": 0,
+            "content": "企业征信查询结果"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.465,
+                0.136,
+                0.533,
+                0.145
+            ],
+            "angle": 0,
+            "content": "（授信机构版）"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.118,
+                0.183,
+                0.34,
+                0.195
+            ],
+            "angle": 0,
+            "content": "报告编号：2024081709433808482674"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.119,
+                0.195,
+                0.27,
+                0.206
+            ],
+            "angle": 0,
+            "content": "查询机构：赣州农商银行"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.677,
+                0.183,
+                0.88,
+                0.195
+            ],
+            "angle": 0,
+            "content": "报告时间：2024-08-17 09:43:38"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.699,
+                0.195,
+                0.879,
+                0.206
+            ],
+            "angle": 0,
+            "content": "查询原因：贷前（保前）审查"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.212,
+                0.879,
+                0.295
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"2\">身份信息</td></tr><tr><td>企业名称</td><td>赣州市百航企业管理合伙企业(有限合伙)</td></tr><tr><td>组织机构代码</td><td>MABXWE800</td></tr><tr><td>统一社会信用代码</td><td>91360702MABXWE800Y</td></tr></table>"
+        },
+        {
+            "type": "title",
+            "bbox": [
+                0.466,
+                0.307,
+                0.531,
+                0.32
+            ],
+            "angle": 0,
+            "content": "异议提示"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.24,
+                0.325,
+                0.747,
+                0.339
+            ],
+            "angle": 0,
+            "content": "信息主体对信用报告内容提出了0笔异议且正在处理中，请浏览时注意阅读相关内容。"
+        },
+        {
+            "type": "title",
+            "bbox": [
+                0.466,
+                0.36,
+                0.531,
+                0.374
+            ],
+            "angle": 0,
+            "content": "信息概要"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.378,
+                0.879,
+                0.543
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>首次有信贷交易的年份</td><td>发生信贷交易的机构数</td><td>当前有未结清信贷交易的\n机构数</td><td>首次有相关还款责任的年份</td></tr><tr><td></td><td>0</td><td>0</td><td>2023</td></tr><tr><td colspan=\"2\">借贷交易</td><td colspan=\"2\">担保交易</td></tr><tr><td>余额</td><td>0</td><td>余额</td><td>0</td></tr><tr><td>其中:被追偿借贷交易余\n额</td><td>0</td><td>其中:关注类担保交易余\n额</td><td>0</td></tr><tr><td>关注类借贷交易余额</td><td>0</td><td>不良类担保交易余额</td><td>0</td></tr><tr><td>不良类借贷交易余额</td><td>0</td><td></td><td></td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.553,
+                0.878,
+                0.596
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>非信贷交易账户数</td><td>欠税记录条数</td><td>民事判决记录条数</td><td>强制执行记录条数</td><td>行政处罚记录条数</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>"
+        },
+        {
+            "type": "title",
+            "bbox": [
+                0.405,
+                0.619,
+                0.593,
+                0.632
+            ],
+            "angle": 0,
+            "content": "未结清信贷及授信信息概要"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.638,
+                0.878,
+                0.712
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"3\">由资产公司处置的债务</td><td colspan=\"3\">垫款</td><td colspan=\"3\">逾期</td></tr><tr><td>账户数</td><td>余额</td><td>最近一次处置日期</td><td>账户数</td><td>余额</td><td>最近一次还款日期</td><td>本金</td><td>利息及其他</td><td>总额</td></tr><tr><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td>0</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.72,
+                0.878,
+                0.862
+            ],
+            "angle": 0,
+            "content": "<table><tr><td rowspan=\"2\"></td><td colspan=\"2\">正常类</td><td colspan=\"2\">关注类</td><td colspan=\"2\">不良类</td><td colspan=\"2\">合计</td></tr><tr><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.871,
+                0.878,
+                0.913
+            ],
+            "angle": 0,
+            "content": "<table><tr><td rowspan=\"2\"></td><td colspan=\"2\">正常类</td><td colspan=\"2\">关注类</td><td colspan=\"2\">不良类</td><td colspan=\"2\">合计</td></tr><tr><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td></tr></table>"
+        }
+    ],
+    [
+        {
+            "type": "header",
+            "bbox": [
+                0.089,
+                0.0,
+                0.252,
+                0.015
+            ],
+            "angle": 0,
+            "content": "企业信用报告展示"
+        },
+        {
+            "type": "page_number",
+            "bbox": [
+                0.821,
+                0.0,
+                0.909,
+                0.015
+            ],
+            "angle": 0,
+            "content": "页码，2/5"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.061,
+                0.879,
+                0.1
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"3\">非循环信用额度</td><td colspan=\"3\">循环信用额度</td></tr><tr><td>总额</td><td>已用额度</td><td>剩余可用额度</td><td>总额</td><td>已用额度</td><td>剩余可额度</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.109,
+                0.877,
+                0.233
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"9\">相关还款责任信息概要</td></tr><tr><td rowspan=\"2\">责任类型</td><td colspan=\"3\">被追债业务</td><td colspan=\"5\">其他借贷交易</td></tr><tr><td>还款责任金额</td><td>账户数</td><td>余额</td><td>还款责任金额</td><td>账户数</td><td>余额</td><td>关注类金额</td><td>不良类金额</td></tr><tr><td>保证人/反担保人</td><td>0</td><td>0</td><td>0</td><td>8000000</td><td>1</td><td>8000000</td><td>0</td><td>0</td></tr><tr><td>合计</td><td>0</td><td>0</td><td>0</td><td>8000000</td><td>1</td><td>8000000</td><td>0</td><td>0</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.241,
+                0.877,
+                0.284
+            ],
+            "angle": 0,
+            "content": "<table><tr><td rowspan=\"2\">责任类型</td><td colspan=\"5\">担保交易</td></tr><tr><td>还款责任金额</td><td>账户数</td><td>余额</td><td>关注类金额</td><td>不良类金额</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.292,
+                0.877,
+                0.374
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"6\">已结清信贷信息概要</td></tr><tr><td colspan=\"3\">由资产公司处置的债务</td><td colspan=\"3\">垫款</td></tr><tr><td>账户数</td><td>金额</td><td>处置完成日期</td><td>账户数</td><td>金额</td><td>结清日期</td></tr><tr><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td></td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.382,
+                0.877,
+                0.434
+            ],
+            "angle": 0,
+            "content": "<table><tr><td></td><td>正常类账户数</td><td>关注类账户数</td><td>不良类账户数</td><td>合计</td></tr><tr><td colspan=\"5\"></td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.444,
+                0.877,
+                0.537
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"12\">负债历史</td></tr><tr><td></td><td colspan=\"2\">全部负债</td><td colspan=\"2\">关注类负债</td><td colspan=\"2\">不良类负债</td><td colspan=\"5\">逾期类负债</td></tr><tr><td>月份</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>逾期账户数</td><td>逾期总额</td><td>本金逾期账户数</td><td colspan=\"2\">逾期本金</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.467,
+                0.562,
+                0.53,
+                0.574
+            ],
+            "angle": 0,
+            "content": "基本信息"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.58,
+                0.877,
+                0.744
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"4\">基本概况信息</td></tr><tr><td>经济类型</td><td>内资</td><td>组织机构类型</td><td>企业</td></tr><tr><td>企业规模</td><td>微型企业</td><td>所属行业</td><td></td></tr><tr><td>成立年份</td><td>2022</td><td>登记证书有效截止日期</td><td>2099-12-31</td></tr><tr><td>登记地址</td><td colspan=\"3\">中国江西省赣州市章贡区江西省赣州市章贡区新赣州大道18号阳明国际中心2号楼1304-110室</td></tr><tr><td>办公/经营地址</td><td colspan=\"3\">中国江西省赣州市章贡区江西省赣州市章贡区新赣州大道18号阳明国际中心2号楼1304-110室</td></tr><tr><td>存续状态</td><td colspan=\"3\">正常营业</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.424,
+                0.756,
+                0.574,
+                0.768
+            ],
+            "angle": 0,
+            "content": "注册资本及主要出资人信息"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.119,
+                0.782,
+                0.877,
+                0.895
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"4\">主要组成人员信息</td></tr><tr><td>职位</td><td>姓名</td><td>证件类型</td><td>证件号码</td></tr><tr><td>财务负责人</td><td>方春苗</td><td>身份证</td><td>362422198303080125</td></tr><tr><td>法定代表人/非法人组织负责人</td><td>杨逢春</td><td>身份证</td><td>362102197804120010</td></tr><tr><td colspan=\"4\">更新日期：2022-09-28</td></tr></table>"
+        }
+    ],
+    [
+        {
+            "type": "header",
+            "bbox": [
+                0.089,
+                0.0,
+                0.252,
+                0.014
+            ],
+            "angle": 0,
+            "content": "企业信用报告展示"
+        },
+        {
+            "type": "page_number",
+            "bbox": [
+                0.821,
+                0.0,
+                0.909,
+                0.015
+            ],
+            "angle": 0,
+            "content": "页码，3/5"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.451,
+                0.077,
+                0.546,
+                0.091
+            ],
+            "angle": 0,
+            "content": "信贷记录明细"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.465,
+                0.097,
+                0.534,
+                0.108
+            ],
+            "angle": 0,
+            "content": "无相关信息"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.116,
+                0.88,
+                0.161
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>贴现账户分机构汇总信息</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.166,
+                0.88,
+                0.23
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>担保账户</td></tr><tr><td>基本信息</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.237,
+                0.88,
+                0.282
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>在保责任</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.288,
+                0.88,
+                0.332
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>担保账户信息明细</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.34,
+                0.88,
+                0.403
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>授信协议</td></tr><tr><td>授信协议信息</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.408,
+                0.88,
+                0.653
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"12\">相关还款责任</td></tr><tr><td colspan=\"12\">借贷账户（不含贴现）</td></tr><tr><td>账户编号</td><td>主借款人身份类别</td><td>账户类型</td><td>责任类型</td><td>币种（相关还款责任金额）</td><td>还款责任金额</td><td>管理机构类型</td><td>管理机构</td><td>业务种类</td><td>业务种类细分</td><td>开立日期</td><td>到期日期</td></tr><tr><td>币种</td><td>余额</td><td>五级分类</td><td>逾期总额</td><td>逾期本金</td><td>逾期月数</td><td>还款状态</td><td>剩余还款月数</td><td>借款金额</td><td>信用额度</td><td>保证合同编号</td><td>信息报告日期</td></tr><tr><td>S1444</td><td>组织机构</td><td>非循环贷账户</td><td>保证人/反担保人</td><td>CNY</td><td>8000000</td><td>商业银行</td><td>7328</td><td>贷款</td><td>流动资金贷款</td><td>2023-12-14</td><td>2024-12-13</td></tr><tr><td>人民币</td><td>8000000</td><td>正常</td><td>0</td><td>0</td><td>0</td><td></td><td></td><td>800000</td><td></td><td>P374</td><td>2024-07-21</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.66,
+                0.88,
+                0.704
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>贴现账户</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.711,
+                0.88,
+                0.755
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>担保账户</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.443,
+                0.778,
+                0.554,
+                0.792
+            ],
+            "angle": 0,
+            "content": "非信贷记录明细"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.118,
+                0.796,
+                0.88,
+                0.88
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"2\">公用事业缴费信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">过去24个月缴费情况</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.451,
+                0.902,
+                0.546,
+                0.915
+            ],
+            "angle": 0,
+            "content": "公共记录明细"
+        }
+    ],
+    [
+        {
+            "type": "header",
+            "bbox": [
+                0.089,
+                0.0,
+                0.252,
+                0.015
+            ],
+            "angle": 0,
+            "content": "企业信用报告展示"
+        },
+        {
+            "type": "page_number",
+            "bbox": [
+                0.821,
+                0.0,
+                0.909,
+                0.015
+            ],
+            "angle": 0,
+            "content": "页码，4/5"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.06,
+                0.88,
+                0.251
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"2\">欠税信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">民事判决记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">强制执行记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">行政处罚记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.428,
+                0.272,
+                0.57,
+                0.286
+            ],
+            "angle": 0,
+            "content": "住房公积金缴费记录"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.464,
+                0.292,
+                0.534,
+                0.304
+            ],
+            "angle": 0,
+            "content": "无相关信息"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.313,
+                0.879,
+                0.456
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>获得许可记录</td></tr><tr><td>无相关信息</td></tr><tr><td>获得认证记录</td></tr><tr><td>无相关信息</td></tr><tr><td>获得资质记录</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.463,
+                0.879,
+                0.556
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>获得奖励记录</td></tr><tr><td>无相关信息</td></tr><tr><td>拥有专利情况</td></tr><tr><td>无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.563,
+                0.879,
+                0.657
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"2\">出入境检验检疫绿色通道信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td>进出口商品免验信息</td><td>张小伟1313012024</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.662,
+                0.879,
+                0.756
+            ],
+            "angle": 0,
+            "content": "<table><tr><td colspan=\"2\">进出口商品检验分类监管信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">融资规模控制信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.466,
+                0.777,
+                0.531,
+                0.791
+            ],
+            "angle": 0,
+            "content": "财务报表"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.118,
+                0.796,
+                0.212,
+                0.809
+            ],
+            "angle": 0,
+            "content": "精简版/详情版"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.466,
+                0.834,
+                0.531,
+                0.847
+            ],
+            "angle": 0,
+            "content": "评级信息"
+        },
+        {
+            "type": "table",
+            "bbox": [
+                0.117,
+                0.853,
+                0.879,
+                0.876
+            ],
+            "angle": 0,
+            "content": "<table><tr><td>无相关信息</td><td>2024</td></tr></table>"
+        },
+        {
+            "type": "table_caption",
+            "bbox": [
+                0.428,
+                0.888,
+                0.569,
+                0.901
+            ],
+            "angle": 0,
+            "content": "声明及异议标注信息"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.464,
+                0.907,
+                0.534,
+                0.919
+            ],
+            "angle": 0,
+            "content": "无相关信息"
+        }
+    ],
+    [
+        {
+            "type": "header",
+            "bbox": [
+                0.088,
+                0.0,
+                0.252,
+                0.015
+            ],
+            "angle": 0,
+            "content": "企业信用报告展示"
+        },
+        {
+            "type": "page_number",
+            "bbox": [
+                0.82,
+                0.0,
+                0.909,
+                0.015
+            ],
+            "angle": 0,
+            "content": "页码，5/5"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.428,
+                0.062,
+                0.57,
+                0.075
+            ],
+            "angle": 0,
+            "content": "保密资料 禁止外传"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.447,
+                0.085,
+                0.48,
+                0.096
+            ],
+            "angle": 0,
+            "content": "打印"
+        },
+        {
+            "type": "text",
+            "bbox": [
+                0.499,
+                0.086,
+                0.544,
+                0.096
+            ],
+            "angle": 0,
+            "content": "打印预览"
+        }
+    ]
+]

@@ -1,0 +1,2616 @@
+{
+    "pdf_info": [
+        {
+            "para_blocks": [
+                {
+                    "bbox": [
+                        298,
+                        79,
+                        520,
+                        95
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                298,
+                                79,
+                                520,
+                                95
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        298,
+                                        79,
+                                        520,
+                                        95
+                                    ],
+                                    "type": "text",
+                                    "content": "保密资料，仅限内部使用，禁止外传"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "bbox": [
+                        248,
+                        100,
+                        345,
+                        113
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                248,
+                                100,
+                                345,
+                                113
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        248,
+                                        100,
+                                        345,
+                                        113
+                                    ],
+                                    "type": "text",
+                                    "content": "企业征信查询结果"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 3
+                },
+                {
+                    "bbox": [
+                        276,
+                        114,
+                        317,
+                        121
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                276,
+                                114,
+                                317,
+                                121
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        276,
+                                        114,
+                                        317,
+                                        121
+                                    ],
+                                    "type": "text",
+                                    "content": "（授信机构版）"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 4
+                },
+                {
+                    "bbox": [
+                        70,
+                        153,
+                        202,
+                        163
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                153,
+                                202,
+                                163
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        153,
+                                        202,
+                                        163
+                                    ],
+                                    "type": "text",
+                                    "content": "报告编号：2024081709433808482674"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 5
+                },
+                {
+                    "bbox": [
+                        70,
+                        163,
+                        160,
+                        173
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                163,
+                                160,
+                                173
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        163,
+                                        160,
+                                        173
+                                    ],
+                                    "type": "text",
+                                    "content": "查询机构：赣州农商银行"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "bbox": [
+                        402,
+                        153,
+                        523,
+                        163
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                402,
+                                153,
+                                523,
+                                163
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        402,
+                                        153,
+                                        523,
+                                        163
+                                    ],
+                                    "type": "text",
+                                    "content": "报告时间：2024-08-17 09:43:38"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 7
+                },
+                {
+                    "bbox": [
+                        415,
+                        163,
+                        523,
+                        173
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                415,
+                                163,
+                                523,
+                                173
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        415,
+                                        163,
+                                        523,
+                                        173
+                                    ],
+                                    "type": "text",
+                                    "content": "查询原因：贷前（保前）审查"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 8
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        178,
+                        523,
+                        248
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                178,
+                                523,
+                                248
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        178,
+                                        523,
+                                        248
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                178,
+                                                523,
+                                                248
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"2\">身份信息</td></tr><tr><td>企业名称</td><td>赣州市百航企业管理合伙企业(有限合伙)</td></tr><tr><td>组织机构代码</td><td>MABXWE800</td></tr><tr><td>统一社会信用代码</td><td>91360702MABXWE800Y</td></tr></table>",
+                                            "image_path": "362291c8930cdfd158b221efe23978ed829ad16128889db37ae51ea15e11acfa.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 9,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 9
+                },
+                {
+                    "bbox": [
+                        277,
+                        258,
+                        315,
+                        269
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                277,
+                                258,
+                                315,
+                                269
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        277,
+                                        258,
+                                        315,
+                                        269
+                                    ],
+                                    "type": "text",
+                                    "content": "异议提示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 10
+                },
+                {
+                    "bbox": [
+                        142,
+                        273,
+                        444,
+                        285
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                142,
+                                273,
+                                444,
+                                285
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        142,
+                                        273,
+                                        444,
+                                        285
+                                    ],
+                                    "type": "text",
+                                    "content": "信息主体对信用报告内容提出了0笔异议且正在处理中，请浏览时注意阅读相关内容。"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 11
+                },
+                {
+                    "bbox": [
+                        277,
+                        302,
+                        315,
+                        314
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                277,
+                                302,
+                                315,
+                                314
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        277,
+                                        302,
+                                        315,
+                                        314
+                                    ],
+                                    "type": "text",
+                                    "content": "信息概要"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 12
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        317,
+                        523,
+                        456
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                317,
+                                523,
+                                456
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        317,
+                                        523,
+                                        456
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                317,
+                                                523,
+                                                456
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>首次有信贷交易的年份</td><td>发生信贷交易的机构数</td><td>当前有未结清信贷交易的\n机构数</td><td>首次有相关还款责任的年份</td></tr><tr><td></td><td>0</td><td>0</td><td>2023</td></tr><tr><td colspan=\"2\">借贷交易</td><td colspan=\"2\">担保交易</td></tr><tr><td>余额</td><td>0</td><td>余额</td><td>0</td></tr><tr><td>其中:被追偿借贷交易余\n额</td><td>0</td><td>其中:关注类担保交易余\n额</td><td>0</td></tr><tr><td>关注类借贷交易余额</td><td>0</td><td>不良类担保交易余额</td><td>0</td></tr><tr><td>不良类借贷交易余额</td><td>0</td><td></td><td></td></tr></table>",
+                                            "image_path": "90301513e5da1a909ef206fa58eb2958687f3abc5e05d4b764a7d8f098172f21.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 13,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 13
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        465,
+                        522,
+                        501
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                465,
+                                522,
+                                501
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        465,
+                                        522,
+                                        501
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                465,
+                                                522,
+                                                501
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>非信贷交易账户数</td><td>欠税记录条数</td><td>民事判决记录条数</td><td>强制执行记录条数</td><td>行政处罚记录条数</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>",
+                                            "image_path": "e655a7c8402e14677e44e38c5ca2b07b5803fcc13dd9887b814fc6d84a3d2b07.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 14,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 14
+                },
+                {
+                    "bbox": [
+                        240,
+                        520,
+                        352,
+                        531
+                    ],
+                    "type": "title",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                240,
+                                520,
+                                352,
+                                531
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        240,
+                                        520,
+                                        352,
+                                        531
+                                    ],
+                                    "type": "text",
+                                    "content": "未结清信贷及授信信息概要"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 15
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        536,
+                        522,
+                        598
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                536,
+                                522,
+                                598
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        536,
+                                        522,
+                                        598
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                536,
+                                                522,
+                                                598
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"3\">由资产公司处置的债务</td><td colspan=\"3\">垫款</td><td colspan=\"3\">逾期</td></tr><tr><td>账户数</td><td>余额</td><td>最近一次处置日期</td><td>账户数</td><td>余额</td><td>最近一次还款日期</td><td>本金</td><td>利息及其他</td><td>总额</td></tr><tr><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td>0</td></tr></table>",
+                                            "image_path": "63bc856f121e3e78144a8512047c0df310aac6864de16a8654fa5077a1fb0eb3.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 16,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 16
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        605,
+                        522,
+                        724
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                605,
+                                522,
+                                724
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        605,
+                                        522,
+                                        724
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                605,
+                                                522,
+                                                724
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td rowspan=\"2\"></td><td colspan=\"2\">正常类</td><td colspan=\"2\">关注类</td><td colspan=\"2\">不良类</td><td colspan=\"2\">合计</td></tr><tr><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr></table>",
+                                            "image_path": "0fa081500e6e64e019364deb13e1819e55d0cb228cab16c6f7b05007d034ef18.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 17,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 17
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        732,
+                        522,
+                        767
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                732,
+                                522,
+                                767
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        732,
+                                        522,
+                                        767
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                732,
+                                                522,
+                                                767
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td rowspan=\"2\"></td><td colspan=\"2\">正常类</td><td colspan=\"2\">关注类</td><td colspan=\"2\">不良类</td><td colspan=\"2\">合计</td></tr><tr><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td></tr></table>",
+                                            "image_path": "131fa5ab725fecd4cda494a9ce442a4087c0bfa53099cee0cc803fdb1cd60648.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 18,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 18
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        52,
+                        0,
+                        149,
+                        12
+                    ],
+                    "type": "header",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                52,
+                                0,
+                                149,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        52,
+                                        0,
+                                        149,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "企业信用报告展示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 0
+                },
+                {
+                    "bbox": [
+                        488,
+                        0,
+                        540,
+                        12
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                488,
+                                0,
+                                540,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        488,
+                                        0,
+                                        540,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "页码，1/5"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 1
+                }
+            ],
+            "page_size": [
+                595,
+                841
+            ],
+            "page_idx": 0
+        },
+        {
+            "para_blocks": [
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        51,
+                        523,
+                        84
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                51,
+                                523,
+                                84
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        51,
+                                        523,
+                                        84
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                51,
+                                                523,
+                                                84
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"3\">非循环信用额度</td><td colspan=\"3\">循环信用额度</td></tr><tr><td>总额</td><td>已用额度</td><td>剩余可用额度</td><td>总额</td><td>已用额度</td><td>剩余可额度</td></tr></table>",
+                                            "image_path": "bac36a650bbcf4a7448a69a975b0d0950e1e60c3634b96cfe5b78bfa9a17414f.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 2,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        91,
+                        521,
+                        195
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                91,
+                                521,
+                                195
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        91,
+                                        521,
+                                        195
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                91,
+                                                521,
+                                                195
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"9\">相关还款责任信息概要</td></tr><tr><td rowspan=\"2\">责任类型</td><td colspan=\"3\">被追债业务</td><td colspan=\"5\">其他借贷交易</td></tr><tr><td>还款责任金额</td><td>账户数</td><td>余额</td><td>还款责任金额</td><td>账户数</td><td>余额</td><td>关注类金额</td><td>不良类金额</td></tr><tr><td>保证人/反担保人</td><td>0</td><td>0</td><td>0</td><td>8000000</td><td>1</td><td>8000000</td><td>0</td><td>0</td></tr><tr><td>合计</td><td>0</td><td>0</td><td>0</td><td>8000000</td><td>1</td><td>8000000</td><td>0</td><td>0</td></tr></table>",
+                                            "image_path": "f8f3e2e19259791a0c03e407148d111162be497edb7a0318310f6d771be92961.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 3,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 3
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        202,
+                        521,
+                        238
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                202,
+                                521,
+                                238
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        202,
+                                        521,
+                                        238
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                202,
+                                                521,
+                                                238
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td rowspan=\"2\">责任类型</td><td colspan=\"5\">担保交易</td></tr><tr><td>还款责任金额</td><td>账户数</td><td>余额</td><td>关注类金额</td><td>不良类金额</td></tr></table>",
+                                            "image_path": "b062d1c173635c533946577a74b7d43b90416a2cb6736afde7055f5f1bf517d0.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 4,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 4
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        245,
+                        521,
+                        314
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                245,
+                                521,
+                                314
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        245,
+                                        521,
+                                        314
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                245,
+                                                521,
+                                                314
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"6\">已结清信贷信息概要</td></tr><tr><td colspan=\"3\">由资产公司处置的债务</td><td colspan=\"3\">垫款</td></tr><tr><td>账户数</td><td>金额</td><td>处置完成日期</td><td>账户数</td><td>金额</td><td>结清日期</td></tr><tr><td>0</td><td>0</td><td></td><td>0</td><td>0</td><td></td></tr></table>",
+                                            "image_path": "fc77d9efec155c49ef8e0b2c5d9d63ef9d50ff16461ee4ed42707e937a600218.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 5,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 5
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        321,
+                        521,
+                        364
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                321,
+                                521,
+                                364
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        321,
+                                        521,
+                                        364
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                321,
+                                                521,
+                                                364
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td></td><td>正常类账户数</td><td>关注类账户数</td><td>不良类账户数</td><td>合计</td></tr><tr><td colspan=\"5\"></td></tr></table>",
+                                            "image_path": "caa2e3532bcfa2625c384295869bae16602d693ea854324e3ed60db396a97011.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 6,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        373,
+                        521,
+                        451
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                70,
+                                373,
+                                521,
+                                451
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        373,
+                                        521,
+                                        451
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                373,
+                                                521,
+                                                451
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"12\">负债历史</td></tr><tr><td></td><td colspan=\"2\">全部负债</td><td colspan=\"2\">关注类负债</td><td colspan=\"2\">不良类负债</td><td colspan=\"5\">逾期类负债</td></tr><tr><td>月份</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>账户数</td><td>余额</td><td>逾期账户数</td><td>逾期总额</td><td>本金逾期账户数</td><td colspan=\"2\">逾期本金</td></tr></table>",
+                                            "image_path": "0315e1ed338777b765fb93808b45e438118f20c8c6dd2440fd3c78a292ab174e.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 7,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 7
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        487,
+                        521,
+                        625
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                277,
+                                472,
+                                315,
+                                482
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        277,
+                                        472,
+                                        315,
+                                        482
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                277,
+                                                472,
+                                                315,
+                                                482
+                                            ],
+                                            "type": "text",
+                                            "content": "基本信息"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 8,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                487,
+                                521,
+                                625
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        487,
+                                        521,
+                                        625
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                487,
+                                                521,
+                                                625
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"4\">基本概况信息</td></tr><tr><td>经济类型</td><td>内资</td><td>组织机构类型</td><td>企业</td></tr><tr><td>企业规模</td><td>微型企业</td><td>所属行业</td><td></td></tr><tr><td>成立年份</td><td>2022</td><td>登记证书有效截止日期</td><td>2099-12-31</td></tr><tr><td>登记地址</td><td colspan=\"3\">中国江西省赣州市章贡区江西省赣州市章贡区新赣州大道18号阳明国际中心2号楼1304-110室</td></tr><tr><td>办公/经营地址</td><td colspan=\"3\">中国江西省赣州市章贡区江西省赣州市章贡区新赣州大道18号阳明国际中心2号楼1304-110室</td></tr><tr><td>存续状态</td><td colspan=\"3\">正常营业</td></tr></table>",
+                                            "image_path": "64799c03623f993d9b0e3b2b1e27490fe65ef6d262da649c1772aa06e83bc902.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 9,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 9
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        657,
+                        521,
+                        752
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                252,
+                                635,
+                                341,
+                                645
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        252,
+                                        635,
+                                        341,
+                                        645
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                252,
+                                                635,
+                                                341,
+                                                645
+                                            ],
+                                            "type": "text",
+                                            "content": "注册资本及主要出资人信息"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 10,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                657,
+                                521,
+                                752
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        657,
+                                        521,
+                                        752
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                657,
+                                                521,
+                                                752
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"4\">主要组成人员信息</td></tr><tr><td>职位</td><td>姓名</td><td>证件类型</td><td>证件号码</td></tr><tr><td>财务负责人</td><td>方春苗</td><td>身份证</td><td>362422198303080125</td></tr><tr><td>法定代表人/非法人组织负责人</td><td>杨逢春</td><td>身份证</td><td>362102197804120010</td></tr><tr><td colspan=\"4\">更新日期：2022-09-28</td></tr></table>",
+                                            "image_path": "014ca9dcd76572abec3b2c72cbf619de6ecb1fa5bb754b4f44f448b232036a05.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 11,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 11
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        52,
+                        0,
+                        149,
+                        12
+                    ],
+                    "type": "header",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                52,
+                                0,
+                                149,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        52,
+                                        0,
+                                        149,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "企业信用报告展示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 0
+                },
+                {
+                    "bbox": [
+                        488,
+                        0,
+                        540,
+                        12
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                488,
+                                0,
+                                540,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        488,
+                                        0,
+                                        540,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "页码，2/5"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 1
+                }
+            ],
+            "page_size": [
+                595,
+                841
+            ],
+            "page_idx": 1
+        },
+        {
+            "para_blocks": [
+                {
+                    "bbox": [
+                        276,
+                        81,
+                        317,
+                        90
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                276,
+                                81,
+                                317,
+                                90
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        276,
+                                        81,
+                                        317,
+                                        90
+                                    ],
+                                    "type": "text",
+                                    "content": "无相关信息"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 3
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        97,
+                        523,
+                        135
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                268,
+                                64,
+                                324,
+                                76
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        268,
+                                        64,
+                                        324,
+                                        76
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                268,
+                                                64,
+                                                324,
+                                                76
+                                            ],
+                                            "type": "text",
+                                            "content": "信贷记录明细"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 2,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                97,
+                                523,
+                                135
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        97,
+                                        523,
+                                        135
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                97,
+                                                523,
+                                                135
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>贴现账户分机构汇总信息</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "4bfe803e8530a772ec110b930f7e7ddc1c2f98c85a08ae939175d86b17bb3395.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 4,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 4
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        139,
+                        523,
+                        193
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                139,
+                                523,
+                                193
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        139,
+                                        523,
+                                        193
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                139,
+                                                523,
+                                                193
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>担保账户</td></tr><tr><td>基本信息</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "70b7ebce438b713c3641bf2a682e5b2d836ae6fae3fe1ed1bf7df41f5bd66222.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 5,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 5
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        199,
+                        523,
+                        237
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                199,
+                                523,
+                                237
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        199,
+                                        523,
+                                        237
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                199,
+                                                523,
+                                                237
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>在保责任</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "9b102949361259bcb51ca35b9f27259d00272053b2a311eb929d6935d4c841f9.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 6,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        242,
+                        523,
+                        279
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                242,
+                                523,
+                                279
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        242,
+                                        523,
+                                        279
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                242,
+                                                523,
+                                                279
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>担保账户信息明细</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "68fe2ce86cb7d007e19a1cf5248d5f145460de6d983e66c3b4655879c51ca7d9.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 7,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 7
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        285,
+                        523,
+                        338
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                285,
+                                523,
+                                338
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        285,
+                                        523,
+                                        338
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                285,
+                                                523,
+                                                338
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>授信协议</td></tr><tr><td>授信协议信息</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "58223aef817aaabf5c53f38902716558f1d67ca49b95a06a2bb7799edb03a347.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 8,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 8
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        343,
+                        523,
+                        549
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                343,
+                                523,
+                                549
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        343,
+                                        523,
+                                        549
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                343,
+                                                523,
+                                                549
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"12\">相关还款责任</td></tr><tr><td colspan=\"12\">借贷账户（不含贴现）</td></tr><tr><td>账户编号</td><td>主借款人身份类别</td><td>账户类型</td><td>责任类型</td><td>币种（相关还款责任金额）</td><td>还款责任金额</td><td>管理机构类型</td><td>管理机构</td><td>业务种类</td><td>业务种类细分</td><td>开立日期</td><td>到期日期</td></tr><tr><td>币种</td><td>余额</td><td>五级分类</td><td>逾期总额</td><td>逾期本金</td><td>逾期月数</td><td>还款状态</td><td>剩余还款月数</td><td>借款金额</td><td>信用额度</td><td>保证合同编号</td><td>信息报告日期</td></tr><tr><td>S1444</td><td>组织机构</td><td>非循环贷账户</td><td>保证人/反担保人</td><td>CNY</td><td>8000000</td><td>商业银行</td><td>7328</td><td>贷款</td><td>流动资金贷款</td><td>2023-12-14</td><td>2024-12-13</td></tr><tr><td>人民币</td><td>8000000</td><td>正常</td><td>0</td><td>0</td><td>0</td><td></td><td></td><td>800000</td><td></td><td>P374</td><td>2024-07-21</td></tr></table>",
+                                            "image_path": "84992b064e00049e678c0e6ba0122c77cd77f779a593b111816b8598bb534329.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 9,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 9
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        555,
+                        523,
+                        592
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                555,
+                                523,
+                                592
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        555,
+                                        523,
+                                        592
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                555,
+                                                523,
+                                                592
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>贴现账户</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "fc3562119123426266be94c66c1477abcbc5a970480ac29106a20b8781037519.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 10,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 10
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        597,
+                        523,
+                        634
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                597,
+                                523,
+                                634
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        597,
+                                        523,
+                                        634
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                597,
+                                                523,
+                                                634
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>担保账户</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "c373181d731b277aee2676a2a13a3ea89965a8392bbfdda29a2074200c85ca16.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 11,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 11
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        70,
+                        669,
+                        523,
+                        740
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                263,
+                                654,
+                                329,
+                                666
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        263,
+                                        654,
+                                        329,
+                                        666
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                263,
+                                                654,
+                                                329,
+                                                666
+                                            ],
+                                            "type": "text",
+                                            "content": "非信贷记录明细"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 12,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                70,
+                                669,
+                                523,
+                                740
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        669,
+                                        523,
+                                        740
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                70,
+                                                669,
+                                                523,
+                                                740
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"2\">公用事业缴费信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">过去24个月缴费情况</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>",
+                                            "image_path": "d8609324448cac69708e05c6d6aa806ab870b740fb8d85ee19228403cdf73790.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 13,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 13
+                },
+                {
+                    "bbox": [
+                        268,
+                        758,
+                        324,
+                        769
+                    ],
+                    "lines": [
+                        {
+                            "bbox": [
+                                268,
+                                758,
+                                324,
+                                769
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        268,
+                                        758,
+                                        324,
+                                        769
+                                    ],
+                                    "type": "text",
+                                    "content": "公共记录明细"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 14,
+                    "angle": 0,
+                    "type": "text"
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        52,
+                        0,
+                        149,
+                        11
+                    ],
+                    "type": "header",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                52,
+                                0,
+                                149,
+                                11
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        52,
+                                        0,
+                                        149,
+                                        11
+                                    ],
+                                    "type": "text",
+                                    "content": "企业信用报告展示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 0
+                },
+                {
+                    "bbox": [
+                        488,
+                        0,
+                        540,
+                        12
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                488,
+                                0,
+                                540,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        488,
+                                        0,
+                                        540,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "页码，3/5"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 1
+                }
+            ],
+            "page_size": [
+                595,
+                841
+            ],
+            "page_idx": 2
+        },
+        {
+            "para_blocks": [
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        50,
+                        523,
+                        211
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                50,
+                                523,
+                                211
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        50,
+                                        523,
+                                        211
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                50,
+                                                523,
+                                                211
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"2\">欠税信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">民事判决记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">强制执行记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">行政处罚记录</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>",
+                                            "image_path": "0b2746d0130914bf884d91173c7cf433c7dca2885e314a57aba5aea6eff5f726.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 2,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "bbox": [
+                        276,
+                        245,
+                        317,
+                        255
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                276,
+                                245,
+                                317,
+                                255
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        276,
+                                        245,
+                                        317,
+                                        255
+                                    ],
+                                    "type": "text",
+                                    "content": "无相关信息"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 4
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        263,
+                        523,
+                        383
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                254,
+                                228,
+                                339,
+                                240
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        254,
+                                        228,
+                                        339,
+                                        240
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                254,
+                                                228,
+                                                339,
+                                                240
+                                            ],
+                                            "type": "text",
+                                            "content": "住房公积金缴费记录"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 3,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                263,
+                                523,
+                                383
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        263,
+                                        523,
+                                        383
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                263,
+                                                523,
+                                                383
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>获得许可记录</td></tr><tr><td>无相关信息</td></tr><tr><td>获得认证记录</td></tr><tr><td>无相关信息</td></tr><tr><td>获得资质记录</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "0af4929e4f7cb106c34ddb71a330402cb615937f53e85a948c69a66c41c4b301.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 5,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 5
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        389,
+                        523,
+                        467
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                389,
+                                523,
+                                467
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        389,
+                                        523,
+                                        467
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                389,
+                                                523,
+                                                467
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>获得奖励记录</td></tr><tr><td>无相关信息</td></tr><tr><td>拥有专利情况</td></tr><tr><td>无相关信息</td></tr></table>",
+                                            "image_path": "1ab15d12fd0d5158160f44596a3208c3152add5c9ee4d203bbe2cd68175d23ee.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 6,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 6
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        473,
+                        523,
+                        552
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                473,
+                                523,
+                                552
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        473,
+                                        523,
+                                        552
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                473,
+                                                523,
+                                                552
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"2\">出入境检验检疫绿色通道信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td>进出口商品免验信息</td><td>张小伟1313012024</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>",
+                                            "image_path": "31784653bce865524c0f9fb7d69495cd0163acfa32b52f44e6590fe04a7530ee.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 7,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 7
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        556,
+                        523,
+                        635
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                69,
+                                556,
+                                523,
+                                635
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        556,
+                                        523,
+                                        635
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                556,
+                                                523,
+                                                635
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td colspan=\"2\">进出口商品检验分类监管信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr><tr><td colspan=\"2\">融资规模控制信息</td></tr><tr><td colspan=\"2\">无相关信息</td></tr></table>",
+                                            "image_path": "ca045c484857d5e0e7ac8e72c05fe9cf677ae39deed0caf8e6f6dbc353873608.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 8,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 8
+                },
+                {
+                    "bbox": [
+                        277,
+                        653,
+                        315,
+                        665
+                    ],
+                    "lines": [
+                        {
+                            "bbox": [
+                                277,
+                                653,
+                                315,
+                                665
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        277,
+                                        653,
+                                        315,
+                                        665
+                                    ],
+                                    "type": "text",
+                                    "content": "财务报表"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 9,
+                    "angle": 0,
+                    "type": "text"
+                },
+                {
+                    "bbox": [
+                        70,
+                        669,
+                        126,
+                        680
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                70,
+                                669,
+                                126,
+                                680
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        70,
+                                        669,
+                                        126,
+                                        680
+                                    ],
+                                    "type": "text",
+                                    "content": "精简版/详情版"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 10
+                },
+                {
+                    "type": "table",
+                    "bbox": [
+                        69,
+                        717,
+                        523,
+                        736
+                    ],
+                    "blocks": [
+                        {
+                            "bbox": [
+                                277,
+                                701,
+                                315,
+                                712
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        277,
+                                        701,
+                                        315,
+                                        712
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                277,
+                                                701,
+                                                315,
+                                                712
+                                            ],
+                                            "type": "text",
+                                            "content": "评级信息"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 11,
+                            "angle": 0,
+                            "type": "table_caption"
+                        },
+                        {
+                            "bbox": [
+                                69,
+                                717,
+                                523,
+                                736
+                            ],
+                            "lines": [
+                                {
+                                    "bbox": [
+                                        69,
+                                        717,
+                                        523,
+                                        736
+                                    ],
+                                    "spans": [
+                                        {
+                                            "bbox": [
+                                                69,
+                                                717,
+                                                523,
+                                                736
+                                            ],
+                                            "type": "table",
+                                            "html": "<table><tr><td>无相关信息</td><td>2024</td></tr></table>",
+                                            "image_path": "21f8053d1abe1018cb984bfa975ce4511376122f323f7e3ee2096f8f4c63b7e3.jpg"
+                                        }
+                                    ]
+                                }
+                            ],
+                            "index": 12,
+                            "angle": 0,
+                            "type": "table_body"
+                        }
+                    ],
+                    "index": 12
+                },
+                {
+                    "bbox": [
+                        254,
+                        746,
+                        338,
+                        757
+                    ],
+                    "lines": [
+                        {
+                            "bbox": [
+                                254,
+                                746,
+                                338,
+                                757
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        254,
+                                        746,
+                                        338,
+                                        757
+                                    ],
+                                    "type": "text",
+                                    "content": "声明及异议标注信息"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 13,
+                    "angle": 0,
+                    "type": "text"
+                },
+                {
+                    "bbox": [
+                        276,
+                        762,
+                        317,
+                        772
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                276,
+                                762,
+                                317,
+                                772
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        276,
+                                        762,
+                                        317,
+                                        772
+                                    ],
+                                    "type": "text",
+                                    "content": "无相关信息"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 14
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        52,
+                        0,
+                        149,
+                        12
+                    ],
+                    "type": "header",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                52,
+                                0,
+                                149,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        52,
+                                        0,
+                                        149,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "企业信用报告展示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 0
+                },
+                {
+                    "bbox": [
+                        488,
+                        0,
+                        540,
+                        12
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                488,
+                                0,
+                                540,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        488,
+                                        0,
+                                        540,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "页码，4/5"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 1
+                }
+            ],
+            "page_size": [
+                595,
+                841
+            ],
+            "page_idx": 3
+        },
+        {
+            "para_blocks": [
+                {
+                    "bbox": [
+                        254,
+                        52,
+                        339,
+                        63
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                254,
+                                52,
+                                339,
+                                63
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        254,
+                                        52,
+                                        339,
+                                        63
+                                    ],
+                                    "type": "text",
+                                    "content": "保密资料 禁止外传"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 2
+                },
+                {
+                    "bbox": [
+                        265,
+                        71,
+                        285,
+                        80
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                265,
+                                71,
+                                285,
+                                80
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        265,
+                                        71,
+                                        285,
+                                        80
+                                    ],
+                                    "type": "text",
+                                    "content": "打印"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 3
+                },
+                {
+                    "bbox": [
+                        296,
+                        72,
+                        323,
+                        80
+                    ],
+                    "type": "text",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                296,
+                                72,
+                                323,
+                                80
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        296,
+                                        72,
+                                        323,
+                                        80
+                                    ],
+                                    "type": "text",
+                                    "content": "打印预览"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 4
+                }
+            ],
+            "discarded_blocks": [
+                {
+                    "bbox": [
+                        52,
+                        0,
+                        149,
+                        12
+                    ],
+                    "type": "header",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                52,
+                                0,
+                                149,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        52,
+                                        0,
+                                        149,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "企业信用报告展示"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 0
+                },
+                {
+                    "bbox": [
+                        487,
+                        0,
+                        540,
+                        12
+                    ],
+                    "type": "page_number",
+                    "angle": 0,
+                    "lines": [
+                        {
+                            "bbox": [
+                                487,
+                                0,
+                                540,
+                                12
+                            ],
+                            "spans": [
+                                {
+                                    "bbox": [
+                                        487,
+                                        0,
+                                        540,
+                                        12
+                                    ],
+                                    "type": "text",
+                                    "content": "页码，5/5"
+                                }
+                            ]
+                        }
+                    ],
+                    "index": 1
+                }
+            ],
+            "page_size": [
+                595,
+                841
+            ],
+            "page_idx": 4
+        }
+    ],
+    "_backend": "vlm",
+    "_version_name": "2.6.2"
+}
