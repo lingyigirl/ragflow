@@ -53,6 +53,7 @@ import tempfile
 import zipfile
 import base64
 import shutil
+from urllib.parse import quote
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
@@ -717,7 +718,9 @@ async def get(doc_id):
 async def download_attachment(attachment_id):
     try:
         ext = request.args.get("ext", "markdown")
-        data = await asyncio.to_thread(settings.STORAGE_IMPL.get, current_user.id, attachment_id)
+        # 支持通过查询参数指定bucket，如果不指定则使用current_user.id
+        bucket = request.args.get("bucket", current_user.id)
+        data = await asyncio.to_thread(settings.STORAGE_IMPL.get, bucket, attachment_id)
         response = await make_response(data)
         response.headers.set("Content-Type", CONTENT_TYPE_MAP.get(ext, f"application/{ext}"))
 
@@ -1250,6 +1253,107 @@ async def mineru_parse():
             message=f"MinerU API request failed: {str(e)}",
             code=RetCode.SERVER_ERROR
         )
+    except Exception as e:
+        return server_error_response(e)
+
+
+@manager.route("/mineru_download/<file_type>", methods=["GET"])  # noqa: F821
+@login_required
+async def mineru_download(file_type):
+    try:
+        kb_id_raw = request.args.get("kb_id")
+        doc_id_raw = request.args.get("doc_id")
+        
+        kb_id = (kb_id_raw or "").strip() if kb_id_raw is not None else ""
+        doc_id = (doc_id_raw or "").strip() if doc_id_raw is not None else ""
+        file_type = (file_type or "").strip().lower()
+
+        if not kb_id or not doc_id:
+            missing_params = []
+            if not kb_id:
+                missing_params.append("kb_id")
+            if not doc_id:
+                missing_params.append("doc_id")
+            received_params = list(request.args.keys())
+            return get_json_result(
+                data=False,
+                message=f"请提供知识库ID（kb_id）和文档ID（doc_id）。缺少参数：{', '.join(missing_params)}。"
+                       f"当前接收到的查询参数：{', '.join(received_params) if received_params else '无'}。"
+                       f"请确保使用 GET 请求，并将 kb_id 和 doc_id 作为 URL 查询参数传递，例如："
+                       f"/v1/document/mineru_download/json?kb_id=xxx&doc_id=yyy",
+                code=RetCode.ARGUMENT_ERROR
+            )
+
+        valid_file_types = ["json", "markdown", "pdf"]
+        if file_type not in valid_file_types:
+            return get_json_result(
+                data=False,
+                message=f"文件类型必须是以下之一：{', '.join(valid_file_types)}",
+                code=RetCode.ARGUMENT_ERROR
+            )
+
+        e, kb = KnowledgebaseService.get_by_id(kb_id)
+        if not e:
+            return get_json_result(data=False, message="知识库不存在", code=RetCode.NOT_FOUND)
+        check_kb_team_permission(kb, current_user.id)
+
+        e, doc = DocumentService.get_by_id(doc_id)
+        if not e or not doc:
+            return get_json_result(data=False, message="文档不存在", code=RetCode.NOT_FOUND)
+        if str(doc.kb_id) != str(kb_id):
+            return get_json_result(data=False, message="文档不属于该知识库", code=RetCode.ARGUMENT_ERROR)
+
+        file_location = None
+        list_fn = getattr(settings.STORAGE_IMPL, "list_objects", None)
+        if callable(list_fn):
+            keys = list_fn(kb_id, f"{doc_id}/")
+
+            if file_type == "json":
+                target_file = f"{doc_id}/content_list.json"
+                if settings.STORAGE_IMPL.obj_exist(kb_id, target_file):
+                    file_location = target_file
+            elif file_type == "markdown":
+                for key in keys:
+                    if key.lower().endswith(".md"):
+                        file_location = key
+                        break
+            elif file_type == "pdf":
+                for key in keys:
+                    if key.lower().endswith(".pdf"):
+                        file_location = key
+                        break
+
+        if not file_location:
+            return get_json_result(
+                data=False,
+                message=f"未找到该文档的 {file_type} 文件",
+                code=RetCode.NOT_FOUND
+            )
+
+        file_content = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, file_location)
+        if file_content is None or len(file_content) == 0:
+            return get_json_result(
+                data=False,
+                message="文件读取失败或文件为空",
+                code=RetCode.SERVER_ERROR
+            )
+
+        download_filename = Path(file_location).name
+        if not download_filename:
+            download_filename = {"json": "content_list.json", "markdown": "document.md", "pdf": "document.pdf"}.get(file_type, "download")
+
+        ext_for_type = {"json": "json", "markdown": "markdown", "pdf": "pdf"}
+        ext = ext_for_type.get(file_type, file_type)
+        content_type = CONTENT_TYPE_MAP.get(ext, f"application/{ext}")
+
+        response = await make_response(file_content)
+        response.headers.set("Content-Type", content_type)
+        response.headers.set(
+            "Content-Disposition",
+            f"attachment; filename*=UTF-8''{quote(download_filename)}"
+        )
+        return response
+
     except Exception as e:
         return server_error_response(e)
 

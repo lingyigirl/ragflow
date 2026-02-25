@@ -290,6 +290,7 @@ class Base(ABC):
                 for _ in range(self.max_rounds + 1):
                     logging.info(f"{self.tools=}")
                     response = await self.async_client.chat.completions.create(model=self.model_name, messages=history, tools=self.tools, tool_choice="auto", **gen_conf)
+
                     tk_count += total_token_count_from_response(response)
                     if any([not response.choices, not response.choices[0].message]):
                         raise Exception(f"500 response structure error. Response: {response}")
@@ -469,6 +470,7 @@ class Base(ABC):
         ans = response.choices[0].message.content.strip()
         if response.choices[0].finish_reason == "length":
             ans = self._length_stop(ans)
+
         return ans, total_token_count_from_response(response)
 
     async def async_chat(self, system, history, gen_conf={}, **kwargs):
