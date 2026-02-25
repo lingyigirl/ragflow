@@ -34,6 +34,7 @@ from PIL import Image
 from strenum import StrEnum
 
 from deepdoc.parser.pdf_parser import RAGFlowPdfParser
+from common import settings
 
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
 if LOCK_KEY_pdfplumber not in sys.modules:
@@ -540,6 +541,131 @@ class MinerUParser(RAGFlowPdfParser):
     def _transfer_to_tables(self, outputs: list[dict[str, Any]]):
         return []
 
+    def _upload_mineru_outputs_to_minio(
+        self,
+        output_dir: Path,
+        kb_id: str,
+        doc_id: str,
+        content_list: list[dict[str, Any]],
+        callback: Optional[Callable] = None,
+    ) -> bool:
+        try:
+            base_prefix = f"{doc_id}"
+            self.logger.info(f"[MinerU] 开始上传解析产物到MinIO: bucket={kb_id}, prefix={base_prefix}")
+            
+            if callback:
+                callback(0.76, f"[MinerU] 开始上传解析产物到MinIO...")
+            
+            content_list_location = f"{base_prefix}/content_list.json"
+            content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
+            settings.STORAGE_IMPL.put(kb_id, content_list_location, content_list_json_str.encode("utf-8"))
+            self.logger.info(f"[MinerU] 已上传content_list.json: bucket={kb_id}, location={content_list_location}")
+            
+            if callback:
+                callback(0.78, f"[MinerU] 已上传content_list.json")
+            
+            markdown_files = list(output_dir.rglob("*.md"))
+            markdown_uploaded = False
+            if markdown_files:
+                md_file = markdown_files[0] 
+                try:
+                    with open(md_file, "r", encoding="utf-8") as f:
+                        markdown_content = f.read()
+                    markdown_location = f"{base_prefix}/{md_file.name}"
+                    settings.STORAGE_IMPL.put(kb_id, markdown_location, markdown_content.encode("utf-8"))
+                    self.logger.info(f"[MinerU] 已上传Markdown文件: bucket={kb_id}, location={markdown_location}")
+                    markdown_uploaded = True
+                    if callback:
+                        callback(0.80, f"[MinerU] 已上传Markdown文件")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传Markdown文件失败: {e}")
+            else:
+                self.logger.info(f"[MinerU] 未找到Markdown文件，跳过上传")
+            
+            image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+            processed_image_paths = set() 
+            image_files_to_upload = []
+            
+            for item in content_list:
+                for img_key in ["img_path", "table_img_path", "equation_img_path"]:
+                    if img_key in item and item[img_key]:
+                        img_path_str = item[img_key]
+                        
+                        img_path = Path(img_path_str)
+                        
+                        if not img_path.exists():
+                            img_filename = Path(img_path_str).name
+                            found_img = None
+                            for possible_img in output_dir.rglob(img_filename):
+                                found_img = possible_img
+                                break
+                            if found_img:
+                                img_path = found_img
+                        
+                        if img_path.exists() and img_path.suffix.lower() in image_extensions:
+                            try:
+                                img_relative_path = str(img_path.relative_to(output_dir))
+                                
+                                if img_relative_path not in processed_image_paths:
+                                    processed_image_paths.add(img_relative_path)
+                                    image_files_to_upload.append({
+                                        "path": img_path,
+                                        "relative_path": img_relative_path,
+                                    })
+                            except ValueError:
+                                self.logger.warning(f"[MinerU] 图片路径不在输出目录内，跳过: {img_path}")
+                                continue
+            
+            for img_file in output_dir.rglob("*"):
+                if img_file.is_file() and img_file.suffix.lower() in image_extensions:
+                    img_relative_path = str(img_file.relative_to(output_dir))
+                    
+                    if img_relative_path not in processed_image_paths:
+                        processed_image_paths.add(img_relative_path)
+                        image_files_to_upload.append({
+                            "path": img_file,
+                            "relative_path": img_relative_path,
+                        })
+            
+            uploaded_image_count = 0
+            for img_info in image_files_to_upload:
+                img_path = img_info["path"]
+                img_filename = img_path.name
+                
+                try:
+                    with open(img_path, "rb") as img_file:
+                        img_data = img_file.read()
+                    
+                    img_location = f"{base_prefix}/images/{img_filename}"
+                    settings.STORAGE_IMPL.put(kb_id, img_location, img_data)
+                    uploaded_image_count += 1
+                    self.logger.debug(f"[MinerU] 已上传图片: bucket={kb_id}, location={img_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传图片失败 {img_filename}: {e}")
+            
+            if uploaded_image_count > 0:
+                self.logger.info(f"[MinerU] 已上传 {uploaded_image_count} 张图片到MinIO (bucket: {kb_id}, prefix: {base_prefix})")
+                if callback:
+                    callback(0.85, f"[MinerU] 已上传 {uploaded_image_count} 张图片")
+            else:
+                self.logger.info(f"[MinerU] 未找到图片文件，跳过上传")
+            
+            self.logger.info(
+                f"[MinerU] 上传完成: bucket={kb_id}, prefix={base_prefix}, "
+                f"content_list=已上传, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张"
+            )
+            
+            if callback:
+                callback(0.90, f"[MinerU] 解析产物上传完成")
+            
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"[MinerU] 上传解析产物到MinIO失败: {e}", exc_info=True)
+            if callback:
+                callback(-1, f"[MinerU] 上传解析产物到MinIO失败: {e}")
+            return False
+
     def parse_pdf(
             self,
             filepath: str | PathLike[str],
@@ -618,6 +744,22 @@ class MinerUParser(RAGFlowPdfParser):
             self.logger.info(f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
             if callback:
                 callback(0.75, f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
+
+            kb_id = kwargs.get('kb_id')
+            doc_id = kwargs.get('doc_id')
+            self.logger.info(f"###Mineru解析判断: kb_id={kwargs.get('kb_id')}, doc_id={kwargs.get('doc_id')}###")
+
+            if kb_id and doc_id:
+                try:
+                    self._upload_mineru_outputs_to_minio(
+                        output_dir=final_out_dir,
+                        kb_id=kb_id,
+                        doc_id=doc_id,
+                        content_list=outputs,
+                        callback=callback
+                    )
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传解析产物到MinIO失败: {e}", exc_info=True)
 
             return self._transfer_to_sections(outputs, parse_method), self._transfer_to_tables(outputs)
         finally:

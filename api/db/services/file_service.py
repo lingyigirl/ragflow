@@ -457,6 +457,9 @@ class FileService(CommonService):
 
                 doc_id = get_uuid()
 
+                doc_id_location = f"{doc_id}/{filename}" 
+                settings.STORAGE_IMPL.put(kb.id, doc_id_location, blob) 
+
                 img = thumbnail_img(filename, blob)
                 thumbnail_location = ""
                 if img is not None:
