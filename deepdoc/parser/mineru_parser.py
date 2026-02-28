@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import base64
 import json
 import logging
 import os
@@ -35,6 +36,9 @@ from strenum import StrEnum
 
 from deepdoc.parser.pdf_parser import RAGFlowPdfParser
 from common import settings
+
+# 图片下载链接统一使用无鉴权接口，写入 JSON 时只使用该前缀，避免出现 /v1/document/download/
+DOCUMENT_PUBLIC_DOWNLOAD_PREFIX = "/v1/document/public_download"
 
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
 if LOCK_KEY_pdfplumber not in sys.modules:
@@ -541,6 +545,30 @@ class MinerUParser(RAGFlowPdfParser):
     def _transfer_to_tables(self, outputs: list[dict[str, Any]]):
         return []
 
+    def _convert_content_list_to_markdown(self, content_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        new_content_list: list[dict[str, Any]] = []
+        for item in content_list:
+            new_item = dict(item)
+            item_type = new_item.get("type")
+            if item_type == MinerUContentType.TEXT or item_type == MinerUContentType.TEXT.value:
+                text = new_item.get("text")
+                if isinstance(text, str) and text.strip():
+                    text_level = new_item.get("text_level")
+                    level_int = 0
+                    if isinstance(text_level, int):
+                        level_int = text_level
+                    elif isinstance(text_level, str):
+                        try:
+                            level_int = int(text_level)
+                        except ValueError:
+                            level_int = 0
+                    if level_int > 0:
+                        level_int = max(1, min(6, level_int))
+                        if not text.lstrip().startswith("#"):
+                            new_item["text"] = f"{'#' * level_int} {text}"
+            new_content_list.append(new_item)
+        return new_content_list
+
     def _upload_mineru_outputs_to_minio(
         self,
         output_dir: Path,
@@ -550,25 +578,180 @@ class MinerUParser(RAGFlowPdfParser):
         callback: Optional[Callable] = None,
     ) -> bool:
         try:
+            if not output_dir or not output_dir.exists():
+                self.logger.error(f"[MinerU] 上传MinIO失败: output_dir 不存在或无效: {output_dir}")
+                if callback:
+                    callback(-1, f"[MinerU] 解析输出目录无效: {output_dir}")
+                return False
+            if not output_dir.is_dir():
+                self.logger.error(f"[MinerU] 上传MinIO失败: output_dir 不是目录: {output_dir}")
+                if callback:
+                    callback(-1, f"[MinerU] 解析输出路径不是目录: {output_dir}")
+                return False
+
             base_prefix = f"{doc_id}"
             self.logger.info(f"[MinerU] 开始上传解析产物到MinIO: bucket={kb_id}, prefix={base_prefix}")
-            
+
+            _IMG_KEYS_NORM = ("img_path", "table_img_path", "equation_img_path")
+
+            def _normalize_download_to_public(obj: Any) -> None:
+                if isinstance(obj, dict):
+                    for k in list(obj.keys()):
+                        if k in _IMG_KEYS_NORM and obj[k] and isinstance(obj[k], str) and "/v1/document/download/" in obj[k]:
+                            obj[k] = obj[k].replace("/v1/document/download/", f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/", 1)
+                        else:
+                            _normalize_download_to_public(obj[k])
+                elif isinstance(obj, list):
+                    for v in obj:
+                        _normalize_download_to_public(v)
+
+            for item in content_list:
+                _normalize_download_to_public(item)
+
             if callback:
                 callback(0.76, f"[MinerU] 开始上传解析产物到MinIO...")
-            
-            content_list_location = f"{base_prefix}/content_list.json"
-            content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
-            settings.STORAGE_IMPL.put(kb_id, content_list_location, content_list_json_str.encode("utf-8"))
-            self.logger.info(f"[MinerU] 已上传content_list.json: bucket={kb_id}, location={content_list_location}")
-            
-            if callback:
-                callback(0.78, f"[MinerU] 已上传content_list.json")
-            
-            markdown_files = list(output_dir.rglob("*.md"))
+
+            image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
+            processed_image_paths: set[str] = set()
+            image_files_to_upload: list[dict] = []
+            img_path_to_minio_url: dict[str, str] = {}
+            _IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
+
+            def _collect_img_paths(obj: Any):
+                if isinstance(obj, dict):
+                    for k in list(obj.keys()):
+                        if k in _IMG_KEYS and obj[k] and isinstance(obj[k], str):
+                            yield obj[k]
+                        else:
+                            yield from _collect_img_paths(obj[k])
+                elif isinstance(obj, list):
+                    for v in obj:
+                        yield from _collect_img_paths(v)
+
+            for item in content_list:
+                for img_path_str in _collect_img_paths(item):
+                    raw_str = str(img_path_str).strip()
+                    if not raw_str:
+                        continue
+                    img_path = (output_dir / raw_str) if not os.path.isabs(raw_str) else Path(raw_str)
+                    if not img_path.exists():
+                        img_filename = Path(raw_str).name
+                        found_img = None
+                        for possible_img in output_dir.rglob(img_filename):
+                            found_img = possible_img
+                            break
+                        if found_img:
+                            img_path = found_img
+                    if img_path.exists() and img_path.is_file() and img_path.suffix.lower() in image_extensions:
+                        try:
+                            img_relative_path = str(img_path.relative_to(output_dir))
+                            if img_relative_path not in processed_image_paths:
+                                processed_image_paths.add(img_relative_path)
+                                image_files_to_upload.append({"path": img_path, "relative_path": img_relative_path})
+                            filename = img_path.name
+                            minio_key = f"{base_prefix}/images/{filename}"
+                            ext = img_path.suffix.lstrip(".") or "jpg"
+                            key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
+                            download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
+                            img_path_to_minio_url[raw_str] = download_url
+                            img_path_to_minio_url[raw_str.replace("\\", "/")] = download_url
+                            img_path_to_minio_url[img_relative_path] = download_url
+                            img_path_to_minio_url[filename] = download_url
+                        except ValueError:
+                            self.logger.warning(f"[MinerU] 图片路径不在输出目录内，跳过: {img_path}")
+
+            for img_file in output_dir.rglob("*"):
+                if img_file.is_file() and img_file.suffix.lower() in image_extensions:
+                    img_relative_path = str(img_file.relative_to(output_dir))
+                    if img_relative_path not in processed_image_paths:
+                        processed_image_paths.add(img_relative_path)
+                        image_files_to_upload.append({"path": img_file, "relative_path": img_relative_path})
+                        filename = img_file.name
+                        minio_key = f"{base_prefix}/images/{filename}"
+                        ext = img_file.suffix.lstrip(".") or "jpg"
+                        key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
+                        download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
+                        img_path_to_minio_url[img_relative_path] = download_url
+                        img_path_to_minio_url[filename] = download_url
+
+            IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
+            _IMG_KEY_SET = {k.lower() for k in IMG_KEYS}
+
+            def _is_local_img_path(s: str) -> bool:
+                s = (s or "").strip()
+                if not s or s.startswith("/v1/document/"):
+                    return False
+                return "/" in s or "\\" in s or s.lower().endswith((".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"))
+
+            def _replace_img_paths_in_obj(obj: Any, path: str = "") -> None:
+                if isinstance(obj, dict):
+                    for k in list(obj.keys()):
+                        if (k in IMG_KEYS or k.lower() in _IMG_KEY_SET) and obj[k] and isinstance(obj[k], str):
+                            raw = str(obj[k]).strip()
+                            cands = [raw, raw.replace("\\", "/"), Path(raw).name]
+                            try:
+                                cands.append(str(Path(raw).resolve()))
+                                cands.append(str(Path(raw).relative_to(output_dir)))
+                            except (ValueError, OSError):
+                                pass
+                            replaced = False
+                            for cand in cands:
+                                if cand and cand in img_path_to_minio_url:
+                                    obj[k] = img_path_to_minio_url[cand]
+                                    replaced = True
+                                    break
+                            if not replaced:
+                                for part in raw.replace("\\", "/").split("/"):
+                                    if part and any(part.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")):
+                                        if part in img_path_to_minio_url:
+                                            obj[k] = img_path_to_minio_url[part]
+                                            replaced = True
+                                        break
+                            if not replaced and _is_local_img_path(raw):
+                                self.logger.warning(f"[MinerU] ⚠ 未匹配到下载链接: path={path}, key={k}, value={raw}")
+                        else:
+                            _replace_img_paths_in_obj(obj[k], f"{path}.{k}" if path else k)
+                elif isinstance(obj, list):
+                    for i, v in enumerate(obj):
+                        _replace_img_paths_in_obj(v, f"{path}[{i}]" if path else f"[{i}]")
+
+            for idx, item in enumerate(content_list):
+                _replace_img_paths_in_obj(item, f"item[{idx}]")
+
+            def _normalize_to_public_download(obj: Any) -> None:
+                if isinstance(obj, dict):
+                    for k in list(obj.keys()):
+                        if k in IMG_KEYS and obj[k] and isinstance(obj[k], str) and "/v1/document/download/" in obj[k]:
+                            obj[k] = obj[k].replace("/v1/document/download/", f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/", 1)
+                        else:
+                            _normalize_to_public_download(obj[k])
+                elif isinstance(obj, list):
+                    for v in obj:
+                        _normalize_to_public_download(v)
+
+            for item in content_list:
+                _normalize_to_public_download(item)
+
+            json_uploaded = False
+            try:
+                content_list_location = f"{base_prefix}/content_list.json"
+                content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
+                settings.STORAGE_IMPL.put(kb_id, content_list_location, content_list_json_str.encode("utf-8"))
+                self.logger.info(f"[MinerU] 已上传content_list.json: bucket={kb_id}, location={content_list_location}")
+                json_uploaded = True
+                if callback:
+                    callback(0.78, f"[MinerU] 已上传content_list.json")
+            except Exception as e:
+                self.logger.error(f"[MinerU] 上传 content_list.json 失败: {e}", exc_info=True)
+                if callback:
+                    callback(-1, f"[MinerU] 上传 content_list.json 失败: {e}")
+                return False
+
             markdown_uploaded = False
-            if markdown_files:
-                md_file = markdown_files[0] 
-                try:
+            try:
+                markdown_files = list(output_dir.rglob("*.md"))
+                if markdown_files:
+                    md_file = markdown_files[0]
                     with open(md_file, "r", encoding="utf-8") as f:
                         markdown_content = f.read()
                     markdown_location = f"{base_prefix}/{md_file.name}"
@@ -577,89 +760,40 @@ class MinerUParser(RAGFlowPdfParser):
                     markdown_uploaded = True
                     if callback:
                         callback(0.80, f"[MinerU] 已上传Markdown文件")
-                except Exception as e:
-                    self.logger.warning(f"[MinerU] 上传Markdown文件失败: {e}")
-            else:
-                self.logger.info(f"[MinerU] 未找到Markdown文件，跳过上传")
-            
-            image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
-            processed_image_paths = set() 
-            image_files_to_upload = []
-            
-            for item in content_list:
-                for img_key in ["img_path", "table_img_path", "equation_img_path"]:
-                    if img_key in item and item[img_key]:
-                        img_path_str = item[img_key]
-                        
-                        img_path = Path(img_path_str)
-                        
-                        if not img_path.exists():
-                            img_filename = Path(img_path_str).name
-                            found_img = None
-                            for possible_img in output_dir.rglob(img_filename):
-                                found_img = possible_img
-                                break
-                            if found_img:
-                                img_path = found_img
-                        
-                        if img_path.exists() and img_path.suffix.lower() in image_extensions:
-                            try:
-                                img_relative_path = str(img_path.relative_to(output_dir))
-                                
-                                if img_relative_path not in processed_image_paths:
-                                    processed_image_paths.add(img_relative_path)
-                                    image_files_to_upload.append({
-                                        "path": img_path,
-                                        "relative_path": img_relative_path,
-                                    })
-                            except ValueError:
-                                self.logger.warning(f"[MinerU] 图片路径不在输出目录内，跳过: {img_path}")
-                                continue
-            
-            for img_file in output_dir.rglob("*"):
-                if img_file.is_file() and img_file.suffix.lower() in image_extensions:
-                    img_relative_path = str(img_file.relative_to(output_dir))
-                    
-                    if img_relative_path not in processed_image_paths:
-                        processed_image_paths.add(img_relative_path)
-                        image_files_to_upload.append({
-                            "path": img_file,
-                            "relative_path": img_relative_path,
-                        })
-            
+                else:
+                    self.logger.info(f"[MinerU] 未找到Markdown文件，跳过上传")
+            except Exception as e:
+                self.logger.warning(f"[MinerU] 上传Markdown文件失败: {e}")
+
             uploaded_image_count = 0
             for img_info in image_files_to_upload:
                 img_path = img_info["path"]
                 img_filename = img_path.name
-                
                 try:
                     with open(img_path, "rb") as img_file:
                         img_data = img_file.read()
-                    
                     img_location = f"{base_prefix}/images/{img_filename}"
                     settings.STORAGE_IMPL.put(kb_id, img_location, img_data)
                     uploaded_image_count += 1
                     self.logger.debug(f"[MinerU] 已上传图片: bucket={kb_id}, location={img_location}")
                 except Exception as e:
                     self.logger.warning(f"[MinerU] 上传图片失败 {img_filename}: {e}")
-            
+
             if uploaded_image_count > 0:
                 self.logger.info(f"[MinerU] 已上传 {uploaded_image_count} 张图片到MinIO (bucket: {kb_id}, prefix: {base_prefix})")
                 if callback:
                     callback(0.85, f"[MinerU] 已上传 {uploaded_image_count} 张图片")
             else:
                 self.logger.info(f"[MinerU] 未找到图片文件，跳过上传")
-            
+
             self.logger.info(
-                f"[MinerU] 上传完成: bucket={kb_id}, prefix={base_prefix}, "
-                f"content_list=已上传, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张"
+                f"[MinerU] 解析产物上传完成: bucket={kb_id}, prefix={base_prefix}, "
+                f"json={'已上传' if json_uploaded else '失败'}, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张"
             )
-            
             if callback:
                 callback(0.90, f"[MinerU] 解析产物上传完成")
-            
             return True
-            
+
         except Exception as e:
             self.logger.error(f"[MinerU] 上传解析产物到MinIO失败: {e}", exc_info=True)
             if callback:
@@ -747,19 +881,33 @@ class MinerUParser(RAGFlowPdfParser):
 
             kb_id = kwargs.get('kb_id')
             doc_id = kwargs.get('doc_id')
-            self.logger.info(f"###Mineru解析判断: kb_id={kwargs.get('kb_id')}, doc_id={kwargs.get('doc_id')}###")
+            self.logger.info(f"[MinerU] 解析完成，MinIO 上传参数: kb_id={kb_id}, doc_id={doc_id}")
 
-            if kb_id and doc_id:
+            if not kb_id or not doc_id:
+                self.logger.warning(
+                    "[MinerU] 未传入 kb_id 或 doc_id，跳过解析产物上传 MinIO（知识库/文档链路应传入二者）；"
+                    "若批量解析时经常缺失，请检查任务执行器传入的 task['kb_id']/task['doc_id']"
+                )
+            else:
                 try:
-                    self._upload_mineru_outputs_to_minio(
+                    content_list_for_minio = self._convert_content_list_to_markdown(outputs)
+                    ok = self._upload_mineru_outputs_to_minio(
                         output_dir=final_out_dir,
                         kb_id=kb_id,
                         doc_id=doc_id,
-                        content_list=outputs,
-                        callback=callback
+                        content_list=content_list_for_minio,
+                        callback=callback,
                     )
+                    if not ok:
+                        self.logger.warning(
+                            "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
+                            doc_id, kb_id,
+                        )
                 except Exception as e:
-                    self.logger.warning(f"[MinerU] 上传解析产物到MinIO失败: {e}", exc_info=True)
+                    self.logger.warning(
+                        "[MinerU] 上传解析产物到MinIO异常: %s (doc_id=%s, kb_id=%s)",
+                        e, doc_id, kb_id, exc_info=True,
+                    )
 
             return self._transfer_to_sections(outputs, parse_method), self._transfer_to_tables(outputs)
         finally:

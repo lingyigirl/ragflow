@@ -1156,14 +1156,18 @@ def doc_upload_and_parse(conversation_id, file_objs, user_id):
         doc_nm[d["id"]] = d["name"]
     for d, blob in files:
         kwargs = {
-            "callback": dummy,
-            "parser_config": parser_config,
-            "from_page": 0,
-            "to_page": 100000,
-            "tenant_id": kb.tenant_id,
-            "lang": kb.language
+            "callback": dummy,  # 回调函数，占位实现，不做任何操作
+            "parser_config": parser_config,  # 解析和切分配置
+            "from_page": 0,  # 起始页码
+            "to_page": 100000,  # 结束页码，默认处理整本文档
+            "tenant_id": kb.tenant_id,  # 租户 ID，用于模型和资源隔离
+            "lang": kb.language,  # 知识库语言，用于解析与分词
+            "kb_id": kb.id,  # 知识库 ID，传递给 MinerU 解析器，用于将解析产物上传到对应 MinIO bucket
+            "doc_id": d["id"],  # 文档 ID，传递给 MinerU 解析器，用于在 MinIO 中以 doc_id 作为前缀存储解析产物
         }
-        threads.append(exe.submit(FACTORY.get(d["parser_id"], naive).chunk, d["name"], blob, **kwargs))
+        threads.append(  # 提交解析任务到线程池，实际调用底层解析与切分逻辑
+            exe.submit(FACTORY.get(d["parser_id"], naive).chunk, d["name"], blob, **kwargs)
+        )
 
     for (docinfo, _), th in zip(files, threads):
         docs = []

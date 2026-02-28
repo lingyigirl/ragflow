@@ -719,9 +719,17 @@ async def get(doc_id):
 async def download_attachment(attachment_id):
     try:
         ext = request.args.get("ext", "markdown")
-        # 支持通过查询参数指定bucket，如果不指定则使用current_user.id
         bucket = request.args.get("bucket", current_user.id)
-        data = await asyncio.to_thread(settings.STORAGE_IMPL.get, bucket, attachment_id)
+        key = attachment_id
+        try:
+            pad = 4 - len(attachment_id) % 4
+            if pad != 4:
+                key = attachment_id + ("=" * pad)
+            decoded = base64.urlsafe_b64decode(key)
+            key = decoded.decode("utf-8")
+        except Exception:
+            pass
+        data = await asyncio.to_thread(settings.STORAGE_IMPL.get, bucket, key)
         response = await make_response(data)
         response.headers.set("Content-Type", CONTENT_TYPE_MAP.get(ext, f"application/{ext}"))
 
@@ -729,6 +737,30 @@ async def download_attachment(attachment_id):
 
     except Exception as e:
         return server_error_response(e)
+
+# 代码功能同上，去除鉴权需求，用于下载图片链接
+@manager.route("/public_download/<attachment_id>", methods=["GET"])  # noqa: F821
+async def public_download_attachment(attachment_id):
+    try:
+        ext = request.args.get("ext", "markdown") 
+        bucket = request.args.get("bucket", "")  
+        key = attachment_id 
+        try:
+            pad = 4 - len(attachment_id) % 4  
+            if pad != 4: 
+                key = attachment_id + ("=" * pad) 
+            decoded = base64.urlsafe_b64decode(key)  
+            key = decoded.decode("utf-8")  
+        except Exception:
+            pass
+        data = await asyncio.to_thread(settings.STORAGE_IMPL.get, bucket, key) 
+        response = await make_response(data) 
+        response.headers.set("Content-Type", CONTENT_TYPE_MAP.get(ext, f"application/{ext}")) 
+
+        return response
+
+    except Exception as e:
+        return server_error_response(e) 
 
 
 @manager.route("/change_parser", methods=["POST"])  # noqa: F821
@@ -1069,7 +1101,7 @@ async def mineru_parse():
         response.raise_for_status()
         content_type = response.headers.get("Content-Type", "")
         
-        def _process_mineru_zip_response(zip_content: bytes, original_filename: str, user_id: str, parse_id: str, pdf_path: str = None) -> dict:
+        def _process_mineru_zip_response(zip_content: bytes, original_filename: str, user_id: str, parse_id: str, pdf_path: str = None, kb_id: str | None = None, doc_id: str | None = None) -> dict:
             temp_dir = tempfile.mkdtemp(prefix="mineru_parse_")
             zip_path = os.path.join(temp_dir, "response.zip")
             extract_dir = os.path.join(temp_dir, "extracted")
@@ -1109,17 +1141,24 @@ async def mineru_parse():
                             content_list = json.load(f)
                             content_list_file = json_file
                             break
+
+                _PUBLIC_DOWNLOAD_PREFIX = "/v1/document/public_download"
+                _IMG_KEYS_NORM = ("img_path", "table_img_path", "equation_img_path")
+                def _normalize_download_to_public(obj):
+                    if isinstance(obj, dict):
+                        for k in list(obj.keys()):
+                            if k in _IMG_KEYS_NORM and obj[k] and isinstance(obj[k], str) and "/v1/document/download/" in obj[k]:
+                                obj[k] = obj[k].replace("/v1/document/download/", f"{_PUBLIC_DOWNLOAD_PREFIX}/", 1)
+                            else:
+                                _normalize_download_to_public(obj[k])
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            _normalize_download_to_public(v)
+                if content_list:
+                    for item in content_list:
+                        _normalize_download_to_public(item)
                 
                 content_list_url = None
-                if content_list and content_list_file:
-                    content_list_location = f"{base_prefix}/content_list.json"
-                    content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
-                    settings.STORAGE_IMPL.put(user_id, content_list_location, content_list_json_str.encode("utf-8"))
-
-                    content_list_location_encoded = base64.urlsafe_b64encode(content_list_location.encode("utf-8")).decode("utf-8").rstrip("=")
-                    content_list_url = f"/v1/document/download/{content_list_location_encoded}?ext=json"
-                
-
                 markdown_url = None
                 markdown_file = None
                 for md_file in extract_path.rglob("*.md"):
@@ -1130,6 +1169,10 @@ async def mineru_parse():
                         markdown_location = f"{base_prefix}/{md_file.name}"
                         settings.STORAGE_IMPL.put(user_id, markdown_location, markdown_content.encode("utf-8"))
 
+                        if kb_id and doc_id:
+                            kb_md_location = f"{doc_id}/{md_file.name}"
+                            settings.STORAGE_IMPL.put(kb_id, kb_md_location, markdown_content.encode("utf-8"))
+
                         markdown_location_encoded = base64.urlsafe_b64encode(markdown_location.encode("utf-8")).decode("utf-8").rstrip("=")
                         markdown_url = f"/v1/document/download/{markdown_location_encoded}?ext=markdown"
                         break
@@ -1137,39 +1180,45 @@ async def mineru_parse():
                 image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
                 processed_image_paths = set()
                 image_files_to_upload = []
+                img_path_to_url: dict[str, str] = {}
                 
+                def _collect_img_paths(obj):
+                    if isinstance(obj, dict):
+                        for k in list(obj.keys()):
+                            if k in ("img_path", "table_img_path", "equation_img_path") and obj[k] and isinstance(obj[k], str):
+                                yield obj[k]
+                            else:
+                                yield from _collect_img_paths(obj[k])
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            yield from _collect_img_paths(v)
 
                 if content_list and content_list_file:
                     for item in content_list:
-                        for img_key in ["img_path", "table_img_path", "equation_img_path"]:
-                            if img_key in item and item[img_key]:
-                                img_path_str = item[img_key]
-                                if os.path.isabs(img_path_str):
-                                    img_path = Path(img_path_str)
-                                else:
-                                    img_path = content_list_file.parent / img_path_str
-                                
-                                if not img_path.exists():
-                                    img_filename = Path(img_path_str).name
-                                    found_img = None
-                                    for possible_img in extract_path.rglob(img_filename):
-                                        found_img = possible_img
-                                        break
-                                    if found_img:
-                                        img_path = found_img
-                                
-                                if img_path.exists() and img_path.suffix.lower() in image_extensions:
-                                    img_relative_path = str(img_path.relative_to(extract_path))
-                                    
-                                    if img_relative_path not in processed_image_paths:
-                                        processed_image_paths.add(img_relative_path)
-                                        image_files_to_upload.append({
-                                            "path": img_path,
-                                            "relative_path": img_relative_path,
-                                            "source_key": img_key,
-                                            "content_type": item.get("type", "unknown"),
-                                            "page_idx": item.get("page_idx", -1)
-                                        })
+                        for img_path_str in _collect_img_paths(item):
+                            if os.path.isabs(img_path_str):
+                                img_path = Path(img_path_str)
+                            else:
+                                img_path = content_list_file.parent / img_path_str
+                            if not img_path.exists():
+                                img_filename = Path(img_path_str).name
+                                found_img = None
+                                for possible_img in extract_path.rglob(img_filename):
+                                    found_img = possible_img
+                                    break
+                                if found_img:
+                                    img_path = found_img
+                            if img_path.exists() and img_path.is_file() and img_path.suffix.lower() in image_extensions:
+                                img_relative_path = str(img_path.relative_to(extract_path))
+                                if img_relative_path not in processed_image_paths:
+                                    processed_image_paths.add(img_relative_path)
+                                    image_files_to_upload.append({
+                                        "path": img_path,
+                                        "relative_path": img_relative_path,
+                                        "source_key": "image",
+                                        "content_type": "image",
+                                        "page_idx": -1
+                                    })
                 
                 for img_file in extract_path.rglob("*"):
                     if img_file.is_file() and img_file.suffix.lower() in image_extensions:
@@ -1195,19 +1244,84 @@ async def mineru_parse():
                     
                     img_location = f"{base_prefix}/images/{img_filename}"
                     settings.STORAGE_IMPL.put(user_id, img_location, img_data)
+
+                    if kb_id and doc_id:
+                        kb_img_location = f"{doc_id}/images/{img_filename}"
+                        settings.STORAGE_IMPL.put(kb_id, kb_img_location, img_data)
                     
                     img_location_encoded = base64.urlsafe_b64encode(img_location.encode("utf-8")).decode("utf-8").rstrip("=")
-                    img_url = f"/v1/document/download/{img_location_encoded}?ext={img_path.suffix[1:] if img_path.suffix else 'png'}"
+                    img_url = f"{_PUBLIC_DOWNLOAD_PREFIX}/{img_location_encoded}?ext={img_path.suffix[1:] if img_path.suffix else 'png'}&bucket={user_id}"
+                    img_path_to_url[img_info["relative_path"]] = img_url
+                    img_path_to_url[img_filename] = img_url
                     image_urls.append({
                         "url": img_url,
                         "path": img_info["relative_path"],
                         "filename": img_filename,
-                        "location": img_location, 
+                        "location": img_location,
                         "size": len(img_data),
                         "source_key": img_info["source_key"],
                         "content_type": img_info["content_type"],
                         "page_idx": img_info["page_idx"]
                     })
+                
+                IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
+                _IMG_KEY_SET = {k.lower() for k in IMG_KEYS}
+
+                def _replace_img_paths_in_obj(obj):
+                    if isinstance(obj, dict):
+                        for k in list(obj.keys()):
+                            if (k in IMG_KEYS or k.lower() in _IMG_KEY_SET) and obj[k] and isinstance(obj[k], str):
+                                raw_val = str(obj[k]).strip()
+                                cands = [raw_val, raw_val.replace("\\", "/"), str(Path(raw_val).name)]
+                                replaced = False
+                                for ck in cands:
+                                    if ck and ck in img_path_to_url:
+                                        obj[k] = img_path_to_url[ck]
+                                        replaced = True
+                                        break
+                                if not replaced:
+                                    for part in raw_val.replace("\\", "/").split("/"):
+                                        if part and any(part.lower().endswith(ext) for ext in (".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp")):
+                                            if part in img_path_to_url:
+                                                obj[k] = img_path_to_url[part]
+                                                replaced = True
+                                            break
+                            else:
+                                _replace_img_paths_in_obj(obj[k])
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            _replace_img_paths_in_obj(v)
+
+                if content_list:
+                    for item in content_list:
+                        _replace_img_paths_in_obj(item)
+
+                def _normalize_to_public_download(obj):
+                    if isinstance(obj, dict):
+                        for k in list(obj.keys()):
+                            if k in IMG_KEYS and obj[k] and isinstance(obj[k], str) and "/v1/document/download/" in obj[k]:
+                                obj[k] = obj[k].replace("/v1/document/download/", f"{_PUBLIC_DOWNLOAD_PREFIX}/", 1)
+                            else:
+                                _normalize_to_public_download(obj[k])
+                    elif isinstance(obj, list):
+                        for v in obj:
+                            _normalize_to_public_download(v)
+
+                if content_list:
+                    for item in content_list:
+                        _normalize_to_public_download(item)
+
+                if content_list and content_list_file:
+                    content_list_location = f"{base_prefix}/content_list.json"
+                    content_list_json_str = json.dumps(content_list, ensure_ascii=False, indent=2)
+                    settings.STORAGE_IMPL.put(user_id, content_list_location, content_list_json_str.encode("utf-8"))
+
+                    if kb_id and doc_id:
+                        kb_json_location = f"{doc_id}/content_list.json"
+                        settings.STORAGE_IMPL.put(kb_id, kb_json_location, content_list_json_str.encode("utf-8"))
+
+                    content_list_location_encoded = base64.urlsafe_b64encode(content_list_location.encode("utf-8")).decode("utf-8").rstrip("=")
+                    content_list_url = f"/v1/document/download/{content_list_location_encoded}?ext=json"
                 
                 result = {
                     "content_list_url": content_list_url,
@@ -1237,7 +1351,16 @@ async def mineru_parse():
                     pass        
 
         if "application/zip" in content_type:
-            result_data = await asyncio.to_thread(_process_mineru_zip_response, response.content, file_obj.filename, user_id, parse_id, pdf_minio_path)
+            result_data = await asyncio.to_thread(
+                _process_mineru_zip_response,
+                response.content,
+                file_obj.filename,
+                user_id,
+                parse_id,
+                pdf_minio_path,
+                kb_id if has_doc_kb else None,
+                doc_id if has_doc_kb else None,
+            )
             return get_json_result(data=result_data)
         else:
             try:
