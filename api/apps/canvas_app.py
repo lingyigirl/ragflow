@@ -17,6 +17,7 @@ import asyncio
 import inspect
 import json
 import logging
+from uuid import uuid4
 from functools import partial
 from quart import request, Response, make_response
 from agent.component import LLM
@@ -34,7 +35,7 @@ from api.utils.api_utils import get_json_result, server_error_response, validate
     get_request_json
 from agent.canvas import Canvas
 from peewee import MySQLDatabase, PostgresqlDatabase
-from api.db.db_models import APIToken, Task
+from api.db.db_models import APIToken, Task, API4Conversation
 import time
 
 from rag.flow.pipeline import Pipeline
@@ -159,13 +160,44 @@ async def run():
 
     async def sse():
         nonlocal canvas, user_id
+        session_id=get_uuid()
+        txt = ""
         try:
             async for ans in canvas.run(query=query, files=files, user_id=user_id, inputs=inputs):
+                ans["session_id"] = session_id
+                if ans["event"] == "message":
+                    txt += ans["data"]["content"]
+                    if ans["data"].get("start_to_think", False):
+                        txt += "<think>"
+                    elif ans["data"].get("end_to_think", False):
+                        txt += "</think>"
                 yield "data:" + json.dumps(ans, ensure_ascii=False) + "\n\n"
 
             cvs.dsl = json.loads(str(canvas))
             UserCanvasService.update_by_id(req["id"], cvs.to_dict())
-
+            conv = {
+                        "id": session_id,
+                        "dialog_id": cvs.id,
+                        "user_id": user_id,
+                        "message": [],
+                        "source": "agent",
+                        "dsl": cvs.dsl,
+                        "reference": []
+                    }
+            API4ConversationService.save(**conv)
+            conv = API4Conversation(**conv)
+            message_id = str(uuid4())
+            conv.message.append({
+                "role": "user",
+                "content": query,
+                "id": message_id
+            })
+            conv.message.append({"role": "assistant", "content": txt, "created_at": time.time(), "id": message_id})
+            conv.reference = canvas.get_reference()
+            conv.errors = canvas.error
+            conv.dsl = str(canvas)
+            conv = conv.to_dict()
+            API4ConversationService.append_message(conv["id"], conv)
         except Exception as e:
             logging.exception(e)
             canvas.cancel_task()
