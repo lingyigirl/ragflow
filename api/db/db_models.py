@@ -839,6 +839,30 @@ class Task(DataBaseModel):
     chunk_ids = LongTextField(null=True, help_text="chunk ids", default="")
 
 
+class MineruSection(DataBaseModel):
+    id = BigIntegerField(primary_key=True) 
+    kb_id = CharField(max_length=64, null=False, index=True) 
+    doc_id = CharField(max_length=64, null=False, index=True) 
+    chunk_id = CharField(max_length=64, null=False, index=True)  
+    type = CharField(max_length=20, null=False) 
+
+    text = LongTextField(null=True)
+    bbox = JSONField(null=True) 
+    page_idx = IntegerField(null=True) 
+    text_level = IntegerField(null=True) 
+
+    img_path = CharField(max_length=512, null=True) 
+    table_caption = JSONField(null=True) 
+    table_footnote = JSONField(null=True) 
+    table_body = LongTextField(null=True)
+
+    sub_type = CharField(max_length=50, null=True) 
+    list_items = JSONField(null=True) 
+
+    class Meta:
+        db_table = "mineru_section" 
+
+
 class Dialog(DataBaseModel):
     id = CharField(max_length=32, primary_key=True)
     tenant_id = CharField(max_length=32, null=False, index=True)

@@ -14,6 +14,7 @@
 #  limitations under the License.
 #
 import base64
+import copy
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ import re
 import sys
 import tempfile
 import threading
+import time
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
@@ -37,7 +39,6 @@ from strenum import StrEnum
 from deepdoc.parser.pdf_parser import RAGFlowPdfParser
 from common import settings
 
-# 图片下载链接统一使用无鉴权接口，写入 JSON 时只使用该前缀，避免出现 /v1/document/download/
 DOCUMENT_PUBLIC_DOWNLOAD_PREFIX = "/v1/document/public_download"
 
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
@@ -179,11 +180,17 @@ class MinerUParser(RAGFlowPdfParser):
 
     @staticmethod
     def _is_http_endpoint_valid(url, timeout=5):
-        try:
-            response = requests.head(url, timeout=timeout, allow_redirects=True)
-            return response.status_code in [200, 301, 302, 307, 308]
-        except Exception:
-            return False
+        for _method in ("head", "get"):
+            try:
+                if _method == "head":
+                    response = requests.head(url, timeout=timeout, allow_redirects=True)
+                else:
+                    response = requests.get(url, timeout=timeout, allow_redirects=True)
+                if response.status_code in [200, 301, 302, 307, 308]:
+                    return True
+            except Exception:
+                continue
+        return False
 
     def check_installation(self, backend: str = "pipeline", server_url: Optional[str] = None) -> tuple[bool, str]:
         reason = ""
@@ -200,16 +207,27 @@ class MinerUParser(RAGFlowPdfParser):
             return False, reason
 
         api_openapi = f"{self.mineru_api}/openapi.json"
-        try:
-            api_ok = self._is_http_endpoint_valid(api_openapi)
-            self.logger.info(f"[MinerU] API openapi.json reachable={api_ok} url={api_openapi}")
-            if not api_ok:
-                reason = f"[MinerU] MinerU API not accessible: {api_openapi}"
-                return False, reason
-        except Exception as exc:
-            reason = f"[MinerU] MinerU API check failed: {exc}"
-            self.logger.warning(reason)
-            return False, reason
+        #
+        _probe_attempts = int(os.environ.get("MINERU_API_PROBE_ATTEMPTS", "3"))  
+        _probe_interval = float(os.environ.get("MINERU_API_PROBE_INTERVAL_SEC", "2"))  
+        api_ok = False  
+        reason = ""  
+        for _attempt in range(1, _probe_attempts + 1):  
+            try:
+                api_ok = self._is_http_endpoint_valid(api_openapi)  
+                self.logger.info(
+                    f"[MinerU] API openapi.json reachable={api_ok} url={api_openapi} attempt={_attempt}/{_probe_attempts}"
+                )  
+                if api_ok:  
+                    break  
+                reason = f"[MinerU] MinerU API not accessible: {api_openapi}"  
+            except Exception as exc:  
+                reason = f"[MinerU] MinerU API check failed: {exc}"  
+                self.logger.warning(f"{reason} attempt={_attempt}/{_probe_attempts}")  
+            if not api_ok and _attempt < _probe_attempts:  
+                time.sleep(_probe_interval)  
+        if not api_ok:  
+            return False, reason  
 
         if backend == "vlm-http-client":
             resolved_server = server_url or self.mineru_server_url
@@ -228,7 +246,23 @@ class MinerUParser(RAGFlowPdfParser):
     def _run_mineru(
         self, input_path: Path, output_dir: Path, options: MinerUParseOptions, callback: Optional[Callable] = None
     ) -> Path:
+
         return self._run_mineru_api(input_path, output_dir, options, callback)
+
+    def _emit_callback(self, callback: Optional[Callable], prog: float, msg: str) -> None:
+        """安全触发进度回调，避免上游回调异常打断主流程。"""
+        if not callback:
+            return
+        try:
+            callback(prog, msg)
+        except Exception as _cb_err:
+            self.logger.warning(
+                "[MinerU] callback failed (ignored): %s, prog=%s, msg=%s",
+                _cb_err,
+                prog,
+                msg,
+                exc_info=True,
+            )
 
     def _run_mineru_api(
         self, input_path: Path, output_dir: Path, options: MinerUParseOptions, callback: Optional[Callable] = None
@@ -268,13 +302,12 @@ class MinerUParser(RAGFlowPdfParser):
             data["server_url"] = self.mineru_server_url
 
         self.logger.info(f"[MinerU] request {data=}")
-        self.logger.info(f"[MinerU] request {options=}")
+        self.logger.info(f"[MinerU] request {options=}")    
 
         headers = {"Accept": "application/json"}
         try:
             self.logger.info(f"[MinerU] invoke api: {self.mineru_api}/file_parse backend={options.backend} server_url={data.get('server_url')}")
-            if callback:
-                callback(0.20, f"[MinerU] invoke api: {self.mineru_api}/file_parse")
+            self._emit_callback(callback, 0.20, f"[MinerU] invoke api: {self.mineru_api}/file_parse")
             response = requests.post(url=f"{self.mineru_api}/file_parse", files=files, data=data, headers=headers,
                                      timeout=1800)
 
@@ -282,8 +315,7 @@ class MinerUParser(RAGFlowPdfParser):
             if response.headers.get("Content-Type") == "application/zip":
                 self.logger.info(f"[MinerU] zip file returned, saving to {output_zip_path}...")
 
-                if callback:
-                    callback(0.30, f"[MinerU] zip file returned, saving to {output_zip_path}...")
+                self._emit_callback(callback, 0.30, f"[MinerU] zip file returned, saving to {output_zip_path}...")
 
                 with open(output_zip_path, "wb") as f:
                     f.write(response.content)
@@ -291,8 +323,7 @@ class MinerUParser(RAGFlowPdfParser):
                 self.logger.info(f"[MinerU] Unzip to {output_path}...")
                 self._extract_zip_no_root(output_zip_path, output_path, pdf_file_name + "/")
 
-                if callback:
-                    callback(0.40, f"[MinerU] Unzip to {output_path}...")
+                self._emit_callback(callback, 0.40, f"[MinerU] Unzip to {output_path}...")
             else:
                 self.logger.warning(f"[MinerU] not zip returned from api: {response.headers.get('Content-Type')}")
         except Exception as e:
@@ -313,19 +344,50 @@ class MinerUParser(RAGFlowPdfParser):
             self.total_page = 0
             self.logger.exception(e)
 
+    @staticmethod
+    def _join_mineru_lines(val: Any, sep: str = "\n") -> str:
+        """将 table_caption / list_items 等安全拼成字符串（兼容 null、纯 str、JSON 列表）。"""  
+        if val is None:  
+            return ""  
+        if isinstance(val, str):  
+            return val  
+        if isinstance(val, (list, tuple)):  
+            return sep.join(str(x) for x in val)  
+        return str(val)  
+
     def _line_tag(self, bx):
-        pn = [bx["page_idx"] + 1]
-        positions = bx.get("bbox", (0, 0, 0, 0))
-        x0, top, x1, bott = positions
+        _pi = bx.get("page_idx", 0)  
+        if _pi is None:  
+            _pi = 0  
+        try:
+            _pi = int(_pi)  
+        except (TypeError, ValueError):  
+            self.logger.warning("[MinerU] _line_tag: 无效 page_idx=%r，改用 0", bx.get("page_idx"))  
+            _pi = 0  
+        pn = [_pi + 1]  
 
-        if hasattr(self, "page_images") and self.page_images and len(self.page_images) > bx["page_idx"]:
-            page_width, page_height = self.page_images[bx["page_idx"]].size
-            x0 = (x0 / 1000.0) * page_width
-            x1 = (x1 / 1000.0) * page_width
-            top = (top / 1000.0) * page_height
-            bott = (bott / 1000.0) * page_height
+        raw_bbox = bx.get("bbox")  
+        if raw_bbox is None:  
+            positions = (0.0, 0.0, 0.0, 0.0)  
+        elif isinstance(raw_bbox, (list, tuple)) and len(raw_bbox) >= 4:  
+            try:
+                positions = tuple(float(x) for x in raw_bbox[:4])  
+            except (TypeError, ValueError):  
+                self.logger.warning("[MinerU] _line_tag: bbox 非数值 %r", raw_bbox)  
+                positions = (0.0, 0.0, 0.0, 0.0)  
+        else:  
+            self.logger.warning("[MinerU] _line_tag: bbox 形状异常 %r", raw_bbox)  
+            positions = (0.0, 0.0, 0.0, 0.0)  
+        x0, top, x1, bott = positions  
 
-        return "@@{}\t{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}##".format("-".join([str(p) for p in pn]), x0, x1, top, bott)
+        if hasattr(self, "page_images") and self.page_images and 0 <= _pi < len(self.page_images):  
+            page_width, page_height = self.page_images[_pi].size  
+            x0 = (x0 / 1000.0) * page_width  
+            x1 = (x1 / 1000.0) * page_width  
+            top = (top / 1000.0) * page_height  
+            bott = (bott / 1000.0) * page_height  
+
+        return "@@{}\t{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}##".format("-".join([str(p) for p in pn]), x0, x1, top, bott)  #
 
     def crop(self, text, ZM=1, need_position=False):
         imgs = []
@@ -502,8 +564,44 @@ class MinerUParser(RAGFlowPdfParser):
         if not json_file:
             raise FileNotFoundError(f"[MinerU] Missing output file, tried: {', '.join(str(p) for p in attempted)}")
 
+        #
+        try:
+            _st = json_file.stat()  #
+            _abs_json = str(json_file.resolve())  #
+        except OSError as _e_stat:  #
+            _st = None  #
+            _abs_json = str(json_file)  #
+            self.logger.warning(f"[MinerU][content_list.json] stat 失败: {_e_stat}, path={_abs_json}")  #
+        _sz = _st.st_size if _st else -1  #
+        self.logger.warning(
+            f"[MinerU][content_list.json] 文件已找到 exists=True path={_abs_json} size_bytes={_sz}"
+        )  #
+
         with open(json_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
+            data = json.load(f)  #
+
+        if not isinstance(data, list):  #
+            self.logger.error(
+                f"[MinerU][content_list.json] 根节点类型非 list: {type(data)}, path={_abs_json}"
+            )  #
+            raise ValueError(
+                f"[MinerU] content_list.json 根节点应为 list，实际 {type(data)}，path={_abs_json}"
+            )  #
+        else:
+            _n_blocks = len(data)  #
+            _n_with_cid = sum(
+                1
+                for _it in data
+                if isinstance(_it, dict)
+                and (str(_it.get("chuck_id") or _it.get("chunk_id") or "").strip())
+            )  #
+            _sample_keys = (
+                list(data[0].keys())[:16] if data and isinstance(data[0], dict) else []
+            )  #
+            self.logger.warning(
+                f"[MinerU][content_list.json] 已加载 blocks={_n_blocks} with_chunk_id={_n_with_cid} "
+                f"sample_first_keys={_sample_keys}"
+            )  #
 
         for item in data:
             for key in ("img_path", "table_img_path", "equation_img_path"):
@@ -512,35 +610,79 @@ class MinerUParser(RAGFlowPdfParser):
         return data
 
     def _transfer_to_sections(self, outputs: list[dict[str, Any]], parse_method: str = None):
-        sections = []
-        for output in outputs:
-            match output["type"]:
-                case MinerUContentType.TEXT:
-                    section = output.get("text", "")
-                case MinerUContentType.TABLE:
-                    section = output.get("table_body", "") + "\n".join(output.get("table_caption", [])) + "\n".join(
-                        output.get("table_footnote", []))
-                    if not section.strip():
-                        section = "FAILED TO PARSE TABLE"
-                case MinerUContentType.IMAGE:
-                    section = "".join(output.get("image_caption", [])) + "\n" + "".join(
-                        output.get("image_footnote", []))
-                case MinerUContentType.EQUATION:
-                    section = output.get("text", "")
-                case MinerUContentType.CODE:
-                    section = output.get("code_body", "") + "\n".join(output.get("code_caption", []))
-                case MinerUContentType.LIST:
-                    section = "\n".join(output.get("list_items", []))
-                case MinerUContentType.DISCARDED:
-                    continue  # Skip discarded blocks entirely
+        sections = []  #
+        for idx, output in enumerate(outputs):  #
+            if "type" not in output or not output.get("type"):  #
+                continue  #
+            try:  #
+                section = None  #
+                _t = output["type"]  #
+                match _t:  #
+                    case MinerUContentType.TEXT | "text":  #
+                        section = output.get("text", "") or ""  #
+                    case MinerUContentType.TABLE | "table":  #
+                        _tb = output.get("table_body") or ""  #
+                        section = (
+                            str(_tb)
+                            + self._join_mineru_lines(output.get("table_caption"), "\n")
+                            + self._join_mineru_lines(output.get("table_footnote"), "\n")
+                        )  #
+                        if not str(section).strip():  #
+                            section = "FAILED TO PARSE TABLE"  #
+                    case MinerUContentType.IMAGE | "image":  #
+                        section = self._join_mineru_lines(output.get("image_caption"), "") + "\n" + self._join_mineru_lines(
+                            output.get("image_footnote"), ""
+                        )  #
+                    case MinerUContentType.EQUATION | "equation":  #
+                        section = output.get("text", "") or ""  #
+                    case MinerUContentType.CODE | "code":  #
+                        section = (output.get("code_body") or "") + self._join_mineru_lines(
+                            output.get("code_caption"), "\n"
+                        )  #
+                    case MinerUContentType.LIST | "list":  #
+                        section = self._join_mineru_lines(output.get("list_items"), "\n")  #
+                    case "header" | "page_number":  #
+                        section = output.get("text", "") or ""  #
+                    case MinerUContentType.DISCARDED | "discarded":  #
+                        continue  #
 
-            if section and parse_method == "manual":
-                sections.append((section, output["type"], self._line_tag(output)))
-            elif section and parse_method == "paper":
-                sections.append((section + self._line_tag(output), output["type"]))
-            else:
-                sections.append((section, self._line_tag(output)))
-        return sections
+                if section is None:  #
+                    _fallback = output.get("text")  #
+                    if _fallback is not None and str(_fallback).strip():  #
+                        section = str(_fallback)  #
+                        self.logger.warning(  #
+                            "[MinerU] _transfer_to_sections: 未识别 type=%r，已用 text 兜底 idx=%s",
+                            _t,
+                            idx,
+                        )  #
+                    else:  #
+                        section = ""  #
+                        self.logger.warning(
+                            "[MinerU] _transfer_to_sections: 未识别 type=%r 且无 text，idx=%s keys=%s",
+                            _t,
+                            idx,
+                            list(output.keys())[:20] if isinstance(output, dict) else None,
+                        )  #
+
+                if section and parse_method == "manual":  #
+                    sections.append((section, output["type"], self._line_tag(output)))  #
+                elif section and parse_method == "paper":  #
+                    sections.append((section + self._line_tag(output), output["type"]))  #
+                else:  #
+                    sections.append((section, self._line_tag(output)))  #
+            except Exception as _e_block:  #
+                self.logger.error(  #
+                    "[MinerU] _transfer_to_sections 单块失败 idx=%s type=%r page_idx=%r bbox=%r keys=%s err=%s",
+                    idx,
+                    output.get("type"),
+                    output.get("page_idx"),
+                    output.get("bbox"),
+                    list(output.keys())[:28] if isinstance(output, dict) else None,
+                    _e_block,
+                    exc_info=True,
+                )  #
+                raise  #
+        return sections  #
 
     def _transfer_to_tables(self, outputs: list[dict[str, Any]]):
         return []
@@ -569,6 +711,294 @@ class MinerUParser(RAGFlowPdfParser):
             new_content_list.append(new_item)
         return new_content_list
 
+    @staticmethod
+    def _mineru_row_type_for_db(raw_type: Any) -> str:  
+        s = (raw_type if raw_type is not None else "")  
+        s = str(s).strip() or "unknown"  
+        return s[:20]  
+
+    @staticmethod
+    def _mineru_str_path_for_db(p: Any, max_len: int = 512) -> Optional[str]:  
+        if p is None or p == "":  
+            return None  
+        s = str(p).strip()  
+        if len(s) <= max_len:  
+            return s  
+        return s[: max_len - 1] + "…"  
+
+    @staticmethod
+    def _mineru_json_safe_scalar(x: Any) -> Any:  
+        if x is None:  
+            return None  
+        if hasattr(x, "item") and callable(getattr(x, "item", None)):  
+            try:
+                return x.item()  
+            except Exception:  
+                pass  
+        if isinstance(x, (int, float, str, bool)):  
+            return x  
+        return x  
+
+    @staticmethod
+    def _mineru_bbox_for_db(bbox: Any) -> Any:  
+        if bbox is None:  
+            return None  
+        if isinstance(bbox, (list, tuple)):  
+            return [MinerUParser._mineru_json_safe_scalar(v) for v in bbox[:32]]  
+        if isinstance(bbox, dict):  
+            return bbox  
+        return bbox  
+
+    @staticmethod
+    def _resolve_chunk_id_for_mineru_section(item: dict[str, Any], index: int, doc_id: str) -> tuple[str, bool]:
+        """返回 (chunk_id, 是否为合成)。无 chunk_id 时生成稳定占位。"""
+        for _k in ("chunk_id", "chuck_id", "id", "block_id"):
+            _v = item.get(_k)
+            if _v is not None and str(_v).strip():
+                _s = str(_v).strip()
+                if len(_s) > 64:
+                    _s = _s[:64]
+                return _s, False
+        _d = (doc_id or "doc")[:24].replace(" ", "")
+        _syn = f"a_{_d}_{index:06d}"
+        if len(_syn) > 64:
+            _syn = _syn[:64]
+        return _syn, True
+
+    def _save_sections_to_db(
+        self,
+        outputs: list[dict[str, Any]],
+        kb_id: Optional[str],
+        doc_id: Optional[str],
+        callback: Optional[Callable] = None,
+        *,
+        progress_after_chunk: bool = False,
+    ) -> None:
+        """将 MinerU 输出的 content_list 同步保存到 mineru_section 表。"""
+
+        def _progress(prog: float, msg: str) -> None:
+            if progress_after_chunk:
+                _lo, _hi = 0.902, 0.922
+                _a, _b = 0.925, 0.943
+                _cx = max(_lo, min(_hi, prog))
+                prog = _a + (_cx - _lo) * (_b - _a) / (_hi - _lo) if _hi > _lo else _a
+            self._emit_callback(callback, prog, msg)
+
+        _start_msg = f"[MinerU] 开始保存 MinerU 输出到 mineru_section 表: kb_id={kb_id}, doc_id={doc_id}"
+        self.logger.warning(_start_msg)
+        logging.warning(_start_msg)
+        if not kb_id or not doc_id:
+            _skip_ctx_msg = f"[MinerU] 没有知识库或文档上下文，跳过写入数据库: kb_id={kb_id}, doc_id={doc_id}"
+            self.logger.warning(_skip_ctx_msg)
+            logging.warning(_skip_ctx_msg)
+            _progress(0.91, f"[MinerU] 跳过写入 mineru_section：缺少 kb_id/doc_id (kb_id={kb_id}, doc_id={doc_id})")
+            return
+        try:
+            from api.db.db_models import DB, MineruSection
+        except Exception as e:
+            self.logger.warning(
+                f"[MinerU] 导入 MineruSection 模型失败，跳过写入数据库: {e}",
+                exc_info=True,
+            )
+            return
+
+        _progress(0.902, "[MinerU] mineru_section：检查数据表…")
+        try:
+            if not MineruSection.table_exists():
+                _tb_missing_msg = "[MinerU] mineru_section 表不存在，跳过写入（请确认服务启动时已执行 init_database_tables/完成迁移）"
+                self.logger.error(_tb_missing_msg)
+                logging.warning(_tb_missing_msg)
+                _progress(0.91, "[MinerU] 跳过写入 mineru_section：表不存在")
+                return
+        except Exception as e:
+            self.logger.warning(
+                f"[MinerU] 检查 mineru_section 表是否存在时异常: {e}",
+                exc_info=True,
+            )
+
+        _pre_n = len(outputs)
+        _pre_cid = sum(
+            1
+            for _it in outputs
+            if isinstance(_it, dict)
+            and (str(_it.get("chuck_id") or _it.get("chunk_id") or _it.get("id") or "").strip())
+        )
+        _pre_stat_msg = (
+            f"[MinerU][mineru_section] 入表前统计 outputs_len={_pre_n} mineru原生块id数={_pre_cid} "
+            f"（缺 id 时将自动生成合成 chunk_id 以保证可入库）"
+        )
+        self.logger.warning(_pre_stat_msg)
+        logging.warning(_pre_stat_msg)
+
+        _progress(0.904, f"[MinerU] mineru_section：组装行数据（解析块 {_pre_n}，MinerU 自带 id {_pre_cid}）…")
+
+        rows: list[dict[str, Any]] = []
+        missing_native_chunk_id = 0
+        for idx, item in enumerate(outputs):
+            if not isinstance(item, dict):
+                continue
+            _n_done = idx + 1
+            if _pre_n > 0 and _pre_n >= 20 and _n_done % max(1, _pre_n // 8) == 0:
+                _p = 0.904 + 0.012 * (_n_done / float(_pre_n))
+                _progress(min(0.916, _p), f"[MinerU] mineru_section：组装中 {_n_done}/{_pre_n}…")
+
+            item_type_raw = item.get("type") or ""
+            item_type_db = self._mineru_row_type_for_db(item_type_raw)
+
+            chunk_id, _syn = self._resolve_chunk_id_for_mineru_section(item, idx, str(doc_id))
+            if _syn:
+                missing_native_chunk_id += 1
+
+            _pi = item.get("page_idx")
+            try:
+                _pi = int(_pi) if _pi is not None else None
+            except (TypeError, ValueError):
+                _pi = None
+
+            row: dict[str, Any] = {
+                "kb_id": str(kb_id),
+                "doc_id": str(doc_id),
+                "chunk_id": chunk_id,
+                "type": item_type_db,
+                "bbox": self._mineru_bbox_for_db(item.get("bbox")),
+                "page_idx": _pi,
+                "text": None,
+                "text_level": None,
+                "img_path": None,
+                "table_caption": None,
+                "table_footnote": None,
+                "table_body": None,
+                "sub_type": None,
+                "list_items": None,
+            }
+
+            _tl = item.get("text_level")
+            try:
+                row["text_level"] = int(_tl) if _tl is not None and str(_tl).strip() != "" else None
+            except (TypeError, ValueError):
+                row["text_level"] = None
+
+            if item_type_raw in (MinerUContentType.TEXT, MinerUContentType.TEXT.value, "text"):
+                row["text"] = item.get("text")
+            elif item_type_raw in (MinerUContentType.TABLE, MinerUContentType.TABLE.value, "table"):
+                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path"))
+                row["table_caption"] = item.get("table_caption")
+                row["table_footnote"] = item.get("table_footnote")
+                row["table_body"] = item.get("table_body")
+            elif item_type_raw in ("header", "page_number"):
+                row["text"] = item.get("text")
+            elif item_type_raw in (MinerUContentType.LIST, MinerUContentType.LIST.value, "list"):
+                row["sub_type"] = item.get("sub_type")
+                row["list_items"] = item.get("list_items")
+            elif item_type_raw in (MinerUContentType.IMAGE, MinerUContentType.IMAGE.value, "image"):
+                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path"))
+                row["text"] = (
+                    self._join_mineru_lines(item.get("image_caption"), "")
+                    + ("\n" if item.get("image_footnote") else "")
+                    + self._join_mineru_lines(item.get("image_footnote"), "")
+                ).strip() or None
+            elif item_type_raw in (MinerUContentType.EQUATION, MinerUContentType.EQUATION.value, "equation"):
+                row["text"] = item.get("text")
+            elif item_type_raw in (MinerUContentType.CODE, MinerUContentType.CODE.value, "code"):
+                row["text"] = ((item.get("code_body") or "") + self._join_mineru_lines(item.get("code_caption"), "\n")).strip() or None
+
+            rows.append(row)
+
+        if missing_native_chunk_id:
+            self.logger.warning(
+                f"[MinerU][mineru_section] 共 {missing_native_chunk_id}/{len(rows)} 条使用合成 chunk_id（MinerU 未提供 chunk_id/chuck_id/id）"
+            )
+
+        if not rows:
+            self.logger.info(
+                f"[MinerU] mineru_section 本次无可写入记录，doc_id={doc_id}, kb_id={kb_id}, total_blocks={len(outputs)}"
+            )
+            _progress(0.91, f"[MinerU] mineru_section 无可写入记录：total_blocks={len(outputs)}")
+            return
+
+        _progress(0.917, f"[MinerU] mineru_section：删除本文档旧记录并写入 {len(rows)} 条…")
+
+        try:
+            with DB.connection_context():
+                _progress(0.918, "[MinerU] mineru_section：正在删除旧切片…")
+                (
+                    MineruSection.delete()
+                    .where((MineruSection.kb_id == kb_id) & (MineruSection.doc_id == doc_id))
+                    .execute()
+                )
+                _progress(0.919, f"[MinerU] mineru_section：正在批量插入 {len(rows)} 条…")
+                MineruSection.insert_many(rows).execute()
+            _ok_msg = (
+                f"[MinerU] mineru_section 已写入 {len(rows)} 条记录，doc_id={doc_id}, kb_id={kb_id}, "
+                f"total_blocks={len(outputs)}, synthetic_chunk_id_count={missing_native_chunk_id}"
+            )
+            self.logger.info(_ok_msg)
+            logging.warning(_ok_msg)
+            _progress(0.92, f"[MinerU] mineru_section 已写入 {len(rows)} 条记录")
+        except Exception as e:
+            self.logger.error(
+                f"[MinerU] 写入 mineru_section 表失败，doc_id={doc_id}, kb_id={kb_id}, err={e}",
+                exc_info=True,
+            )
+            logging.warning(
+                "[MinerU] 写入 mineru_section 表失败（root摘要）doc_id=%s kb_id=%s err=%s",
+                doc_id,
+                kb_id,
+                e,
+            )
+            _em = str(e).replace("'", "")[:400]
+            _progress(0.922, f"[MinerU][WARN] mineru_section 写入失败（主解析仍继续）: {_em}")
+
+    def _schedule_save_sections_to_db(
+        self,
+        outputs: list[dict[str, Any]],
+        kb_id: Optional[str],
+        doc_id: Optional[str],
+        callback: Optional[Callable] = None,
+    ) -> Optional[threading.Thread]:
+        """解析完成后异步写 mineru_section，主链路继续执行。"""
+        if not kb_id or not doc_id:
+            return None
+        try:
+            snapshot = copy.deepcopy(outputs)
+        except Exception as _e_snap:
+            self.logger.warning(
+                "[MinerU][DB_THREAD] deepcopy(outputs) 失败，改用原引用: %s",
+                _e_snap,
+                exc_info=True,
+            )
+            snapshot = outputs
+
+        def _worker() -> None:
+            try:
+                self.logger.warning(
+                    "[MinerU][DB_THREAD] 后台入库线程开始: kb_id=%s doc_id=%s blocks=%s",
+                    kb_id,
+                    doc_id,
+                    len(snapshot) if isinstance(snapshot, list) else None,
+                )
+                self._save_sections_to_db(snapshot, kb_id, doc_id, callback=callback, progress_after_chunk=False)
+                self.logger.warning("[MinerU][DB_THREAD] 后台入库线程结束: doc_id=%s", doc_id)
+            except Exception as _e_worker:
+                self.logger.error(
+                    "[MinerU][DB_THREAD] 后台入库线程异常: %s",
+                    _e_worker,
+                    exc_info=True,
+                )
+
+        worker = threading.Thread(
+            target=_worker,
+            name=f"mineru_db_{str(doc_id)[:8]}",
+            daemon=True,
+        )
+        worker.start()
+        self.logger.warning(
+            "[MinerU][DB_THREAD] 已启动后台入库线程: kb_id=%s doc_id=%s",
+            kb_id,
+            doc_id,
+        )
+        return worker
+
     def _upload_mineru_outputs_to_minio(
         self,
         output_dir: Path,
@@ -580,13 +1010,11 @@ class MinerUParser(RAGFlowPdfParser):
         try:
             if not output_dir or not output_dir.exists():
                 self.logger.error(f"[MinerU] 上传MinIO失败: output_dir 不存在或无效: {output_dir}")
-                if callback:
-                    callback(-1, f"[MinerU] 解析输出目录无效: {output_dir}")
+                self._emit_callback(callback, -1, f"[MinerU] 解析输出目录无效: {output_dir}")
                 return False
             if not output_dir.is_dir():
                 self.logger.error(f"[MinerU] 上传MinIO失败: output_dir 不是目录: {output_dir}")
-                if callback:
-                    callback(-1, f"[MinerU] 解析输出路径不是目录: {output_dir}")
+                self._emit_callback(callback, -1, f"[MinerU] 解析输出路径不是目录: {output_dir}")
                 return False
 
             base_prefix = f"{doc_id}"
@@ -608,8 +1036,7 @@ class MinerUParser(RAGFlowPdfParser):
             for item in content_list:
                 _normalize_download_to_public(item)
 
-            if callback:
-                callback(0.76, f"[MinerU] 开始上传解析产物到MinIO...")
+            self._emit_callback(callback, 0.76, f"[MinerU] 开始上传解析产物到MinIO...")
 
             image_extensions = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"}
             processed_image_paths: set[str] = set()
@@ -739,12 +1166,10 @@ class MinerUParser(RAGFlowPdfParser):
                 settings.STORAGE_IMPL.put(kb_id, content_list_location, content_list_json_str.encode("utf-8"))
                 self.logger.info(f"[MinerU] 已上传content_list.json: bucket={kb_id}, location={content_list_location}")
                 json_uploaded = True
-                if callback:
-                    callback(0.78, f"[MinerU] 已上传content_list.json")
+                self._emit_callback(callback, 0.78, f"[MinerU] 已上传content_list.json")
             except Exception as e:
                 self.logger.error(f"[MinerU] 上传 content_list.json 失败: {e}", exc_info=True)
-                if callback:
-                    callback(-1, f"[MinerU] 上传 content_list.json 失败: {e}")
+                self._emit_callback(callback, -1, f"[MinerU] 上传 content_list.json 失败: {e}")
                 return False
 
             markdown_uploaded = False
@@ -758,8 +1183,7 @@ class MinerUParser(RAGFlowPdfParser):
                     settings.STORAGE_IMPL.put(kb_id, markdown_location, markdown_content.encode("utf-8"))
                     self.logger.info(f"[MinerU] 已上传Markdown文件: bucket={kb_id}, location={markdown_location}")
                     markdown_uploaded = True
-                    if callback:
-                        callback(0.80, f"[MinerU] 已上传Markdown文件")
+                    self._emit_callback(callback, 0.80, f"[MinerU] 已上传Markdown文件")
                 else:
                     self.logger.info(f"[MinerU] 未找到Markdown文件，跳过上传")
             except Exception as e:
@@ -781,8 +1205,7 @@ class MinerUParser(RAGFlowPdfParser):
 
             if uploaded_image_count > 0:
                 self.logger.info(f"[MinerU] 已上传 {uploaded_image_count} 张图片到MinIO (bucket: {kb_id}, prefix: {base_prefix})")
-                if callback:
-                    callback(0.85, f"[MinerU] 已上传 {uploaded_image_count} 张图片")
+                self._emit_callback(callback, 0.85, f"[MinerU] 已上传 {uploaded_image_count} 张图片")
             else:
                 self.logger.info(f"[MinerU] 未找到图片文件，跳过上传")
 
@@ -790,14 +1213,12 @@ class MinerUParser(RAGFlowPdfParser):
                 f"[MinerU] 解析产物上传完成: bucket={kb_id}, prefix={base_prefix}, "
                 f"json={'已上传' if json_uploaded else '失败'}, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张"
             )
-            if callback:
-                callback(0.90, f"[MinerU] 解析产物上传完成")
+            self._emit_callback(callback, 0.90, f"[MinerU] 解析产物上传完成")
             return True
 
         except Exception as e:
             self.logger.error(f"[MinerU] 上传解析产物到MinIO失败: {e}", exc_info=True)
-            if callback:
-                callback(-1, f"[MinerU] 上传解析产物到MinIO失败: {e}")
+            self._emit_callback(callback, -1, f"[MinerU] 上传解析产物到MinIO失败: {e}")
             return False
 
     def parse_pdf(
@@ -837,16 +1258,14 @@ class MinerUParser(RAGFlowPdfParser):
                 f.write(binary)
             pdf = temp_pdf
             self.logger.info(f"[MinerU] Received binary PDF -> {temp_pdf}")
-            if callback:
-                callback(0.15, f"[MinerU] Received binary PDF -> {temp_pdf}")
+            self._emit_callback(callback, 0.15, f"[MinerU] Received binary PDF -> {temp_pdf}")
         else:
             if pdf_file_path_valid != filepath:
                 self.logger.info(f"[MinerU] Remove all space in file name: {pdf_file_path_valid}")
                 shutil.move(filepath, pdf_file_path_valid)
             pdf = Path(pdf_file_path_valid)
             if not pdf.exists():
-                if callback:
-                    callback(-1, f"[MinerU] PDF not found: {pdf}")
+                self._emit_callback(callback, -1, f"[MinerU] PDF not found: {pdf}")
                 raise FileNotFoundError(f"[MinerU] PDF not found: {pdf}")
 
         if output_dir:
@@ -857,10 +1276,11 @@ class MinerUParser(RAGFlowPdfParser):
             created_tmp_dir = True
 
         self.logger.info(f"[MinerU] Output directory: {out_dir} backend={backend} api={self.mineru_api} server_url={server_url or self.mineru_server_url}")
-        if callback:
-            callback(0.15, f"[MinerU] Output directory: {out_dir}")
+        self._emit_callback(callback, 0.15, f"[MinerU] Output directory: {out_dir}")
 
         self.__images__(pdf, zoomin=1)
+
+        self._mineru_outputs_for_db = None
 
         try:
             options = MinerUParseOptions(
@@ -876,8 +1296,7 @@ class MinerUParser(RAGFlowPdfParser):
             final_out_dir = self._run_mineru(pdf, out_dir, options, callback=callback)
             outputs = self._read_output(final_out_dir, pdf.stem, method=mineru_method_raw_str, backend=backend)
             self.logger.info(f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
-            if callback:
-                callback(0.75, f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
+            self._emit_callback(callback, 0.75, f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
 
             kb_id = kwargs.get('kb_id')
             doc_id = kwargs.get('doc_id')
@@ -903,13 +1322,46 @@ class MinerUParser(RAGFlowPdfParser):
                             "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
                             doc_id, kb_id,
                         )
+
+                    logging.warning("#########上传解析产物流程结束#########")
+                    logging.warning("#########上传解析产物流程结束#########")
+                    logging.warning("#########上传解析产物流程结束#########")
                 except Exception as e:
                     self.logger.warning(
                         "[MinerU] 上传解析产物到MinIO异常: %s (doc_id=%s, kb_id=%s)",
                         e, doc_id, kb_id, exc_info=True,
                     )
 
-            return self._transfer_to_sections(outputs, parse_method), self._transfer_to_tables(outputs)
+            self._mineru_outputs_for_db = None
+            _db_async = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "1")).strip().lower() not in ("0", "false", "no", "off")
+            if kb_id and doc_id:
+                if _db_async:
+                    self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
+                else:
+                    self.logger.warning(
+                        "[MinerU][DB_THREAD] MINERU_DB_SAVE_ASYNC=0，改为同步入库: kb_id=%s doc_id=%s blocks=%s",
+                        kb_id,
+                        doc_id,
+                        len(outputs),
+                    )
+                    self._save_sections_to_db(outputs, kb_id, doc_id, callback=callback, progress_after_chunk=False)
+            self.logger.info(
+                "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
+                "blocks=%s parse_method=%s",
+                len(outputs),
+                parse_method,
+            )
+            try:
+                _sections = self._transfer_to_sections(outputs, parse_method)
+                _tables = self._transfer_to_tables(outputs)
+            except Exception as _e_transfer:
+                self.logger.error(
+                    "[MinerU] _transfer_to_sections/_transfer_to_tables 失败: %s",
+                    _e_transfer,
+                    exc_info=True,
+                )
+                raise
+            return _sections, _tables
         finally:
             if temp_pdf and temp_pdf.exists():
                 try:

@@ -270,6 +270,9 @@ class Parser(ProcessBase):
                 callback=self.callback,
                 parse_method=conf.get("mineru_parse_method", "raw"),
                 lang=conf.get("lang", "Chinese"),
+                kb_id=str(self._canvas._kb_id) if getattr(self._canvas, "_kb_id", None) else None,
+                doc_id=self._canvas._doc_id if getattr(self._canvas, "_doc_id", None) else None,
+                parser_config=conf,
             )
             bboxes = []
             for t, poss in lines:

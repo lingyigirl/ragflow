@@ -106,7 +106,19 @@ def by_mineru(
                 )
                 return sections, tables, pdf_parser
             except Exception as e:
-                logging.error(f"Failed to parse pdf via LLMBundle MinerU ({mineru_llm_name}): {e}")
+                logging.error(
+                    "Failed to parse pdf via LLMBundle MinerU (%s): %s",
+                    mineru_llm_name,
+                    e,
+                    exc_info=True,
+                )
+                if callback:
+                    _detail = str(e).replace("'", "")[:480]
+                    callback(
+                        -1,
+                        f"[MinerU] parse_pdf failed: {_detail}" if _detail else "[MinerU] parse_pdf failed.",
+                    )
+                return None, None, None
 
     if callback:
         callback(-1, "MinerU not found.")

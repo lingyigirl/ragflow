@@ -85,6 +85,7 @@ def signal_handler(sig, frame):
 if __name__ == '__main__':
     faulthandler.enable()
     init_root_logger("ragflow_server")
+    
     logging.info(r"""
         ____   ___    ______ ______ __
        / __ \ /   |  / ____// ____// /____  _      __
@@ -93,6 +94,7 @@ if __name__ == '__main__':
     /_/ |_|/_/  |_|\____//_/    /_/ \____/ |__/|__/
 
     """)
+
     logging.info(
         f'RAGFlow version: {get_ragflow_version()}'
     )
