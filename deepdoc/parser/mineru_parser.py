@@ -750,8 +750,36 @@ class MinerUParser(RAGFlowPdfParser):
         return bbox  
 
     @staticmethod
+    def _mineru_json_safe(value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            return {
+                str(k): MinerUParser._mineru_json_safe(v)
+                for k, v in value.items()
+            }
+        if isinstance(value, (list, tuple)):
+            return [MinerUParser._mineru_json_safe(v) for v in value]
+        return MinerUParser._mineru_json_safe_scalar(value)
+
+    @staticmethod
+    def _mineru_longtext_for_db(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (dict, list, tuple)):
+            return json.dumps(MinerUParser._mineru_json_safe(value), ensure_ascii=False)
+        return str(MinerUParser._mineru_json_safe_scalar(value))
+
+    @staticmethod
+    def _build_mineru_section_id(doc_id: str, chunk_id: str, index: int) -> int:
+        raw = f"{doc_id}:{chunk_id}:{index}".encode("utf-8", errors="ignore")
+        val = int.from_bytes(hashlib.blake2b(raw, digest_size=8).digest(), "big") & 0x7FFFFFFFFFFFFFFF
+        return val or (index + 1)
+
+    @staticmethod
     def _resolve_chunk_id_for_mineru_section(item: dict[str, Any], index: int, doc_id: str) -> tuple[str, bool]:
-        """返回 (chunk_id, 是否为合成)。无 chunk_id 时生成稳定占位。"""
         for _k in ("chunk_id", "chuck_id", "id", "block_id"):
             _v = item.get(_k)
             if _v is not None and str(_v).strip():
@@ -774,8 +802,6 @@ class MinerUParser(RAGFlowPdfParser):
         *,
         progress_after_chunk: bool = False,
     ) -> None:
-        """将 MinerU 输出的 content_list 同步保存到 mineru_section 表。"""
-
         def _progress(prog: float, msg: str) -> None:
             if progress_after_chunk:
                 _lo, _hi = 0.902, 0.922
@@ -842,20 +868,21 @@ class MinerUParser(RAGFlowPdfParser):
                 _p = 0.904 + 0.012 * (_n_done / float(_pre_n))
                 _progress(min(0.916, _p), f"[MinerU] mineru_section：组装中 {_n_done}/{_pre_n}…")
 
-            item_type_raw = item.get("type") or ""
-            item_type_db = self._mineru_row_type_for_db(item_type_raw)
+            item_type_raw = item.get("type") or "" 
+            item_type_db = self._mineru_row_type_for_db(item_type_raw) 
 
             chunk_id, _syn = self._resolve_chunk_id_for_mineru_section(item, idx, str(doc_id))
             if _syn:
                 missing_native_chunk_id += 1
 
-            _pi = item.get("page_idx")
+            _pi = item.get("page_idx") 
             try:
-                _pi = int(_pi) if _pi is not None else None
+                _pi = int(_pi) if _pi is not None and str(_pi).strip() != "" else None  
             except (TypeError, ValueError):
-                _pi = None
+                _pi = None 
 
             row: dict[str, Any] = {
+                "id": self._build_mineru_section_id(str(doc_id), chunk_id, idx),
                 "kb_id": str(kb_id),
                 "doc_id": str(doc_id),
                 "chunk_id": chunk_id,
@@ -876,31 +903,22 @@ class MinerUParser(RAGFlowPdfParser):
             try:
                 row["text_level"] = int(_tl) if _tl is not None and str(_tl).strip() != "" else None
             except (TypeError, ValueError):
-                row["text_level"] = None
+                row["text_level"] = None 
 
-            if item_type_raw in (MinerUContentType.TEXT, MinerUContentType.TEXT.value, "text"):
-                row["text"] = item.get("text")
-            elif item_type_raw in (MinerUContentType.TABLE, MinerUContentType.TABLE.value, "table"):
-                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path"))
-                row["table_caption"] = item.get("table_caption")
-                row["table_footnote"] = item.get("table_footnote")
-                row["table_body"] = item.get("table_body")
-            elif item_type_raw in ("header", "page_number"):
-                row["text"] = item.get("text")
-            elif item_type_raw in (MinerUContentType.LIST, MinerUContentType.LIST.value, "list"):
-                row["sub_type"] = item.get("sub_type")
-                row["list_items"] = item.get("list_items")
-            elif item_type_raw in (MinerUContentType.IMAGE, MinerUContentType.IMAGE.value, "image"):
-                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path"))
-                row["text"] = (
-                    self._join_mineru_lines(item.get("image_caption"), "")
-                    + ("\n" if item.get("image_footnote") else "")
-                    + self._join_mineru_lines(item.get("image_footnote"), "")
-                ).strip() or None
-            elif item_type_raw in (MinerUContentType.EQUATION, MinerUContentType.EQUATION.value, "equation"):
-                row["text"] = item.get("text")
-            elif item_type_raw in (MinerUContentType.CODE, MinerUContentType.CODE.value, "code"):
-                row["text"] = ((item.get("code_body") or "") + self._join_mineru_lines(item.get("code_caption"), "\n")).strip() or None
+            if "text" in item and item.get("text") is not None and str(item.get("text")).strip() != "":
+                row["text"] = self._mineru_longtext_for_db(item.get("text")) 
+            if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
+                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path")) 
+            if "table_caption" in item and item.get("table_caption") is not None:
+                row["table_caption"] = self._mineru_json_safe(item.get("table_caption")) 
+            if "table_footnote" in item and item.get("table_footnote") is not None:
+                row["table_footnote"] = self._mineru_json_safe(item.get("table_footnote")) 
+            if "table_body" in item and item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
+                row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
+            if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
+                row["sub_type"] = self._mineru_longtext_for_db(item.get("sub_type")) 
+            if "list_items" in item and item.get("list_items") is not None:
+                row["list_items"] = self._mineru_json_safe(item.get("list_items")) 
 
             rows.append(row)
 
