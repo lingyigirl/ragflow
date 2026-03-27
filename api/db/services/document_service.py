@@ -362,7 +362,35 @@ class DocumentService(CommonService):
                                              search.index_name(tenant_id), doc.kb_id)
         except Exception:
             pass
+        cls.delete_mineru_sections(doc_id=doc.id, kb_id=doc.kb_id)
         return cls.delete_by_id(doc.id)
+
+    @classmethod
+    @DB.connection_context()
+    def delete_mineru_sections(cls, doc_id=None, kb_id=None):
+        if not doc_id and not kb_id:
+            return 0
+        try:
+            from api.db.db_models import MineruSection
+            if not MineruSection.table_exists():
+                return 0
+            where_conds = []
+            if kb_id:
+                where_conds.append(MineruSection.kb_id == kb_id)
+            if doc_id:
+                where_conds.append(MineruSection.doc_id == doc_id)
+            query = MineruSection.delete()
+            for cond in where_conds:
+                query = query.where(cond)
+            return query.execute()
+        except Exception as e:
+            logging.warning(
+                "[MinerU] delete mineru_section failed: kb_id=%s, doc_id=%s, err=%s",
+                kb_id,
+                doc_id,
+                e,
+            )
+            return 0
 
     @classmethod
     @DB.connection_context()

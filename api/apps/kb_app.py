@@ -283,6 +283,7 @@ async def rm():
             if not KnowledgebaseService.delete_by_id(req["kb_id"]):
                 return get_data_error_result(
                     message="Database error (Knowledgebase removal)!")
+            DocumentService.delete_mineru_sections(kb_id=req["kb_id"])
             for kb in kbs:
                 settings.docStoreConn.delete({"kb_id": kb.id}, search.index_name(kb.tenant_id), kb.id)
                 settings.docStoreConn.delete_idx(search.index_name(kb.tenant_id), kb.id)

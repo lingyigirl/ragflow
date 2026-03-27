@@ -236,6 +236,7 @@ async def delete(tenant_id):
             if not KnowledgebaseService.delete_by_id(kb_id):
                 errors.append(f"Delete dataset error for {kb_id}")
                 continue
+            DocumentService.delete_mineru_sections(kb_id=kb_id)
             success_count += 1
 
         if not errors:
