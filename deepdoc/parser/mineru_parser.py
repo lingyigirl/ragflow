@@ -766,6 +766,16 @@ class MinerUParser(RAGFlowPdfParser):
         return MinerUParser._mineru_json_safe_scalar(value)
 
     @staticmethod
+    def _mineru_json_field_for_db(value: Any) -> Any:
+        if value is None:
+            return None
+        try:
+            # Ensure JSON fields are always serializable and normalized.
+            return json.loads(json.dumps(MinerUParser._mineru_json_safe(value), ensure_ascii=False))
+        except Exception:
+            return None
+
+    @staticmethod
     def _mineru_longtext_for_db(value: Any) -> Optional[str]:
         if value is None:
             return None
@@ -902,7 +912,7 @@ class MinerUParser(RAGFlowPdfParser):
                 "doc_id": str(doc_id),
                 "chunk_id": chunk_id,
                 "type": item_type_db,
-                "bbox": self._mineru_bbox_for_db(item.get("bbox")),
+                "bbox": self._mineru_json_field_for_db(self._mineru_bbox_for_db(item.get("bbox"))),
                 "page_idx": _pi,
                 "text": None,
                 "text_level": None,
@@ -925,15 +935,15 @@ class MinerUParser(RAGFlowPdfParser):
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = self._mineru_str_path_for_db(item.get("img_path")) 
             if "table_caption" in item and item.get("table_caption") is not None:
-                row["table_caption"] = self._mineru_json_safe(item.get("table_caption")) 
+                row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption"))
             if "table_footnote" in item and item.get("table_footnote") is not None:
-                row["table_footnote"] = self._mineru_json_safe(item.get("table_footnote")) 
+                row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote"))
             if "table_body" in item and item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
                 row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
                 row["sub_type"] = self._mineru_short_text_for_db(item.get("sub_type"), max_len=50)
             if "list_items" in item and item.get("list_items") is not None:
-                row["list_items"] = self._mineru_json_safe(item.get("list_items")) 
+                row["list_items"] = self._mineru_json_field_for_db(item.get("list_items"))
 
             rows.append(row)
 

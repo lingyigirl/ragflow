@@ -1491,13 +1491,11 @@ async def update_mineru_section():
         chunk_id = (req.get("chunk_id") or "").strip()
         req_type = (req.get("type") or "").strip().lower()
         text = req.get("text")
-        table_caption = req.get("table_caption")
-        table_footnote = req.get("table_footnote")
-
-        if req_type not in ("text", "table"):
+        valid_types = ("text", "table_caption", "table_footnote", "table_body")
+        if req_type not in valid_types:
             return get_json_result(
                 data=False,
-                message="type 仅支持 text 或 table",
+                message="type 仅支持 text、table_caption、table_footnote、table_body",
                 code=RetCode.ARGUMENT_ERROR,
             )
 
@@ -1522,8 +1520,6 @@ async def update_mineru_section():
             chunk_id,
             req_type,
             text,
-            table_caption=table_caption,
-            table_footnote=table_footnote,
         )
         if not ok:
             return get_json_result(

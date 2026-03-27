@@ -410,14 +410,18 @@ class DocumentService(CommonService):
         chunk_id,
         req_type,
         text,
-        table_caption=None,
-        table_footnote=None,
     ):
         if not chunk_id:
             return False, "chunk_id is required", {}
         req_type = str(req_type or "").strip().lower()
-        if req_type not in ("text", "table"):
-            return False, "type must be text or table", {}
+        type_to_field = {
+            "text": "text",
+            "table_caption": "table_caption",
+            "table_footnote": "table_footnote",
+            "table_body": "table_body",
+        }
+        if req_type not in type_to_field:
+            return False, "type must be one of text, table_caption, table_footnote, table_body", {}
         try:
             from api.db.db_models import MineruSection
         except Exception:
@@ -425,26 +429,12 @@ class DocumentService(CommonService):
         section = cls.get_mineru_section_by_chunk_id(chunk_id)
         if not section:
             return False, "mineru_section not found by chunk_id", {}
-        if req_type == "text":
-            updated = MineruSection.update(text=text).where(MineruSection.id == section.id).execute()
-            if not updated:
-                return False, "update failed", {}
-            return True, "", {"updated_field": "text", "kb_id": section.kb_id, "doc_id": section.doc_id, "chunk_id": section.chunk_id}
-
-        update_data = {"table_body": text}
-        updated_fields = ["table_body"]
-        if table_caption is not None:
-            update_data["table_caption"] = table_caption
-            updated_fields.append("table_caption")
-        if table_footnote is not None:
-            update_data["table_footnote"] = table_footnote
-            updated_fields.append("table_footnote")
-
-        updated = MineruSection.update(**update_data).where(MineruSection.id == section.id).execute()
+        target_field = type_to_field[req_type]
+        updated = MineruSection.update(**{target_field: text}).where(MineruSection.id == section.id).execute()
         if not updated:
             return False, "update failed", {}
         return True, "", {
-            "updated_field": ",".join(updated_fields),
+            "updated_field": target_field,
             "kb_id": section.kb_id,
             "doc_id": section.doc_id,
             "chunk_id": section.chunk_id,
