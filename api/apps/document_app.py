@@ -1481,3 +1481,57 @@ async def mineru_download(file_type):
     except Exception as e:
         return server_error_response(e)
 
+
+@manager.route("/mineru_section/update", methods=["POST"])  # noqa: F821
+@login_required
+@validate_request("chunk_id", "type", "text")
+async def update_mineru_section():
+    try:
+        req = await get_request_json()
+        chunk_id = (req.get("chunk_id") or "").strip()
+        req_type = (req.get("type") or "").strip().lower()
+        text = req.get("text")
+        table_caption = req.get("table_caption")
+        table_footnote = req.get("table_footnote")
+
+        if req_type not in ("text", "table"):
+            return get_json_result(
+                data=False,
+                message="type 仅支持 text 或 table",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+
+        section = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
+        if not section:
+            return get_json_result(
+                data=False,
+                message="未找到对应 chunk_id 的 mineru_section 记录",
+                code=RetCode.NOT_FOUND,
+            )
+
+        e, kb = KnowledgebaseService.get_by_id(section.kb_id)
+        if not e:
+            return get_json_result(
+                data=False,
+                message="知识库不存在",
+                code=RetCode.NOT_FOUND,
+            )
+        check_kb_team_permission(kb, current_user.id)
+
+        ok, msg, data = DocumentService.update_mineru_section_content_by_chunk_id(
+            chunk_id,
+            req_type,
+            text,
+            table_caption=table_caption,
+            table_footnote=table_footnote,
+        )
+        if not ok:
+            return get_json_result(
+                data=False,
+                message=msg or "更新 mineru_section 失败",
+                code=RetCode.SERVER_ERROR,
+            )
+        return get_json_result(data=data)
+    except Exception as e:
+        return server_error_response(e)
+

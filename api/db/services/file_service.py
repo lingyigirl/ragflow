@@ -200,8 +200,22 @@ class FileService(CommonService):
         if count > len(name) - 2:
             return file
         else:
+            actor_id = getattr(current_user, "id", None)
+            if not actor_id:
+                actor_id = getattr(file, "tenant_id", None) if file is not None else None
+            if not actor_id and isinstance(file, dict):
+                actor_id = file.get("tenant_id")
             file = cls.insert(
-                {"id": get_uuid(), "parent_id": parent_id, "tenant_id": current_user.id, "created_by": current_user.id, "name": name[count], "location": "", "size": 0, "type": FileType.FOLDER.value}
+                {
+                    "id": get_uuid(),
+                    "parent_id": parent_id,
+                    "tenant_id": actor_id,
+                    "created_by": actor_id,
+                    "name": name[count],
+                    "location": "",
+                    "size": 0,
+                    "type": FileType.FOLDER.value,
+                }
             )
             return cls.create_folder(file, file.id, name, count + 1)
 
