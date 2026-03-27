@@ -773,6 +773,18 @@ class MinerUParser(RAGFlowPdfParser):
         return str(MinerUParser._mineru_json_safe_scalar(value))
 
     @staticmethod
+    def _mineru_short_text_for_db(value: Any, max_len: int = 50) -> Optional[str]:
+        if value is None:
+            return None
+        s = value if isinstance(value, str) else MinerUParser._mineru_longtext_for_db(value)
+        if s is None:
+            return None
+        s = str(s).strip()
+        if not s:
+            return None
+        return s[:max_len]
+
+    @staticmethod
     def _build_mineru_section_id(doc_id: str, chunk_id: str, index: int) -> int:
         raw = f"{doc_id}:{chunk_id}:{index}".encode("utf-8", errors="ignore")
         val = int.from_bytes(hashlib.blake2b(raw, digest_size=8).digest(), "big") & 0x7FFFFFFFFFFFFFFF
@@ -916,7 +928,7 @@ class MinerUParser(RAGFlowPdfParser):
             if "table_body" in item and item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
                 row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
-                row["sub_type"] = self._mineru_longtext_for_db(item.get("sub_type")) 
+                row["sub_type"] = self._mineru_short_text_for_db(item.get("sub_type"), max_len=50)
             if "list_items" in item and item.get("list_items") is not None:
                 row["list_items"] = self._mineru_json_safe(item.get("list_items")) 
 
@@ -1007,7 +1019,7 @@ class MinerUParser(RAGFlowPdfParser):
         worker = threading.Thread(
             target=_worker,
             name=f"mineru_db_{str(doc_id)[:8]}",
-            daemon=True,
+            daemon=False,
         )
         worker.start()
         self.logger.warning(
