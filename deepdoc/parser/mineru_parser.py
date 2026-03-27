@@ -737,7 +737,10 @@ class MinerUParser(RAGFlowPdfParser):
                 pass  
         if isinstance(x, (int, float, str, bool)):  
             return x  
-        return x  
+        try:
+            return str(x)
+        except Exception:
+            return repr(x)
 
     @staticmethod
     def _mineru_bbox_for_db(bbox: Any) -> Any:  
@@ -957,7 +960,41 @@ class MinerUParser(RAGFlowPdfParser):
                     .execute()
                 )
                 _progress(0.919, f"[MinerU] mineru_section：正在批量插入 {len(rows)} 条…")
-                MineruSection.insert_many(rows).execute()
+                try:
+                    MineruSection.insert_many(rows).execute()
+                except Exception as _bulk_e:
+                    self.logger.warning(
+                        "[MinerU][mineru_section] 批量插入失败，降级逐条插入。doc_id=%s kb_id=%s err=%s",
+                        doc_id,
+                        kb_id,
+                        _bulk_e,
+                        exc_info=True,
+                    )
+                    ok_cnt = 0
+                    fail_cnt = 0
+                    for _r in rows:
+                        try:
+                            MineruSection.insert(**_r).execute()
+                            ok_cnt += 1
+                        except Exception as _row_e:
+                            fail_cnt += 1
+                            self.logger.warning(
+                                "[MinerU][mineru_section] 单条插入失败，已跳过。doc_id=%s kb_id=%s chunk_id=%s err=%s",
+                                doc_id,
+                                kb_id,
+                                _r.get("chunk_id"),
+                                _row_e,
+                            )
+                    self.logger.warning(
+                        "[MinerU][mineru_section] 降级插入完成。ok=%s fail=%s total=%s doc_id=%s kb_id=%s",
+                        ok_cnt,
+                        fail_cnt,
+                        len(rows),
+                        doc_id,
+                        kb_id,
+                    )
+                    if ok_cnt <= 0:
+                        raise RuntimeError(f"mineru_section fallback insert failed: fail={fail_cnt}, total={len(rows)}")
             _ok_msg = (
                 f"[MinerU] mineru_section 已写入 {len(rows)} 条记录，doc_id={doc_id}, kb_id={kb_id}, "
                 f"total_blocks={len(outputs)}, synthetic_chunk_id_count={missing_native_chunk_id}"
@@ -1015,6 +1052,8 @@ class MinerUParser(RAGFlowPdfParser):
                     _e_worker,
                     exc_info=True,
                 )
+                _em = str(_e_worker).replace("'", "")[:400]
+                self._emit_callback(callback, 0.922, f"[MinerU][WARN] 后台入库线程异常: {_em}")
 
         worker = threading.Thread(
             target=_worker,
@@ -1363,7 +1402,7 @@ class MinerUParser(RAGFlowPdfParser):
                     )
 
             self._mineru_outputs_for_db = None
-            _db_async = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "1")).strip().lower() not in ("0", "false", "no", "off")
+            _db_async = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "0")).strip().lower() not in ("0", "false", "no", "off")
             if kb_id and doc_id:
                 if _db_async:
                     self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
