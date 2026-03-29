@@ -818,6 +818,15 @@ class MinerUParser(RAGFlowPdfParser):
             _syn = _syn[:64]
         return _syn, True
 
+    @staticmethod
+    def _normalize_kb_doc_ctx(v: Any) -> str:
+        """将知识库/文档上下文 ID 规范为去空白字符串（兼容 list 包裹或非 str）。"""
+        if v is None:
+            return ""
+        if isinstance(v, (list, tuple)) and len(v) > 0:
+            v = v[0]
+        return str(v).strip()
+
     def _save_sections_to_db(
         self,
         outputs: list[dict[str, Any]],
@@ -827,6 +836,20 @@ class MinerUParser(RAGFlowPdfParser):
         *,
         progress_after_chunk: bool = False,
     ) -> None:
+        kb_id = MinerUParser._normalize_kb_doc_ctx(kb_id)
+        doc_id = MinerUParser._normalize_kb_doc_ctx(doc_id)
+        _th = threading.current_thread()
+        logging.info(
+            "[MinerU][mineru_section] _save_sections_to_db 进入: pid=%s thread=%s daemon=%s kb_id=%r doc_id=%r outputs类型=%s len=%s",
+            os.getpid(),
+            _th.name,
+            _th.daemon,
+            kb_id,
+            doc_id,
+            type(outputs).__name__,
+            len(outputs) if isinstance(outputs, list) else None,
+        )
+
         def _progress(prog: float, msg: str) -> None:
             if progress_after_chunk:
                 _lo, _hi = 0.902, 0.922
@@ -847,27 +870,47 @@ class MinerUParser(RAGFlowPdfParser):
         try:
             from api.db.db_models import DB, MineruSection
         except Exception as e:
-            self.logger.warning(
-                f"[MinerU] 导入 MineruSection 模型失败，跳过写入数据库: {e}",
+            logging.error(
+                "[MinerU][mineru_section] 导入 MineruSection/DB 失败，跳过写入。请确认任务进程 PYTHONPATH 含项目根且可 import api。err=%s",
+                e,
+                exc_info=True,
+            )
+            self.logger.error(
+                f"[MinerU][mineru_section] 导入模型失败，跳过写入: {e}",
                 exc_info=True,
             )
             return
 
         _progress(0.902, "[MinerU] mineru_section：检查数据表…")
         try:
-            if not MineruSection.table_exists():
+            _tbl_ok = MineruSection.table_exists()
+            logging.info(
+                "[MinerU][mineru_section] 表检查: mineru_section.table_exists()=%s kb_id=%s doc_id=%s",
+                _tbl_ok,
+                kb_id,
+                doc_id,
+            )
+            if not _tbl_ok:
                 _tb_missing_msg = "[MinerU] mineru_section 表不存在，跳过写入（请确认服务启动时已执行 init_database_tables/完成迁移）"
                 self.logger.error(_tb_missing_msg)
-                logging.warning(_tb_missing_msg)
+                logging.error(_tb_missing_msg)
                 _progress(0.91, "[MinerU] 跳过写入 mineru_section：表不存在")
                 return
         except Exception as e:
+            logging.error(
+                "[MinerU][mineru_section] table_exists() 异常，仍将尝试 INSERT；若最终无数据请查库连接/权限。err=%s",
+                e,
+                exc_info=True,
+            )
             self.logger.warning(
                 f"[MinerU] 检查 mineru_section 表是否存在时异常: {e}",
                 exc_info=True,
             )
 
         _pre_n = len(outputs)
+        _nondict = (
+            sum(1 for _it in outputs if not isinstance(_it, dict)) if isinstance(outputs, list) else -1
+        )
         _pre_cid = sum(
             1
             for _it in outputs
@@ -880,6 +923,11 @@ class MinerUParser(RAGFlowPdfParser):
         )
         self.logger.warning(_pre_stat_msg)
         logging.warning(_pre_stat_msg)
+        if isinstance(outputs, list) and _nondict > 0:
+            logging.warning(
+                "[MinerU][mineru_section] outputs 中非 dict 元素已跳过: 跳过数=%s（仅 dict 会入表）",
+                _nondict,
+            )
 
         _progress(0.904, f"[MinerU] mineru_section：组装行数据（解析块 {_pre_n}，MinerU 自带 id {_pre_cid}）…")
 
@@ -953,26 +1001,63 @@ class MinerUParser(RAGFlowPdfParser):
             )
 
         if not rows:
+            logging.warning(
+                "[MinerU][mineru_section] 无可写入行: rows=0 outputs_len=%s nondict_skipped=%s kb_id=%s doc_id=%s",
+                _pre_n,
+                _nondict,
+                kb_id,
+                doc_id,
+            )
             self.logger.info(
                 f"[MinerU] mineru_section 本次无可写入记录，doc_id={doc_id}, kb_id={kb_id}, total_blocks={len(outputs)}"
             )
             _progress(0.91, f"[MinerU] mineru_section 无可写入记录：total_blocks={len(outputs)}")
             return
 
+        _sample_keys = list(rows[0].keys()) if rows else []
+        logging.info(
+            "[MinerU][mineru_section] 即将写入: 行数=%s 首行字段键=%s 首行id=%s chunk_id=%s type=%s",
+            len(rows),
+            _sample_keys,
+            rows[0].get("id") if rows else None,
+            rows[0].get("chunk_id") if rows else None,
+            rows[0].get("type") if rows else None,
+        )
+
         _progress(0.917, f"[MinerU] mineru_section：删除本文档旧记录并写入 {len(rows)} 条…")
 
         try:
             with DB.connection_context():
                 _progress(0.918, "[MinerU] mineru_section：正在删除旧切片…")
-                (
+                _del_n = (
                     MineruSection.delete()
                     .where((MineruSection.kb_id == kb_id) & (MineruSection.doc_id == doc_id))
                     .execute()
                 )
+                logging.info(
+                    "[MinerU][mineru_section] DELETE 已执行: 删除行数(返回值)=%s kb_id=%r doc_id=%r",
+                    _del_n,
+                    kb_id,
+                    doc_id,
+                )
                 _progress(0.919, f"[MinerU] mineru_section：正在批量插入 {len(rows)} 条…")
                 try:
                     MineruSection.insert_many(rows).execute()
+                    logging.info(
+                        "[MinerU][mineru_section] insert_many 成功: 条数=%s kb_id=%s doc_id=%s",
+                        len(rows),
+                        kb_id,
+                        doc_id,
+                    )
                 except Exception as _bulk_e:
+                    logging.error(
+                        "[MinerU][mineru_section] insert_many 失败，将逐条重试: type=%s repr=%s kb_id=%s doc_id=%s",
+                        type(_bulk_e).__name__,
+                        repr(_bulk_e)[:800],
+                        kb_id,
+                        doc_id,
+                        exc_info=True,
+                    )
                     self.logger.warning(
                         "[MinerU][mineru_section] 批量插入失败，降级逐条插入。doc_id=%s kb_id=%s err=%s",
                         doc_id,
@@ -988,6 +1073,16 @@ class MinerUParser(RAGFlowPdfParser):
                             ok_cnt += 1
                         except Exception as _row_e:
                             fail_cnt += 1
+                            _lvl = logging.error if fail_cnt <= 3 else logging.warning
+                            _lvl(
+                                "[MinerU][mineru_section] 单条 insert 失败 #%s: chunk_id=%r id=%r err_type=%s err=%s",
+                                fail_cnt,
+                                _r.get("chunk_id"),
+                                _r.get("id"),
+                                type(_row_e).__name__,
+                                repr(_row_e)[:500],
+                                exc_info=(fail_cnt <= 2),
+                            )
                             self.logger.warning(
                                 "[MinerU][mineru_section] 单条插入失败，已跳过。doc_id=%s kb_id=%s chunk_id=%s err=%s",
                                 doc_id,
@@ -1005,16 +1100,44 @@ class MinerUParser(RAGFlowPdfParser):
                     )
                     if ok_cnt <= 0:
                         raise RuntimeError(f"mineru_section fallback insert failed: fail={fail_cnt}, total={len(rows)}")
+            try:
+                _verify_cnt = (
+                    MineruSection.select()
+                    .where((MineruSection.kb_id == kb_id) & (MineruSection.doc_id == doc_id))
+                    .count()
+                )
+            except Exception as _vc_e:
+                _verify_cnt = -1
+                logging.warning(
+                    "[MinerU][mineru_section] 写入后 COUNT 校验失败（可忽略）kb_id=%s doc_id=%s err=%s",
+                    kb_id,
+                    doc_id,
+                    _vc_e,
+                )
             _ok_msg = (
                 f"[MinerU] mineru_section 已写入 {len(rows)} 条记录，doc_id={doc_id}, kb_id={kb_id}, "
                 f"total_blocks={len(outputs)}, synthetic_chunk_id_count={missing_native_chunk_id}"
             )
             self.logger.info(_ok_msg)
             logging.warning(_ok_msg)
+            logging.info(
+                "[MinerU][mineru_section] 写入后校验: 本 doc 在表中行数=%s（期望约 %s）",
+                _verify_cnt,
+                len(rows),
+            )
             _progress(0.92, f"[MinerU] mineru_section 已写入 {len(rows)} 条记录")
         except Exception as e:
             self.logger.error(
                 f"[MinerU] 写入 mineru_section 表失败，doc_id={doc_id}, kb_id={kb_id}, err={e}",
+                exc_info=True,
+            )
+            logging.error(
+                "[MinerU][mineru_section] 写入流程异常(整块): type=%s doc_id=%r kb_id=%r rows计划=%s err=%s",
+                type(e).__name__,
+                doc_id,
+                kb_id,
+                len(rows) if isinstance(rows, list) else None,
+                repr(e)[:800],
                 exc_info=True,
             )
             logging.warning(
@@ -1035,10 +1158,20 @@ class MinerUParser(RAGFlowPdfParser):
     ) -> Optional[threading.Thread]:
         """解析完成后异步写 mineru_section，主链路继续执行。"""
         if not kb_id or not doc_id:
+            logging.warning(
+                "[MinerU][mineru_section] _schedule_save_sections_to_db 跳过: kb_id/doc_id 为空 kb_id=%r doc_id=%r",
+                kb_id,
+                doc_id,
+            )
             return None
         try:
             snapshot = copy.deepcopy(outputs)
         except Exception as _e_snap:
+            logging.warning(
+                "[MinerU][mineru_section] deepcopy(outputs) 失败改用原引用: %s",
+                _e_snap,
+                exc_info=True,
+            )
             self.logger.warning(
                 "[MinerU][DB_THREAD] deepcopy(outputs) 失败，改用原引用: %s",
                 _e_snap,
@@ -1048,6 +1181,16 @@ class MinerUParser(RAGFlowPdfParser):
 
         def _worker() -> None:
             try:
+                _wth = threading.current_thread()
+                logging.info(
+                    "[MinerU][mineru_section][ASYNC] 后台线程开始: name=%s ident=%s pid=%s kb_id=%r doc_id=%r blocks=%s",
+                    _wth.name,
+                    getattr(_wth, "native_id", None),
+                    os.getpid(),
+                    kb_id,
+                    doc_id,
+                    len(snapshot) if isinstance(snapshot, list) else None,
+                )
                 self.logger.warning(
                     "[MinerU][DB_THREAD] 后台入库线程开始: kb_id=%s doc_id=%s blocks=%s",
                     kb_id,
@@ -1055,8 +1198,21 @@ class MinerUParser(RAGFlowPdfParser):
                     len(snapshot) if isinstance(snapshot, list) else None,
                 )
                 self._save_sections_to_db(snapshot, kb_id, doc_id, callback=callback, progress_after_chunk=False)
+                logging.info(
+                    "[MinerU][mineru_section][ASYNC] 后台线程正常结束: doc_id=%r kb_id=%r",
+                    doc_id,
+                    kb_id,
+                )
                 self.logger.warning("[MinerU][DB_THREAD] 后台入库线程结束: doc_id=%s", doc_id)
             except Exception as _e_worker:
+                logging.error(
+                    "[MinerU][mineru_section][ASYNC] 后台线程异常: type=%s err=%s doc_id=%r kb_id=%r",
+                    type(_e_worker).__name__,
+                    repr(_e_worker)[:800],
+                    doc_id,
+                    kb_id,
+                    exc_info=True,
+                )
                 self.logger.error(
                     "[MinerU][DB_THREAD] 后台入库线程异常: %s",
                     _e_worker,
@@ -1071,6 +1227,12 @@ class MinerUParser(RAGFlowPdfParser):
             daemon=False,
         )
         worker.start()
+        logging.info(
+            "[MinerU][mineru_section] 已启动异步入库线程: thread_name=%s kb_id=%r doc_id=%r MINERU_DB_SAVE_ASYNC=1",
+            worker.name,
+            kb_id,
+            doc_id,
+        )
         self.logger.warning(
             "[MinerU][DB_THREAD] 已启动后台入库线程: kb_id=%s doc_id=%s",
             kb_id,
@@ -1377,11 +1539,35 @@ class MinerUParser(RAGFlowPdfParser):
             self.logger.info(f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
             self._emit_callback(callback, 0.75, f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
 
-            kb_id = kwargs.get('kb_id')
-            doc_id = kwargs.get('doc_id')
-            self.logger.info(f"[MinerU] 解析完成，MinIO 上传参数: kb_id={kb_id}, doc_id={doc_id}")
+            _kb_raw = kwargs.get("kb_id")
+            _doc_raw = kwargs.get("doc_id")
+            kb_id = MinerUParser._normalize_kb_doc_ctx(_kb_raw)
+            doc_id = MinerUParser._normalize_kb_doc_ctx(_doc_raw)
+            _db_async_flag = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "0")).strip().lower() not in (
+                "0",
+                "false",
+                "no",
+                "off",
+            )
+            logging.info(
+                "[MinerU][mineru_section] 解析完成上下文: kb_id(raw)=%r doc_id(raw)=%r -> kb_id=%r doc_id=%r "
+                "outputs=%s MINERU_DB_SAVE_ASYNC=%s",
+                _kb_raw,
+                _doc_raw,
+                kb_id,
+                doc_id,
+                len(outputs),
+                _db_async_flag,
+            )
+            self.logger.info(f"[MinerU] 解析完成，MinIO/入库上下文: kb_id={kb_id}, doc_id={doc_id}")
 
             if not kb_id or not doc_id:
+                logging.warning(
+                    "[MinerU][mineru_section] 缺少有效 kb_id/doc_id，已跳过 MinIO 与 mineru_section。"
+                    "raw_kb_id=%r raw_doc_id=%r（请确认 chunk 调用传入 kb_id、doc_id，且 task 联表含 document.kb_id）",
+                    _kb_raw,
+                    _doc_raw,
+                )
                 self.logger.warning(
                     "[MinerU] 未传入 kb_id 或 doc_id，跳过解析产物上传 MinIO（知识库/文档链路应传入二者）；"
                     "若批量解析时经常缺失，请检查任务执行器传入的 task['kb_id']/task['doc_id']"
@@ -1412,8 +1598,15 @@ class MinerUParser(RAGFlowPdfParser):
                     )
 
             self._mineru_outputs_for_db = None
-            _db_async = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "0")).strip().lower() not in ("0", "false", "no", "off")
+            _db_async = _db_async_flag
             if kb_id and doc_id:
+                logging.info(
+                    "[MinerU][mineru_section] 开始入库: async=%s blocks=%s kb_id=%s doc_id=%s",
+                    _db_async,
+                    len(outputs),
+                    kb_id,
+                    doc_id,
+                )
                 if _db_async:
                     self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
                 else:
@@ -1424,6 +1617,11 @@ class MinerUParser(RAGFlowPdfParser):
                         len(outputs),
                     )
                     self._save_sections_to_db(outputs, kb_id, doc_id, callback=callback, progress_after_chunk=False)
+            else:
+                logging.warning(
+                    "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
+                    len(outputs),
+                )
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
                 "blocks=%s parse_method=%s",

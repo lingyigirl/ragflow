@@ -258,6 +258,13 @@ async def build_chunks(task, progress_callback):
         raise
 
     try:
+        logging.info(
+            "[MinerU][mineru_section] build_chunks 传入 chunk 的上下文: kb_id=%r doc_id=%r parser_id=%s name=%s",
+            task.get("kb_id"),
+            task.get("doc_id"),
+            task.get("parser_id"),
+            task.get("name"),
+        )
         async with chunk_limiter:
             cks = await asyncio.to_thread(
                 chunker.chunk,
