@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from io import BytesIO
 from os import PathLike
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Optional, Union 
 
 import numpy as np
 import pdfplumber
@@ -128,7 +128,7 @@ class MinerUParseMethod(StrEnum):
 class MinerUParseOptions:
     """Options for MinerU PDF parsing."""
 
-    backend: MinerUBackend = MinerUBackend.PIPELINE
+    backend: Union[MinerUBackend, str] = MinerUBackend.PIPELINE  # 允许外部自定义 backend 字符串透传
     lang: Optional[MinerULanguage] = None  # language for OCR (pipeline backend only)
     method: MinerUParseMethod = MinerUParseMethod.AUTO
     server_url: Optional[str] = None
