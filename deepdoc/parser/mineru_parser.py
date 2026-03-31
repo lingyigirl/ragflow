@@ -1050,8 +1050,22 @@ class MinerUParser(RAGFlowPdfParser):
                         kb_id,
                         doc_id,
                     )
+                    self.logger.warning(
+                        "[MinerU][mineru_section] insert_many 成功: 条数=%s kb_id=%s doc_id=%s",
+                        len(rows),
+                        kb_id,
+                        doc_id,
+                    )
                 except Exception as _bulk_e:
                     logging.error(
+                        "[MinerU][mineru_section] insert_many 失败，将逐条重试: type=%s repr=%s kb_id=%s doc_id=%s",
+                        type(_bulk_e).__name__,
+                        repr(_bulk_e)[:800],
+                        kb_id,
+                        doc_id,
+                        exc_info=True,
+                    )
+                    self.logger.error(
                         "[MinerU][mineru_section] insert_many 失败，将逐条重试: type=%s repr=%s kb_id=%s doc_id=%s",
                         type(_bulk_e).__name__,
                         repr(_bulk_e)[:800],
@@ -1133,6 +1147,15 @@ class MinerUParser(RAGFlowPdfParser):
                 exc_info=True,
             )
             logging.error(
+                "[MinerU][mineru_section] 写入流程异常(整块): type=%s doc_id=%r kb_id=%r rows计划=%s err=%s",
+                type(e).__name__,
+                doc_id,
+                kb_id,
+                len(rows) if isinstance(rows, list) else None,
+                repr(e)[:800],
+                exc_info=True,
+            )
+            self.logger.error(
                 "[MinerU][mineru_section] 写入流程异常(整块): type=%s doc_id=%r kb_id=%r rows计划=%s err=%s",
                 type(e).__name__,
                 doc_id,
