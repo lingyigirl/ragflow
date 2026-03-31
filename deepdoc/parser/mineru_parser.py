@@ -1000,25 +1000,35 @@ class MinerUParser(RAGFlowPdfParser):
             except (TypeError, ValueError):
                 row["text_level"] = None 
 
-            if item_type_db == "text":
+            item_type_db_norm = str(item_type_db).strip().lower()  
+            if item_type_db_norm == "text":
                 if item.get("text") is not None and str(item.get("text")).strip() != "":
                     row["text"] = self._mineru_longtext_for_db(item.get("text"))
-            elif item_type_db == "table":
+            elif item_type_db_norm == "table":
                 if item.get("table_caption") is not None: 
                     row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption")) 
                 if item.get("table_footnote") is not None: 
                     row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote")) 
                 if item.get("table_body") is not None and str(item.get("table_body")).strip() != "": 
                     row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
-            elif item_type_db == "table_caption":
-                if item.get("table_caption") is not None:
-                    row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption"))
-            elif item_type_db == "table_footnote":
-                if item.get("table_footnote") is not None:
-                    row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote"))
-            elif item_type_db == "table_body":
-                if item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
-                    row["table_body"] = self._mineru_longtext_for_db(item.get("table_body"))
+            elif item_type_db_norm == "table_caption":
+                _table_caption = item.get("table_caption")  
+                if (_table_caption is None or str(_table_caption).strip() == "") and item.get("text") is not None and str(item.get("text")).strip() != "":
+                    _table_caption = item.get("text")  
+                if _table_caption is not None and str(_table_caption).strip() != "":
+                    row["table_caption"] = self._mineru_json_field_for_db(_table_caption)
+            elif item_type_db_norm == "table_footnote":
+                _table_footnote = item.get("table_footnote")  
+                if (_table_footnote is None or str(_table_footnote).strip() == "") and item.get("text") is not None and str(item.get("text")).strip() != "":
+                    _table_footnote = item.get("text") 
+                if _table_footnote is not None and str(_table_footnote).strip() != "":
+                    row["table_footnote"] = self._mineru_json_field_for_db(_table_footnote)
+            elif item_type_db_norm == "table_body":
+                _table_body = item.get("table_body") 
+                if (_table_body is None or str(_table_body).strip() == "") and item.get("text") is not None and str(item.get("text")).strip() != "":
+                    _table_body = item.get("text") 
+                if _table_body is not None and str(_table_body).strip() != "":
+                    row["table_body"] = self._mineru_longtext_for_db(_table_body)
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = self._mineru_str_path_for_db(item.get("img_path")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
