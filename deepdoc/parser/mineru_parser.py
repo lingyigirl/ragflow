@@ -1662,20 +1662,18 @@ class MinerUParser(RAGFlowPdfParser):
             self._mineru_outputs_for_db = None
             if kb_id and doc_id:
                 logging.info(
-                    "[MinerU][mineru_section] 主链路已结束，启动后台入库任务: blocks=%s kb_id=%s doc_id=%s",
+                    "[MinerU][mineru_section] 主链路已结束，开始同步入库: blocks=%s kb_id=%s doc_id=%s",
                     len(outputs),
                     kb_id,
                     doc_id,
                 )
-                _worker = self._schedule_save_sections_to_db(
+                self._save_sections_to_db(
                     outputs,
                     kb_id,
                     doc_id,
                     callback=callback,
-                    cleanup_dir=out_dir if (delete_output and created_tmp_dir) else None,
-                    cleanup_enabled=(delete_output and created_tmp_dir),
+                    progress_after_chunk=False,
                 )
-                cleanup_handed_to_db_task = bool(_worker) and delete_output and created_tmp_dir
             else:
                 logging.warning(
                     "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
