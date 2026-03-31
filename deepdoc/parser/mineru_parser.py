@@ -1179,6 +1179,8 @@ class MinerUParser(RAGFlowPdfParser):
         kb_id: Optional[str],
         doc_id: Optional[str],
         callback: Optional[Callable] = None,
+        cleanup_dir: Optional[Path] = None,
+        cleanup_enabled: bool = False,
     ) -> Optional[threading.Thread]:
         """解析完成后异步写 mineru_section，主链路继续执行。"""
         if not kb_id or not doc_id:
@@ -1244,6 +1246,24 @@ class MinerUParser(RAGFlowPdfParser):
                 )
                 _em = str(_e_worker).replace("'", "")[:400]
                 self._emit_callback(callback, 0.922, f"[MinerU][WARN] 后台入库线程异常: {_em}")
+            finally:
+                if cleanup_enabled and cleanup_dir and cleanup_dir.exists():
+                    try:
+                        import shutil
+                        shutil.rmtree(cleanup_dir)
+                        logging.info(
+                            "[MinerU][mineru_section][ASYNC] 后台任务清理输出目录完成: dir=%s doc_id=%r kb_id=%r",
+                            str(cleanup_dir),
+                            doc_id,
+                            kb_id,
+                        )
+                    except Exception as _e_cleanup:
+                        logging.warning(
+                            "[MinerU][mineru_section][ASYNC] 后台任务清理输出目录失败: dir=%s err=%s",
+                            str(cleanup_dir),
+                            _e_cleanup,
+                            exc_info=True,
+                        )
 
         worker = threading.Thread(
             target=_worker,
@@ -1503,6 +1523,7 @@ class MinerUParser(RAGFlowPdfParser):
 
         temp_pdf = None
         created_tmp_dir = False
+        cleanup_handed_to_db_task = False
 
         parser_cfg = kwargs.get('parser_config', {})
         lang = parser_cfg.get('mineru_lang') or kwargs.get('lang', 'English')
@@ -1621,31 +1642,6 @@ class MinerUParser(RAGFlowPdfParser):
                         e, doc_id, kb_id, exc_info=True,
                     )
 
-            self._mineru_outputs_for_db = None
-            _db_async = _db_async_flag
-            if kb_id and doc_id:
-                logging.info(
-                    "[MinerU][mineru_section] 开始入库: async=%s blocks=%s kb_id=%s doc_id=%s",
-                    _db_async,
-                    len(outputs),
-                    kb_id,
-                    doc_id,
-                )
-                if _db_async:
-                    self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
-                else:
-                    self.logger.warning(
-                        "[MinerU][DB_THREAD] MINERU_DB_SAVE_ASYNC=0，改为同步入库: kb_id=%s doc_id=%s blocks=%s",
-                        kb_id,
-                        doc_id,
-                        len(outputs),
-                    )
-                    self._save_sections_to_db(outputs, kb_id, doc_id, callback=callback, progress_after_chunk=False)
-            else:
-                logging.warning(
-                    "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
-                    len(outputs),
-                )
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
                 "blocks=%s parse_method=%s",
@@ -1662,6 +1658,29 @@ class MinerUParser(RAGFlowPdfParser):
                     exc_info=True,
                 )
                 raise
+
+            self._mineru_outputs_for_db = None
+            if kb_id and doc_id:
+                logging.info(
+                    "[MinerU][mineru_section] 主链路已结束，启动后台入库任务: blocks=%s kb_id=%s doc_id=%s",
+                    len(outputs),
+                    kb_id,
+                    doc_id,
+                )
+                _worker = self._schedule_save_sections_to_db(
+                    outputs,
+                    kb_id,
+                    doc_id,
+                    callback=callback,
+                    cleanup_dir=out_dir if (delete_output and created_tmp_dir) else None,
+                    cleanup_enabled=(delete_output and created_tmp_dir),
+                )
+                cleanup_handed_to_db_task = bool(_worker) and delete_output and created_tmp_dir
+            else:
+                logging.warning(
+                    "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
+                    len(outputs),
+                )
             return _sections, _tables
         finally:
             if temp_pdf and temp_pdf.exists():
@@ -1670,7 +1689,7 @@ class MinerUParser(RAGFlowPdfParser):
                     temp_pdf.parent.rmdir()
                 except Exception:
                     pass
-            if delete_output and created_tmp_dir and out_dir.exists():
+            if delete_output and created_tmp_dir and out_dir.exists() and not cleanup_handed_to_db_task:
                 try:
                     shutil.rmtree(out_dir)
                 except Exception:
