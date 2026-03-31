@@ -27,7 +27,7 @@ from functools import wraps
 
 from quart_auth import AuthUser
 from itsdangerous.url_safe import URLSafeTimedSerializer as Serializer
-from peewee import InterfaceError, OperationalError, BigIntegerField, BooleanField, CharField, CompositeKey, DateTimeField, Field, FloatField, IntegerField, Metadata, Model, TextField
+from peewee import InterfaceError, OperationalError, BigAutoField, BigIntegerField, BooleanField, CharField, CompositeKey, DateTimeField, Field, FloatField, IntegerField, Metadata, Model, TextField  # 引入 BigAutoField 以支持自增主键。  # 中文注释
 from playhouse.migrate import MySQLMigrator, PostgresqlMigrator, migrate
 from playhouse.pool import PooledMySQLDatabase, PooledPostgresqlDatabase
 
@@ -840,7 +840,7 @@ class Task(DataBaseModel):
 
 
 class MineruSection(DataBaseModel):
-    id = BigIntegerField(primary_key=True) 
+    id = BigAutoField(primary_key=True) 
     kb_id = CharField(max_length=64, null=False, index=True) 
     doc_id = CharField(max_length=64, null=False, index=True) 
     chunk_id = CharField(max_length=64, null=False, index=True)  

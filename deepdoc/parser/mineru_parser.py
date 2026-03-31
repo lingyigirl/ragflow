@@ -839,11 +839,7 @@ class MinerUParser(RAGFlowPdfParser):
                 if len(_s) > 64:
                     _s = _s[:64]
                 return _s, False
-        _d = (doc_id or "doc")[:24].replace(" ", "")
-        _syn = f"a_{_d}_{index:06d}"
-        if len(_syn) > 64:
-            _syn = _syn[:64]
-        return _syn, True
+        return "", True
 
     @staticmethod
     def _normalize_kb_doc_ctx(v: Any) -> str:
@@ -971,8 +967,8 @@ class MinerUParser(RAGFlowPdfParser):
             item_type_raw = item.get("type") or "" 
             item_type_db = self._mineru_row_type_for_db(item_type_raw) 
 
-            chunk_id, _syn = self._resolve_chunk_id_for_mineru_section(item, idx, str(doc_id))
-            if _syn:
+            chunk_id, _missing_chunk_id = self._resolve_chunk_id_for_mineru_section(item, idx, str(doc_id))
+            if _missing_chunk_id:
                 missing_native_chunk_id += 1
 
             _pi = item.get("page_idx") 
@@ -982,10 +978,9 @@ class MinerUParser(RAGFlowPdfParser):
                 _pi = None 
 
             row: dict[str, Any] = {
-                "id": self._build_mineru_section_id(str(doc_id), chunk_id, idx),
                 "kb_id": str(kb_id),
                 "doc_id": str(doc_id),
-                "chunk_id": chunk_id,
+                "chunk_id": chunk_id or "",  # 缺失时显式留空，避免填充合成 chunk_id。  # 中文注释
                 "type": item_type_db,
                 "bbox": self._mineru_json_field_for_db(self._mineru_bbox_for_db(item.get("bbox"))),
                 "page_idx": _pi,
@@ -1035,7 +1030,7 @@ class MinerUParser(RAGFlowPdfParser):
 
         if missing_native_chunk_id:
             self.logger.warning(
-                f"[MinerU][mineru_section] 共 {missing_native_chunk_id}/{len(rows)} 条使用合成 chunk_id（MinerU 未提供 chunk_id/chuck_id/id）"
+                f"[MinerU][mineru_section] 共 {missing_native_chunk_id}/{len(rows)} 条未提供原生 chunk_id，已按空字符串写入（未生成合成值）"
             )
 
         if not rows:
