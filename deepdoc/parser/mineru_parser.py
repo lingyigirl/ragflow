@@ -979,16 +979,20 @@ class MinerUParser(RAGFlowPdfParser):
             except (TypeError, ValueError):
                 row["text_level"] = None 
 
-            if "text" in item and item.get("text") is not None and str(item.get("text")).strip() != "":
-                row["text"] = self._mineru_longtext_for_db(item.get("text")) 
+            if item_type_db == "text":
+                if item.get("text") is not None and str(item.get("text")).strip() != "":
+                    row["text"] = self._mineru_longtext_for_db(item.get("text"))
+            elif item_type_db == "table_caption":
+                if item.get("table_caption") is not None:
+                    row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption"))
+            elif item_type_db == "table_footnote":
+                if item.get("table_footnote") is not None:
+                    row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote"))
+            elif item_type_db == "table_body":
+                if item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
+                    row["table_body"] = self._mineru_longtext_for_db(item.get("table_body"))
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = self._mineru_str_path_for_db(item.get("img_path")) 
-            if "table_caption" in item and item.get("table_caption") is not None:
-                row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption"))
-            if "table_footnote" in item and item.get("table_footnote") is not None:
-                row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote"))
-            if "table_body" in item and item.get("table_body") is not None and str(item.get("table_body")).strip() != "":
-                row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
                 row["sub_type"] = self._mineru_short_text_for_db(item.get("sub_type"), max_len=50)
             if "list_items" in item and item.get("list_items") is not None:
