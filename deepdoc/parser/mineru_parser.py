@@ -1572,8 +1572,16 @@ class MinerUParser(RAGFlowPdfParser):
         self._mineru_outputs_for_db = None
 
         try:
+            try:
+                resolved_backend = MinerUBackend(backend)  
+            except ValueError:
+                resolved_backend = backend  
+                self.logger.warning( 
+                    "[MinerU] Unknown backend '%s', bypass local enum cast and forward as raw string.",
+                    backend,
+                )
             options = MinerUParseOptions(
-                backend=MinerUBackend(backend),
+                backend=resolved_backend,
                 lang=MinerULanguage(mineru_lang_code),
                 method=MinerUParseMethod(mineru_method_raw_str),
                 server_url=server_url,
