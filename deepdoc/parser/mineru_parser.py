@@ -15,6 +15,7 @@
 #
 import base64
 import copy
+import hashlib
 import json
 import logging
 import os
@@ -1598,31 +1599,30 @@ class MinerUParser(RAGFlowPdfParser):
                     )
 
             self._mineru_outputs_for_db = None
-            # 已注释：禁用 mineru_section 表写入（同步/异步入库均不执行）
-            # _db_async = _db_async_flag
-            # if kb_id and doc_id:
-            #     logging.info(
-            #         "[MinerU][mineru_section] 开始入库: async=%s blocks=%s kb_id=%s doc_id=%s",
-            #         _db_async,
-            #         len(outputs),
-            #         kb_id,
-            #         doc_id,
-            #     )
-            #     if _db_async:
-            #         self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
-            #     else:
-            #         self.logger.warning(
-            #             "[MinerU][DB_THREAD] MINERU_DB_SAVE_ASYNC=0，改为同步入库: kb_id=%s doc_id=%s blocks=%s",
-            #             kb_id,
-            #             doc_id,
-            #             len(outputs),
-            #         )
-            #         self._save_sections_to_db(outputs, kb_id, doc_id, callback=callback, progress_after_chunk=False)
-            # else:
-            #     logging.warning(
-            #         "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
-            #         len(outputs),
-            #     )
+            _db_async = _db_async_flag
+            if kb_id and doc_id:
+                logging.info(
+                    "[MinerU][mineru_section] 开始入库: async=%s blocks=%s kb_id=%s doc_id=%s",
+                    _db_async,
+                    len(outputs),
+                    kb_id,
+                    doc_id,
+                )
+                if _db_async:
+                    self._schedule_save_sections_to_db(outputs, kb_id, doc_id, callback=callback)
+                else:
+                    self.logger.warning(
+                        "[MinerU][DB_THREAD] MINERU_DB_SAVE_ASYNC=0，改为同步入库: kb_id=%s doc_id=%s blocks=%s",
+                        kb_id,
+                        doc_id,
+                        len(outputs),
+                    )
+                    self._save_sections_to_db(outputs, kb_id, doc_id, callback=callback, progress_after_chunk=False)
+            else:
+                logging.warning(
+                    "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
+                    len(outputs),
+                )
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
                 "blocks=%s parse_method=%s",
