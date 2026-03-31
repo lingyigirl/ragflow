@@ -48,8 +48,15 @@ class MinerUOcrModel(Base, MinerUParser):
             config = {}
 
         def _resolve_config(key: str, env_key: str, default=""):
-            # lower-case keys (UI), upper-case MINERU_* (env auto-provision), env vars
-            return config.get(key, config.get(env_key, os.environ.get(env_key, default)))
+            # 系统环境变量优先级最高，便于通过容器/进程环境强制覆盖配置  # 中文注释
+            env_value = os.environ.get(env_key, None)  # 读取系统环境变量  # 中文注释
+            if env_value not in (None, ""):  # 若环境变量有值则直接返回  # 中文注释
+                return env_value  # 返回最高优先级配置  # 中文注释
+            # 其次读取配置中的大写键（环境变量透传场景）  # 中文注释
+            if env_key in config and config.get(env_key, "") != "":  # 判断大写键是否有效  # 中文注释
+                return config.get(env_key)  # 返回次优先级配置  # 中文注释
+            # 最后读取配置中的小写键（UI 表单场景）并回退到默认值  # 中文注释
+            return config.get(key, default)  # 返回低优先级或默认值  # 中文注释
 
         self.mineru_api = _resolve_config("mineru_apiserver", "MINERU_APISERVER", "")
         self.mineru_output_dir = _resolve_config("mineru_output_dir", "MINERU_OUTPUT_DIR", "")
