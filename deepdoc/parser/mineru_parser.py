@@ -196,11 +196,10 @@ class MinerUParser(RAGFlowPdfParser):
     def check_installation(self, backend: str = "pipeline", server_url: Optional[str] = None) -> tuple[bool, str]:
         reason = ""
 
-        valid_backends = ["pipeline", "vlm-http-client", "vlm-transformers", "vlm-vllm-engine", "vlm-mlx-engine", "vlm-vllm-async-engine", "vlm-lmdeploy-engine"]
-        if backend not in valid_backends:
-            reason = f"[MinerU] Invalid backend '{backend}'. Valid backends are: {valid_backends}"
+        valid_backends = ["pipeline", "vlm-http-client", "vlm-transformers", "vlm-vllm-engine", "vlm-mlx-engine", "vlm-vllm-async-engine", "vlm-lmdeploy-engine"]  # 保留已知 backend 列表用于提示日志
+        if backend not in valid_backends: 
+            reason = f"[MinerU] Unknown backend '{backend}', skip local validation and delegate to remote MinerU API. Known backends: {valid_backends}"  # 将校验责任下放给外部 API
             self.logger.warning(reason)
-            return False, reason
 
         if not self.mineru_api:
             reason = "[MinerU] MINERU_APISERVER not configured."
