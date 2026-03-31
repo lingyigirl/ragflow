@@ -1008,6 +1008,13 @@ class MinerUParser(RAGFlowPdfParser):
             if item_type_db == "text":
                 if item.get("text") is not None and str(item.get("text")).strip() != "":
                     row["text"] = self._mineru_longtext_for_db(item.get("text"))
+            elif item_type_db == "table":
+                if item.get("table_caption") is not None: 
+                    row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption")) 
+                if item.get("table_footnote") is not None: 
+                    row["table_footnote"] = self._mineru_json_field_for_db(item.get("table_footnote")) 
+                if item.get("table_body") is not None and str(item.get("table_body")).strip() != "": 
+                    row["table_body"] = self._mineru_longtext_for_db(item.get("table_body")) 
             elif item_type_db == "table_caption":
                 if item.get("table_caption") is not None:
                     row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption"))
