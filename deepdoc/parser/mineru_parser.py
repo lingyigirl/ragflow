@@ -562,46 +562,73 @@ class MinerUParser(RAGFlowPdfParser):
                     json_file = nested_alt
 
         if not json_file:
-            raise FileNotFoundError(f"[MinerU] Missing output file, tried: {', '.join(str(p) for p in attempted)}")
+            fallback_candidates: list[Path] = [] 
+            try:
+                for candidate_name in ("content_list.json", "*_content_list.json"): 
+                    for p in output_dir.rglob(candidate_name): 
+                        if p.is_file():
+                            fallback_candidates.append(p)
+            except Exception as scan_err:
+                self.logger.warning(  
+                    "[MinerU] Fallback scan for content_list.json failed: %s", scan_err, exc_info=True
+                )
 
-        #
+            if fallback_candidates:
+                fallback_candidates.sort(
+                    key=lambda p: (
+                        (file_stem not in str(p).lower() and safe_stem not in str(p).lower()),
+                        len(str(p)),
+                    )
+                )
+                json_file = fallback_candidates[0]  
+                subdir = json_file.parent  
+                self.logger.warning(
+                    "[MinerU] Fixed-path lookup failed, fallback matched content list: %s (total candidates=%s)",
+                    json_file,
+                    len(fallback_candidates),
+                )
+
+        if not json_file:
+            attempted_str = ", ".join(str(p) for p in attempted) 
+            raise FileNotFoundError(f"[MinerU] Missing output file, tried: {attempted_str}")
+
         try:
-            _st = json_file.stat()  #
-            _abs_json = str(json_file.resolve())  #
-        except OSError as _e_stat:  #
-            _st = None  #
-            _abs_json = str(json_file)  #
-            self.logger.warning(f"[MinerU][content_list.json] stat 失败: {_e_stat}, path={_abs_json}")  #
-        _sz = _st.st_size if _st else -1  #
+            _st = json_file.stat()  
+            _abs_json = str(json_file.resolve())  
+        except OSError as _e_stat:  
+            _st = None  
+            _abs_json = str(json_file)  
+            self.logger.warning(f"[MinerU][content_list.json] stat 失败: {_e_stat}, path={_abs_json}")  
+        _sz = _st.st_size if _st else -1  
         self.logger.warning(
             f"[MinerU][content_list.json] 文件已找到 exists=True path={_abs_json} size_bytes={_sz}"
-        )  #
+        )  
 
         with open(json_file, "r", encoding="utf-8") as f:
-            data = json.load(f)  #
+            data = json.load(f)  
 
-        if not isinstance(data, list):  #
+        if not isinstance(data, list):  
             self.logger.error(
                 f"[MinerU][content_list.json] 根节点类型非 list: {type(data)}, path={_abs_json}"
-            )  #
+            )  
             raise ValueError(
                 f"[MinerU] content_list.json 根节点应为 list，实际 {type(data)}，path={_abs_json}"
-            )  #
+            )  
         else:
-            _n_blocks = len(data)  #
+            _n_blocks = len(data)  
             _n_with_cid = sum(
                 1
                 for _it in data
                 if isinstance(_it, dict)
                 and (str(_it.get("chuck_id") or _it.get("chunk_id") or "").strip())
-            )  #
+            )  
             _sample_keys = (
                 list(data[0].keys())[:16] if data and isinstance(data[0], dict) else []
-            )  #
+            )  
             self.logger.warning(
                 f"[MinerU][content_list.json] 已加载 blocks={_n_blocks} with_chunk_id={_n_with_cid} "
                 f"sample_first_keys={_sample_keys}"
-            )  #
+            )  
 
         for item in data:
             for key in ("img_path", "table_img_path", "equation_img_path"):
@@ -610,68 +637,68 @@ class MinerUParser(RAGFlowPdfParser):
         return data
 
     def _transfer_to_sections(self, outputs: list[dict[str, Any]], parse_method: str = None):
-        sections = []  #
-        for idx, output in enumerate(outputs):  #
-            if "type" not in output or not output.get("type"):  #
-                continue  #
-            try:  #
-                section = None  #
-                _t = output["type"]  #
-                match _t:  #
-                    case MinerUContentType.TEXT | "text":  #
-                        section = output.get("text", "") or ""  #
-                    case MinerUContentType.TABLE | "table":  #
-                        _tb = output.get("table_body") or ""  #
+        sections = []  
+        for idx, output in enumerate(outputs):  
+            if "type" not in output or not output.get("type"):  
+                continue  
+            try:  
+                section = None  
+                _t = output["type"]  
+                match _t:  
+                    case MinerUContentType.TEXT | "text":  
+                        section = output.get("text", "") or ""  
+                    case MinerUContentType.TABLE | "table":  
+                        _tb = output.get("table_body") or ""  
                         section = (
                             str(_tb)
                             + self._join_mineru_lines(output.get("table_caption"), "\n")
                             + self._join_mineru_lines(output.get("table_footnote"), "\n")
-                        )  #
-                        if not str(section).strip():  #
-                            section = "FAILED TO PARSE TABLE"  #
-                    case MinerUContentType.IMAGE | "image":  #
+                        )  
+                        if not str(section).strip():  
+                            section = "FAILED TO PARSE TABLE"  
+                    case MinerUContentType.IMAGE | "image":  
                         section = self._join_mineru_lines(output.get("image_caption"), "") + "\n" + self._join_mineru_lines(
                             output.get("image_footnote"), ""
-                        )  #
-                    case MinerUContentType.EQUATION | "equation":  #
-                        section = output.get("text", "") or ""  #
-                    case MinerUContentType.CODE | "code":  #
+                        )  
+                    case MinerUContentType.EQUATION | "equation":  
+                        section = output.get("text", "") or ""  
+                    case MinerUContentType.CODE | "code":  
                         section = (output.get("code_body") or "") + self._join_mineru_lines(
                             output.get("code_caption"), "\n"
-                        )  #
-                    case MinerUContentType.LIST | "list":  #
-                        section = self._join_mineru_lines(output.get("list_items"), "\n")  #
-                    case "header" | "page_number":  #
-                        section = output.get("text", "") or ""  #
-                    case MinerUContentType.DISCARDED | "discarded":  #
-                        continue  #
+                        )  
+                    case MinerUContentType.LIST | "list":  
+                        section = self._join_mineru_lines(output.get("list_items"), "\n")  
+                    case "header" | "page_number":  
+                        section = output.get("text", "") or ""  
+                    case MinerUContentType.DISCARDED | "discarded":  
+                        continue  
 
-                if section is None:  #
-                    _fallback = output.get("text")  #
-                    if _fallback is not None and str(_fallback).strip():  #
-                        section = str(_fallback)  #
-                        self.logger.warning(  #
+                if section is None:  
+                    _fallback = output.get("text")  
+                    if _fallback is not None and str(_fallback).strip():  
+                        section = str(_fallback)  
+                        self.logger.warning(  
                             "[MinerU] _transfer_to_sections: 未识别 type=%r，已用 text 兜底 idx=%s",
                             _t,
                             idx,
-                        )  #
-                    else:  #
-                        section = ""  #
+                        )  
+                    else:  
+                        section = ""  
                         self.logger.warning(
                             "[MinerU] _transfer_to_sections: 未识别 type=%r 且无 text，idx=%s keys=%s",
                             _t,
                             idx,
                             list(output.keys())[:20] if isinstance(output, dict) else None,
-                        )  #
+                        )  
 
-                if section and parse_method == "manual":  #
-                    sections.append((section, output["type"], self._line_tag(output)))  #
-                elif section and parse_method == "paper":  #
-                    sections.append((section + self._line_tag(output), output["type"]))  #
-                else:  #
-                    sections.append((section, self._line_tag(output)))  #
-            except Exception as _e_block:  #
-                self.logger.error(  #
+                if section and parse_method == "manual":  
+                    sections.append((section, output["type"], self._line_tag(output)))  
+                elif section and parse_method == "paper":  
+                    sections.append((section + self._line_tag(output), output["type"]))  
+                else:  
+                    sections.append((section, self._line_tag(output)))  
+            except Exception as _e_block:  
+                self.logger.error(  
                     "[MinerU] _transfer_to_sections 单块失败 idx=%s type=%r page_idx=%r bbox=%r keys=%s err=%s",
                     idx,
                     output.get("type"),
@@ -680,9 +707,9 @@ class MinerUParser(RAGFlowPdfParser):
                     list(output.keys())[:28] if isinstance(output, dict) else None,
                     _e_block,
                     exc_info=True,
-                )  #
-                raise  #
-        return sections  #
+                )  
+                raise  
+        return sections  
 
     def _transfer_to_tables(self, outputs: list[dict[str, Any]]):
         return []
