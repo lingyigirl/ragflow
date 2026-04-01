@@ -384,6 +384,9 @@ export default {
       mineruParseMethod: '解析方法',
       mineruParseMethodTip:
         'PDF 解析方法：auto（自动检测）、txt（文本提取）、ocr（光学字符识别）',
+      mineruBackend: 'MinerU 解析引擎（backend）',
+      mineruBackendTip:
+        '选择 MinerU 的 PDF 解析后端：pipeline、vlm-vllm-async-engine 或 hybrid-auto-engine。需在模型供应商中配置好 MinerU API 服务。',
       mineruFormulaEnable: '公式识别',
       mineruFormulaEnableTip:
         '启用公式识别。注意：对于西里尔文档可能无法正常工作。',
@@ -1100,6 +1103,8 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
         outputDir: 'MinerU输出目录路径',
         backend: 'MinerU处理后端类型',
         serverUrl: 'MinerU服务器URL地址',
+        serverUrlKbBackendTip:
+          '选填。部分引擎需要远程 VLM 服务地址。解析引擎（backend）请在各知识库「配置 → PDF 解析器」中选择 MinerU 后设置。',
         deleteOutput: '处理完成后删除输出文件',
         selectBackend: '选择处理后端',
         backendOptions: {

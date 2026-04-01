@@ -380,6 +380,9 @@ Prozedurales Gedächtnis: Erlernte Fähigkeiten, Gewohnheiten und automatisierte
       mineruParseMethod: 'Analysemethode',
       mineruParseMethodTip:
         'Methode zum Parsen von PDF: auto (automatische Erkennung), txt (Textextraktion), ocr (optische Zeichenerkennung)',
+      mineruBackend: 'MinerU-Backend (Engine)',
+      mineruBackendTip:
+        'MinerU-PDF-Engine wählen: pipeline, vlm-vllm-async-engine oder hybrid-auto-engine. MinerU-API unter Modellanbietern konfigurieren.',
       mineruFormulaEnable: 'Formelerkennung',
       mineruFormulaEnableTip:
         'Formelerkennung aktivieren. Hinweis: Dies funktioniert möglicherweise nicht korrekt bei kyrillischen Dokumenten.',
@@ -1236,6 +1239,8 @@ Beispiel: Virtual Hosted Style`,
         outputDir: 'MinerU Ausgabeverzeichnispfad',
         backend: 'MinerU Verarbeitungs-Backend-Typ',
         serverUrl: 'MinerU Server-URL-Adresse',
+        serverUrlKbBackendTip:
+          'Optional. Einige Engines benötigen eine Remote-VLM-Server-URL. Backend pro Wissensdatenbank unter Konfiguration → PDF-Parser → MinerU wählen.',
         deleteOutput: 'Ausgabedateien nach Verarbeitung löschen',
         selectBackend: 'Verarbeitungs-Backend auswählen',
         backendOptions: {

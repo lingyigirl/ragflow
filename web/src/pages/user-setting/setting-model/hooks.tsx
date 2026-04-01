@@ -477,7 +477,9 @@ export const useSubmitMinerU = () => {
         mineru_delete_output:
           (payload.mineru_delete_output ?? true) ? '1' : '0',
       };
-      if (payload.mineru_backend !== 'vlm-http-client') {
+      delete cfg.mineru_backend;
+      const _su = (cfg.mineru_server_url || '').trim();
+      if (!_su) {
         delete cfg.mineru_server_url;
       }
       const req: IAddLlmRequestBody = {

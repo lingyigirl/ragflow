@@ -57,6 +57,8 @@ class Begin(UserFillUp):
                         pdf_parser_config = {}
                         if v.get("parse_method"):
                             pdf_parser_config["parse_method"] = v.get("parse_method")
+                        if v.get("mineru_backend"):
+                            pdf_parser_config["mineru_backend"] = v.get("mineru_backend")
                         if v.get("mineru_parse_method"):
                             pdf_parser_config["mineru_parse_method"] = v.get("mineru_parse_method")
                         if v.get("mineru_formula_enable") is not None:

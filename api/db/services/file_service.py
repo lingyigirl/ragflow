@@ -550,6 +550,8 @@ class FileService(CommonService):
                 parser_config["mineru_table_enable"] = pdf_parser_config["mineru_table_enable"]
             if pdf_parser_config.get("mineru_lang"):
                 parser_config["mineru_lang"] = pdf_parser_config["mineru_lang"]
+            if pdf_parser_config.get("mineru_backend"):
+                parser_config["mineru_backend"] = pdf_parser_config["mineru_backend"]
 
             if pdf_parser_config.get("tcadp_table_result_type"):
                 parser_config["tcadp_table_result_type"] = pdf_parser_config["tcadp_table_result_type"]
@@ -571,14 +573,19 @@ class FileService(CommonService):
             lang = pdf_parser_config["lang"]
         elif pdf_parser_config and pdf_parser_config.get("mineru_lang"):
             lang = pdf_parser_config["mineru_lang"]
-        
 
+        kwargs = {
+            "lang": lang,
+            "callback": dummy,
+            "parser_config": parser_config,
+            "from_page": 0,
+            "to_page": 100000,
+            "tenant_id": current_user.id if current_user else tenant_id,
+        }
         if pdf_parser_config and pdf_parser_config.get("tcadp_table_result_type"):
             kwargs["table_result_type"] = pdf_parser_config["tcadp_table_result_type"]
         if pdf_parser_config and pdf_parser_config.get("tcadp_markdown_image_response_type"):
             kwargs["markdown_image_response_type"] = pdf_parser_config["tcadp_markdown_image_response_type"]
-        
-        kwargs = {"lang": lang, "callback": dummy, "parser_config": parser_config, "from_page": 0, "to_page": 100000, "tenant_id": current_user.id if current_user else tenant_id}
         file_type = filename_type(filename)
         if img_base64 and file_type == FileType.VISUAL.value:
             return GptV4.image2base64(blob)

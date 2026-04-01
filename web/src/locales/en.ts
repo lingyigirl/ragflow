@@ -418,6 +418,9 @@ Example: A 1 KB message with 1024-dim embedding uses ~9 KB. The 5 MB default lim
       mineruParseMethod: 'Parse method',
       mineruParseMethodTip:
         'Method for parsing PDF: auto (automatic detection), txt (text extraction), ocr (optical character recognition)',
+      mineruBackend: 'MinerU backend (engine)',
+      mineruBackendTip:
+        'Select the MinerU PDF engine: pipeline, vlm-vllm-async-engine, or hybrid-auto-engine. Ensure the MinerU API is configured under Model Providers.',
       mineruFormulaEnable: 'Formula recognition',
       mineruFormulaEnableTip:
         'Enable formula recognition. Note: This may not work correctly for Cyrillic documents.',
@@ -1218,6 +1221,8 @@ Example: Virtual Hosted Style`,
         outputDir: 'MinerU Output Directory Path',
         backend: 'MinerU Processing Backend Type',
         serverUrl: 'MinerU Server URL Address',
+        serverUrlKbBackendTip:
+          'Optional. Some engines need a remote VLM server URL. Choose the parsing engine (backend) per knowledge base under Configuration → PDF parser → MinerU.',
         deleteOutput: 'Delete Output Files After Processing',
         selectBackend: 'Select processing backend',
         backendOptions: {

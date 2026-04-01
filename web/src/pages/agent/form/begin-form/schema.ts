@@ -26,6 +26,9 @@ export const BeginFormSchema = z.object({
         options: z.array(z.union([z.number(), z.string(), z.boolean()])),
         parse_method: z.string().optional(),
 
+        mineru_backend: z
+          .enum(['pipeline', 'vlm-vllm-async-engine', 'hybrid-auto-engine'])
+          .optional(),
         mineru_parse_method: z.enum(['auto', 'txt', 'ocr']).optional(),
         mineru_formula_enable: z.boolean().optional(),
         mineru_table_enable: z.boolean().optional(),

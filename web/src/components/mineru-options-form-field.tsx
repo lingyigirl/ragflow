@@ -6,6 +6,18 @@ import { buildOptions } from '@/utils/form';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 
+export const MINERU_KB_BACKEND_VALUES = [
+  'pipeline',
+  'vlm-vllm-async-engine',
+  'hybrid-auto-engine',
+] as const;
+
+export type MineruKbBackend = (typeof MINERU_KB_BACKEND_VALUES)[number];
+
+const kbBackendOptions = buildOptions([
+  ...MINERU_KB_BACKEND_VALUES,
+]);
+
 const parseMethodOptions = buildOptions(['auto', 'txt', 'ocr']);
 const languageOptions = buildOptions([
   'English',
@@ -59,6 +71,25 @@ export function MinerUOptionsFormField({
       <div className="text-sm font-medium text-text-secondary">
         {t('knowledgeConfiguration.mineruOptions', 'MinerU Options')}
       </div>
+
+      <RAGFlowFormItem
+        name={buildName('mineru_backend')}
+        label={t('knowledgeConfiguration.mineruBackend', 'MinerU backend')}
+        tooltip={t(
+          'knowledgeConfiguration.mineruBackendTip',
+          'MinerU PDF parsing engine. Applied when this knowledge base uses MinerU as the layout recognizer.',
+        )}
+        horizontal={true}
+      >
+        {(field) => (
+          <RAGFlowSelect
+            value={field.value || 'pipeline'}
+            onChange={field.onChange}
+            options={kbBackendOptions}
+            placeholder={t('common.selectPlaceholder', 'Select value')}
+          />
+        )}
+      </RAGFlowFormItem>
 
       <RAGFlowFormItem
         name={buildName('mineru_parse_method')}

@@ -1,6 +1,7 @@
 import { DelimiterInput } from '@/components/delimiter-form-field';
 import { KeyInput } from '@/components/key-input';
 import { LayoutRecognizeFormField } from '@/components/layout-recognize-form-field';
+import { MINERU_KB_BACKEND_VALUES } from '@/components/mineru-options-form-field';
 import { SliderInputFormField } from '@/components/slider-input-form-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -65,6 +66,9 @@ function ParameterForm({
       .array(z.object({ value: z.string().or(z.boolean()).or(z.number()) }))
       .optional(),
     parse_method: z.string().optional(),
+    mineru_backend: z
+      .enum(['pipeline', 'vlm-vllm-async-engine', 'hybrid-auto-engine'])
+      .optional(),
     mineru_parse_method: z.enum(['auto', 'txt', 'ocr']).optional(),
     mineru_formula_enable: z.boolean().optional(),
     mineru_table_enable: z.boolean().optional(),
@@ -126,6 +130,7 @@ function ParameterForm({
         options: initialValue.options?.map((x) => ({ value: x })),
 
         parse_method: initialValue.parse_method || undefined,
+        mineru_backend: initialValue.mineru_backend || undefined,
         mineru_parse_method: initialValue.mineru_parse_method || undefined,
         mineru_formula_enable: initialValue.mineru_formula_enable ?? undefined,
         mineru_table_enable: initialValue.mineru_table_enable ?? undefined,
@@ -393,6 +398,12 @@ function BeginPdfParserOptions() {
 
   useEffect(() => {
     if (parserType === 'mineru') {
+      if (!form.getValues('mineru_backend')) {
+        form.setValue('mineru_backend', 'pipeline', {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      }
       if (!form.getValues('mineru_parse_method')) {
         form.setValue('mineru_parse_method', 'auto', {
           shouldValidate: true,
@@ -465,6 +476,37 @@ function BeginPdfParserOptions() {
               </div>
               <div className="grid gap-5 pl-2">
                 {}
+                <FormField
+                  control={form.control}
+                  name="mineru_backend"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel
+                        tooltip={t(
+                          'knowledgeConfiguration.mineruBackendTip',
+                          'MinerU PDF 解析引擎',
+                        )}
+                      >
+                        {t(
+                          'knowledgeConfiguration.mineruBackend',
+                          'MinerU backend',
+                        )}
+                      </FormLabel>
+                      <FormControl>
+                        <RAGFlowSelect
+                          value={field.value || 'pipeline'}
+                          onChange={field.onChange}
+                          options={MINERU_KB_BACKEND_VALUES.map((v) => ({
+                            label: v,
+                            value: v,
+                          }))}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
                 <FormField
                   control={form.control}
                   name="mineru_parse_method"

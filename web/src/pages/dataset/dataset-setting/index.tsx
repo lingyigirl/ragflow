@@ -76,7 +76,7 @@ export default function DatasetSettings() {
         toc_extraction: false,
         image_table_context_window: 0,
         overlapped_percent: 0,
-        // MinerU-specific defaults
+        mineru_backend: 'pipeline',
         mineru_parse_method: 'auto',
         mineru_formula_enable: true,
         mineru_table_enable: true,

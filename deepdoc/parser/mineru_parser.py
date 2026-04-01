@@ -86,6 +86,7 @@ class MinerUBackend(StrEnum):
     """MinerU processing backend options."""
 
     PIPELINE = "pipeline"  # Traditional multimodel pipeline (default)
+    HYBRID_AUTO_ENGINE = "hybrid-auto-engine"  # MinerU hybrid auto engine（混合自动引擎）
     VLM_TRANSFORMERS = "vlm-transformers"  # Vision-language model using HuggingFace Transformers
     VLM_MLX_ENGINE = "vlm-mlx-engine"  # Faster, requires Apple Silicon and macOS 13.5+
     VLM_VLLM_ENGINE = "vlm-vllm-engine"  # Local vLLM engine, requires local GPU
@@ -1567,7 +1568,10 @@ class MinerUParser(RAGFlowPdfParser):
         created_tmp_dir = False
         cleanup_handed_to_db_task = False
 
-        parser_cfg = kwargs.get('parser_config', {})
+        parser_cfg = kwargs.get('parser_config', {}) or {}
+        _kb_mineru_backend = parser_cfg.get("mineru_backend")
+        if _kb_mineru_backend not in (None, ""):
+            backend = str(_kb_mineru_backend).strip()
         lang = parser_cfg.get('mineru_lang') or kwargs.get('lang', 'English')
         mineru_lang_code = LANGUAGE_TO_MINERU_MAP.get(lang, 'ch')  # Defaults to Chinese if not matched
         mineru_method_raw_str = parser_cfg.get('mineru_parse_method', 'auto')

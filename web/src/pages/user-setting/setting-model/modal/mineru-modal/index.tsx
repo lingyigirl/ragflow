@@ -9,14 +9,12 @@ import {
 } from '@/components/ui/dialog';
 import { Form } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { RAGFlowSelect } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { LLMFactory } from '@/constants/llm';
 import { IModalProps } from '@/interfaces/common';
-import { buildOptions } from '@/utils/form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { t } from 'i18next';
-import { useForm, useWatch } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 import { LLMHeader } from '../../components/llm-header';
@@ -27,16 +25,7 @@ const FormSchema = z.object({
   }),
   mineru_apiserver: z.string().url(),
   mineru_output_dir: z.string().optional(),
-  mineru_backend: z.enum([
-    'pipeline',
-    'vlm-transformers',
-    'vlm-vllm-engine',
-    'vlm-http-client',
-    'vlm-mlx-engine',
-    'vlm-vllm-async-engine',
-    'vlm-lmdeploy-engine',
-  ]),
-  mineru_server_url: z.string().url().optional(),
+  mineru_server_url: z.union([z.string().url(), z.literal('')]).optional(),
   mineru_delete_output: z.boolean(),
 });
 
@@ -50,27 +39,12 @@ const MinerUModal = ({
 }: IModalProps<MinerUFormValues>) => {
   const { t } = useTranslation();
 
-  const backendOptions = buildOptions([
-    'pipeline',
-    'vlm-transformers',
-    'vlm-vllm-engine',
-    'vlm-http-client',
-    'vlm-mlx-engine',
-    'vlm-vllm-async-engine',
-    'vlm-lmdeploy-engine',
-  ]);
-
   const form = useForm<MinerUFormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      mineru_backend: 'pipeline',
       mineru_delete_output: true,
+      mineru_server_url: '',
     },
-  });
-
-  const backend = useWatch({
-    control: form.control,
-    name: 'mineru_backend',
   });
 
   const handleOk = async (values: MinerUFormValues) => {
@@ -115,31 +89,15 @@ const MinerUModal = ({
               <Input placeholder="/tmp/mineru" />
             </RAGFlowFormItem>
             <RAGFlowFormItem
-              name="mineru_backend"
-              label={t('setting.mineru.backend')}
-            >
-              {(field) => (
-                <RAGFlowSelect
-                  value={field.value}
-                  onChange={(value) => {
-                    field.onChange(value);
-                    if (value !== 'vlm-http-client') {
-                      form.setValue('mineru_server_url', undefined);
-                    }
-                  }}
-                  options={backendOptions}
-                  placeholder={t('setting.mineru.selectBackend')}
-                />
+              name="mineru_server_url"
+              label={t('setting.mineru.serverUrl')}
+              tooltip={t(
+                'setting.mineru.serverUrlKbBackendTip',
+                'Optional. Used by some MinerU engines when a remote VLM server URL is required. Parsing engine (backend) is configured per knowledge base.',
               )}
+            >
+              <Input placeholder="http://your-vllm-server:30000" />
             </RAGFlowFormItem>
-            {backend === 'vlm-http-client' && (
-              <RAGFlowFormItem
-                name="mineru_server_url"
-                label={t('setting.mineru.serverUrl')}
-              >
-                <Input placeholder="http://your-vllm-server:30000" />
-              </RAGFlowFormItem>
-            )}
             <RAGFlowFormItem
               name="mineru_delete_output"
               label={t('setting.mineru.deleteOutput')}
