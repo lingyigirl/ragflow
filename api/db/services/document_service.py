@@ -405,6 +405,52 @@ class DocumentService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def list_mineru_sections_page(cls, kb_id, doc_id, offset=0, limit=500):
+        if not kb_id or not doc_id:
+            return []
+        try:
+            from api.db.db_models import MineruSection
+            if not MineruSection.table_exists():
+                return []
+            rows = (
+                MineruSection
+                .select(
+                    MineruSection.id,
+                    MineruSection.chunk_id,
+                    MineruSection.type,
+                    MineruSection.text,
+                    MineruSection.bbox,
+                    MineruSection.page_idx,
+                    MineruSection.text_level,
+                    MineruSection.img_path,
+                    MineruSection.table_caption,
+                    MineruSection.table_footnote,
+                    MineruSection.table_body,
+                    MineruSection.sub_type,
+                    MineruSection.list_items,
+                )
+                .where(
+                    (MineruSection.kb_id == str(kb_id)) &
+                    (MineruSection.doc_id == str(doc_id))
+                )
+                .order_by(MineruSection.page_idx.asc(), MineruSection.id.asc())
+                .offset(max(int(offset), 0))
+                .limit(max(int(limit), 1))
+            )
+            return list(rows.dicts())
+        except Exception as e:
+            logging.warning(
+                "[MinerU] list_mineru_sections_page failed: kb_id=%s, doc_id=%s, offset=%s, limit=%s, err=%s",
+                kb_id,
+                doc_id,
+                offset,
+                limit,
+                e,
+            )
+            return []
+
+    @classmethod
+    @DB.connection_context()
     def update_mineru_section_content_by_chunk_id(
         cls,
         chunk_id,

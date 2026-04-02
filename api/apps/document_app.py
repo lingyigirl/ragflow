@@ -1531,3 +1531,214 @@ async def update_mineru_section():
     except Exception as e:
         return server_error_response(e)
 
+
+def _mineru_json_list_or_empty(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+            return parsed if isinstance(parsed, list) else [parsed]
+        except Exception:
+            return [text]
+    return [value]
+
+
+def _convert_mineru_row_to_content_item(row):
+    row_type = str(row.get("type") or "").strip() or "unknown"
+    row_type_norm = row_type.lower()
+    item = {
+        "type": row_type,
+        "chunk_id": str(row.get("chunk_id") or "").strip(),
+        "bbox": row.get("bbox"),
+        "page_idx": row.get("page_idx"),
+    }
+
+    if row_type_norm == "text":
+        if row.get("text") is not None:
+            item["text"] = row.get("text")
+        if row.get("text_level") is not None:
+            item["text_level"] = row.get("text_level")
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm == "image":
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        item["image_caption"] = _mineru_json_list_or_empty(None)
+        item["image_footnote"] = _mineru_json_list_or_empty(None)
+        if row.get("text"):
+            item["text"] = row.get("text")
+        return item
+
+    if row_type_norm == "table":
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        item["table_caption"] = _mineru_json_list_or_empty(row.get("table_caption"))
+        item["table_footnote"] = _mineru_json_list_or_empty(row.get("table_footnote"))
+        if row.get("table_body") is not None:
+            item["table_body"] = row.get("table_body")
+        return item
+
+    if row_type_norm == "table_caption":
+        table_caption = row.get("table_caption")
+        if table_caption is None and row.get("text"):
+            table_caption = row.get("text")
+        item["table_caption"] = _mineru_json_list_or_empty(table_caption)
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm == "table_footnote":
+        table_footnote = row.get("table_footnote")
+        if table_footnote is None and row.get("text"):
+            table_footnote = row.get("text")
+        item["table_footnote"] = _mineru_json_list_or_empty(table_footnote)
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm == "table_body":
+        table_body_text = row.get("table_body")
+        if table_body_text is None:
+            table_body_text = row.get("text")
+        if table_body_text is not None:
+            item["text"] = table_body_text
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm in ("equation", "header", "page_number", "discarded"):
+        if row.get("text") is not None:
+            item["text"] = row.get("text")
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm == "code":
+        if row.get("text") is not None:
+            item["code_body"] = row.get("text")
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row_type_norm == "list":
+        item["list_items"] = _mineru_json_list_or_empty(row.get("list_items"))
+        if row.get("text"):
+            item["text"] = row.get("text")
+        if row.get("img_path"):
+            item["img_path"] = row.get("img_path")
+        return item
+
+    if row.get("text") is not None:
+        item["text"] = row.get("text")
+    if row.get("img_path"):
+        item["img_path"] = row.get("img_path")
+    if row.get("sub_type"):
+        item["sub_type"] = row.get("sub_type")
+    if row.get("list_items") is not None:
+        item["list_items"] = _mineru_json_list_or_empty(row.get("list_items"))
+    return item
+
+
+@manager.route("/mineru_section/submit", methods=["POST"])  # noqa: F821
+@login_required
+@validate_request("kb_id", "doc_id")
+async def submit_mineru_section():
+    temp_file_path = None
+    temp_file = None
+    try:
+        req = await get_request_json()
+        kb_id = (req.get("kb_id") or "").strip()
+        doc_id = (req.get("doc_id") or "").strip()
+        if not kb_id or not doc_id:
+            return get_json_result(data=False, message="kb_id 或 doc_id 不能为空", code=RetCode.ARGUMENT_ERROR)
+
+        try:
+            batch_size = int(req.get("batch_size") or 500)
+        except Exception:
+            return get_json_result(data=False, message="batch_size 必须为整数", code=RetCode.ARGUMENT_ERROR)
+        if batch_size <= 0 or batch_size > 5000:
+            return get_json_result(data=False, message="batch_size 取值范围应为 1-5000", code=RetCode.ARGUMENT_ERROR)
+
+        e, kb = KnowledgebaseService.get_by_id(kb_id)
+        if not e:
+            return get_json_result(data=False, message="知识库不存在", code=RetCode.NOT_FOUND)
+        if not check_kb_team_permission(kb, current_user.id):
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+        e, doc = DocumentService.get_by_id(doc_id)
+        if not e:
+            return get_json_result(data=False, message="文档不存在", code=RetCode.NOT_FOUND)
+        if str(doc.kb_id) != kb_id:
+            return get_json_result(data=False, message="doc_id 不属于当前知识库", code=RetCode.ARGUMENT_ERROR)
+
+        first_page = DocumentService.list_mineru_sections_page(kb_id=kb_id, doc_id=doc_id, offset=0, limit=batch_size)
+        if not first_page:
+            return get_json_result(data=False, message="未找到可提交的 mineru_section 数据", code=RetCode.NOT_FOUND)
+
+        target_key = f"{doc_id}/content_list.json"
+        temp_file = tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".json")
+        temp_file_path = temp_file.name
+        temp_file.write(b"[")
+
+        offset = 0
+        record_count = 0
+        is_first = True
+        while True:
+            rows = first_page if offset == 0 else DocumentService.list_mineru_sections_page(
+                kb_id=kb_id,
+                doc_id=doc_id,
+                offset=offset,
+                limit=batch_size,
+            )
+            if not rows:
+                break
+            for row in rows:
+                item = _convert_mineru_row_to_content_item(row)
+                if is_first:
+                    temp_file.write(json.dumps(item, ensure_ascii=False).encode("utf-8"))
+                    is_first = False
+                else:
+                    temp_file.write(b",")
+                    temp_file.write(json.dumps(item, ensure_ascii=False).encode("utf-8"))
+                record_count += 1
+            offset += len(rows)
+            if len(rows) < batch_size:
+                break
+
+        temp_file.write(b"]")
+        temp_file.flush()
+        temp_file.close()
+        temp_file = None
+
+        with open(temp_file_path, "rb") as f:
+            payload = f.read()
+        settings.STORAGE_IMPL.put(kb_id, target_key, payload)
+
+        return get_json_result(data={
+            "kb_id": kb_id,
+            "doc_id": doc_id,
+            "target_path": target_key,
+            "record_count": record_count,
+            "batch_size": batch_size,
+        })
+    except Exception as e:
+        return server_error_response(e)
+    finally:
+        if temp_file is not None:
+            try:
+                temp_file.close()
+            except Exception:
+                pass
+        if temp_file_path and os.path.exists(temp_file_path):
+            try:
+                os.remove(temp_file_path)
+            except Exception:
+                logging.warning("[MinerU] 清理临时 content_list 文件失败: %s", temp_file_path)
