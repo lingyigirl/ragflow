@@ -86,7 +86,9 @@ class Retrieval(ToolBase, ABC):
 
     async def _retrieve_kb(self, query_text: str):
         kb_ids: list[str] = []
-        for id in self._param.kb_ids:
+        # 若画布全局变量指定了 dataset_ids，则优先使用该列表覆盖组件配置中的 kb_ids
+        kb_id_source = self._canvas.globals.get("sys.dataset_ids") or self._param.kb_ids
+        for id in kb_id_source:
             if id.find("@") < 0:
                 kb_ids.append(id)
                 continue
@@ -124,6 +126,10 @@ class Retrieval(ToolBase, ABC):
         query = self.string_format(query_text, vars)
 
         doc_ids = []
+        # 若指定了 document_ids，则作为检索文档白名单起点（后续元数据过滤可在此基础上继续收窄）
+        sys_doc_ids = self._canvas.globals.get("sys.document_ids")
+        if sys_doc_ids:
+            doc_ids = list(sys_doc_ids)
         if self._param.meta_data_filter != {}:
             metas = DocumentService.get_meta_by_kbs(kb_ids)
 
@@ -286,7 +292,7 @@ class Retrieval(ToolBase, ABC):
             return await self._retrieve_kb(kwargs["query"])
         elif hasattr(self._param, "retrieval_from") and self._param.retrieval_from == "memory":
             return await self._retrieve_memory(kwargs["query"])
-        elif self._param.kb_ids:
+        elif self._param.kb_ids or self._canvas.globals.get("sys.dataset_ids"):
             return await self._retrieve_kb(kwargs["query"])
         elif hasattr(self._param, "memory_ids") and self._param.memory_ids:
             return await self._retrieve_memory(kwargs["query"])

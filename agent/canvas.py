@@ -383,6 +383,9 @@ class Canvas(Graph):
                     self.globals[f"sys.{k}"] = await self.get_files_async(kwargs[k])
                 else:
                     self.globals[f"sys.{k}"] = kwargs[k]
+            # 接口传入的知识库/文档范围覆盖，供 Retrieval 等组件读取
+            elif k in ("dataset_ids", "document_ids") and kwargs[k]:
+                self.globals[f"sys.{k}"] = kwargs[k]
         if not self.globals["sys.conversation_turns"] :
             self.globals["sys.conversation_turns"] = 0
         self.globals["sys.conversation_turns"] += 1

@@ -62,7 +62,7 @@ export default function DatasetSettings() {
       name: '',
       parser_id: DocumentParserType.Naive,
       permission: PermissionRole.Me,
-      language: 'English',
+      language: 'Chinese',
       parser_config: {
         layout_recognize: DocumentType.DeepDOC,
         chunk_token_num: 512,
@@ -76,11 +76,11 @@ export default function DatasetSettings() {
         toc_extraction: false,
         image_table_context_window: 0,
         overlapped_percent: 0,
-        mineru_backend: 'pipeline',
+        mineru_backend: 'hybrid-auto-engine',
         mineru_parse_method: 'auto',
         mineru_formula_enable: true,
         mineru_table_enable: true,
-        mineru_lang: 'English',
+        mineru_lang: 'Chinese',
         raptor: {
           use_raptor: true,
           max_token: 256,

@@ -232,7 +232,10 @@ async def completion(tenant_id, agent_id, session_id=None, **kwargs):
         "id": message_id
     })
     txt = ""
-    async for ans in canvas.run(query=query, files=files, user_id=user_id, inputs=inputs):
+    # 将 completion 专有参数与画布运行参数分离，其余透传给 canvas.run（如 dataset_ids、document_ids 覆盖检索范围）
+    _no_forward = {"question", "query", "files", "inputs", "user_id", "session_id", "stream", "return_trace"}
+    run_extras = {k: v for k, v in kwargs.items() if k not in _no_forward}
+    async for ans in canvas.run(query=query, files=files, user_id=user_id, inputs=inputs, **run_extras):
         ans["session_id"] = session_id
         if ans["event"] == "message":
             txt += ans["data"]["content"]

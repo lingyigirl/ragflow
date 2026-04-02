@@ -816,6 +816,14 @@ async def ask_about(tenant_id):
     if not isinstance(req.get("dataset_ids"), list):
         return get_error_data_result("`dataset_ids` should be a list.")
     req["kb_ids"] = req.pop("dataset_ids")
+    document_ids = req.get("document_ids", [])
+    if document_ids and not isinstance(document_ids, list):
+        return get_error_data_result("`document_ids` should be a list.")
+    if document_ids:
+        doc_ids_list = KnowledgebaseService.list_documents_by_ids(req["kb_ids"])
+        invalid_docs = [doc_id for doc_id in document_ids if doc_id not in doc_ids_list]
+        if invalid_docs:
+            return get_error_data_result(f"The datasets don't own the document(s): {invalid_docs}")
     for kb_id in req["kb_ids"]:
         if not KnowledgebaseService.accessible(kb_id, tenant_id):
             return get_error_data_result(f"You don't own the dataset {kb_id}.")
@@ -824,11 +832,14 @@ async def ask_about(tenant_id):
         if kb.chunk_num == 0:
             return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")
     uid = tenant_id
+    search_config = {"kb_ids": req["kb_ids"]}
+    if document_ids:
+        search_config["doc_ids"] = document_ids
 
     async def stream():
         nonlocal req, uid
         try:
-            async for ans in async_ask(req["question"], req["kb_ids"], uid):
+            async for ans in async_ask(req["question"], req["kb_ids"], uid, search_config=search_config):
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
         except Exception as e:
             yield "data:" + json.dumps(
@@ -1233,3 +1244,129 @@ async def mindmap():
     if "error" in mind_map:
         return server_error_response(Exception(mind_map["error"]))
     return get_json_result(data=mind_map)
+
+
+
+# 移植江西版本接口：
+@manager.route("/agents/<agent_id>/ask", methods=["POST"])  # noqa: F821
+@token_required
+async def agent_ask(tenant_id, agent_id):
+    """
+    Ask over agent with dataset override; streaming output matches /sessions/ask cumulative SSE.
+    """
+    req = await get_request_json()
+    question = req.get("question", "")
+    dataset_ids = req.pop("dataset_ids", None) 
+    document_ids = req.pop("document_ids", []) 
+    session_id = req.get("session_id", "") 
+    user_id = req.get("user_id", "") 
+    stream_flag = req.get("stream", True) 
+
+    if not question:
+        return get_error_data_result("`question` is required.")
+    if not dataset_ids:
+        return get_error_data_result("`dataset_ids` is required.")
+    if not isinstance(dataset_ids, list):
+        return get_error_data_result("`dataset_ids` should be a list.")
+    if document_ids and not isinstance(document_ids, list):
+        return get_error_data_result("`document_ids` should be a list.")
+
+    if document_ids:
+        doc_ids_list = KnowledgebaseService.list_documents_by_ids(dataset_ids)
+        invalid_docs = [doc_id for doc_id in document_ids if doc_id not in doc_ids_list]
+        if invalid_docs:
+            return get_error_data_result(f"The datasets don't own the document(s): {invalid_docs}")
+    for kb_id in dataset_ids:
+        if not KnowledgebaseService.accessible(kb_id, tenant_id):
+            return get_error_data_result(f"You don't own the dataset {kb_id}.")
+        kbs = KnowledgebaseService.query(id=kb_id)
+        kb = kbs[0]
+        if kb.chunk_num == 0:
+            return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")
+
+    passthrough = {
+        k: v
+        for k, v in req.items()
+        if k not in {"question", "dataset_ids", "document_ids", "session_id", "user_id", "stream"}
+    }
+
+    if stream_flag:
+
+        async def generate():
+            answer_buf = "" 
+            reference_cache = {} 
+            try:
+                async for ans in agent_completion(
+                    tenant_id=tenant_id,
+                    agent_id=agent_id,
+                    question=question,
+                    session_id=session_id,
+                    dataset_ids=dataset_ids,
+                    document_ids=document_ids,
+                    user_id=user_id,
+                    **passthrough,
+                ):
+                    if isinstance(ans, str):
+                        try:
+                            ans = json.loads(ans[5:]) 
+                        except Exception:
+                            continue
+                    event = ans.get("event")
+                    if event == "message":
+                        chunk = ans.get("data", {}).get("content", "")
+                        answer_buf += chunk
+                        yield "data:" + json.dumps(
+                            {"code": 0, "message": "", "data": {"answer": answer_buf, "reference": {}}},
+                            ensure_ascii=False,
+                        ) + "\n\n"
+                    elif event == "message_end":
+                        ref = ans.get("data", {}).get("reference")
+                        if isinstance(ref, dict):
+                            reference_cache.update(ref)
+                yield "data:" + json.dumps(
+                    {"code": 0, "message": "", "data": {"answer": answer_buf, "reference": reference_cache}},
+                    ensure_ascii=False,
+                ) + "\n\n"
+            except Exception as e:
+                yield "data:" + json.dumps(
+                    {"code": 500, "message": str(e), "data": {"answer": "**ERROR**: " + str(e), "reference": {}}},
+                    ensure_ascii=False,
+                ) + "\n\n"
+            yield "data:" + json.dumps({"code": 0, "message": "", "data": True}, ensure_ascii=False) + "\n\n"
+
+        resp = Response(generate(), mimetype="text/event-stream")
+        resp.headers.add_header("Cache-control", "no-cache")
+        resp.headers.add_header("Connection", "keep-alive")
+        resp.headers.add_header("X-Accel-Buffering", "no")
+        resp.headers.add_header("Content-Type", "text/event-stream; charset=utf-8")
+        return resp
+
+    full_content = ""
+    reference = {}
+    try:
+        async for ans in agent_completion(
+            tenant_id=tenant_id,
+            agent_id=agent_id,
+            question=question,
+            session_id=session_id,
+            dataset_ids=dataset_ids,
+            document_ids=document_ids,
+            user_id=user_id,
+            **passthrough,
+        ):
+            if isinstance(ans, str):
+                try:
+                    ans = json.loads(ans[5:])
+                except Exception:
+                    continue
+            event = ans.get("event")
+            if event == "message":
+                full_content += ans.get("data", {}).get("content", "")
+            elif event == "message_end":
+                ref = ans.get("data", {}).get("reference")
+                if isinstance(ref, dict):
+                    reference.update(ref)
+    except Exception as e:
+        return get_error_data_result(str(e))
+
+    return jsonify({"code": 0, "message": "", "data": {"answer": full_content, "reference": reference}})
