@@ -15,6 +15,7 @@
 #
 import json
 import copy
+import logging
 import re
 import time
 
@@ -808,37 +809,67 @@ async def delete_agent_session(tenant_id, agent_id):
 @manager.route("/sessions/ask", methods=["POST"])  # noqa: F821
 @token_required
 async def ask_about(tenant_id):
-    req = await get_request_json()
-    if not isinstance(req, dict):  
-        return get_error_data_result("Invalid JSON body.") 
-    if not req.get("question"):
-        return get_error_data_result("`question` is required.")
-    if not req.get("dataset_ids"):
-        return get_error_data_result("`dataset_ids` is required.")
-    if not isinstance(req.get("dataset_ids"), list):
-        return get_error_data_result("`dataset_ids` should be a list.")
-    req["kb_ids"] = req.pop("dataset_ids")
-    document_ids = req.get("document_ids", [])
-    if document_ids and not isinstance(document_ids, list):
-        return get_error_data_result("`document_ids` should be a list.")
-    if document_ids:
-        doc_ids_list = KnowledgebaseService.list_documents_by_ids(req["kb_ids"])
-        invalid_docs = [doc_id for doc_id in document_ids if doc_id not in doc_ids_list]
-        if invalid_docs:
-            return get_error_data_result(f"The datasets don't own the document(s): {invalid_docs}")
-    for kb_id in req["kb_ids"]:
-        if not KnowledgebaseService.accessible(kb_id, tenant_id):
-            return get_error_data_result(f"You don't own the dataset {kb_id}.")
-        kbs = KnowledgebaseService.query(id=kb_id)
-        if not kbs: 
-            return get_error_data_result(f"The dataset {kb_id} does not exist.") 
-        kb = kbs[0]
-        if kb.chunk_num == 0:
-            return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")
-    uid = tenant_id
-    search_config = {"kb_ids": req["kb_ids"]}
-    if document_ids:
-        search_config["doc_ids"] = document_ids
+    logging.info("========================")
+    req_trace_id = get_uuid()  # 生成请求追踪 ID 便于串联日志
+    try:  # 捕获接口前置阶段异常并打完整日志
+        req = await get_request_json()  # 解析请求体 JSON
+        logging.info(  # 记录入口参数摘要避免打印完整敏感内容
+            "[sessions.ask] trace_id=%s tenant_id=%s req_type=%s has_question=%s dataset_ids_type=%s document_ids_type=%s",
+            req_trace_id,
+            tenant_id,
+            type(req).__name__,
+            isinstance(req, dict) and bool(req.get("question")),
+            type(req.get("dataset_ids")).__name__ if isinstance(req, dict) else "N/A",
+            type(req.get("document_ids")).__name__ if isinstance(req, dict) and "document_ids" in req else "missing",
+        )
+        if not isinstance(req, dict):  # 防止请求体不是 JSON 对象导致后续 .get 报错
+            logging.warning("[sessions.ask] trace_id=%s invalid request body type", req_trace_id)  # 记录非法请求体类型
+            return get_error_data_result("Invalid JSON body.")  # 返回明确错误信息
+        if not req.get("question"):  # 校验问题参数
+            logging.warning("[sessions.ask] trace_id=%s missing question", req_trace_id)  # 记录缺少问题参数
+            return get_error_data_result("`question` is required.")  # 返回参数缺失错误
+        if not req.get("dataset_ids"):  # 校验数据集参数
+            logging.warning("[sessions.ask] trace_id=%s missing dataset_ids", req_trace_id)  # 记录缺少数据集参数
+            return get_error_data_result("`dataset_ids` is required.")  # 返回参数缺失错误
+        if not isinstance(req.get("dataset_ids"), list):  # 校验数据集参数类型
+            logging.warning("[sessions.ask] trace_id=%s dataset_ids is not list", req_trace_id)  # 记录错误参数类型
+            return get_error_data_result("`dataset_ids` should be a list.")  # 返回参数类型错误
+        req["kb_ids"] = req.pop("dataset_ids")  # 兼容下游逻辑字段名
+        document_ids = req.get("document_ids", [])  # 读取可选文档过滤参数
+        if document_ids and not isinstance(document_ids, list):  # 校验文档参数类型
+            logging.warning("[sessions.ask] trace_id=%s document_ids is not list", req_trace_id)  # 记录错误参数类型
+            return get_error_data_result("`document_ids` should be a list.")  # 返回参数类型错误
+        if document_ids:  # 校验文档是否属于目标数据集
+            doc_ids_list = KnowledgebaseService.list_documents_by_ids(req["kb_ids"])  # 查询数据集下可用文档
+            invalid_docs = [doc_id for doc_id in document_ids if doc_id not in doc_ids_list]  # 过滤无效文档 ID
+            if invalid_docs:  # 存在跨数据集或不存在文档
+                logging.warning("[sessions.ask] trace_id=%s invalid_docs=%s", req_trace_id, invalid_docs)  # 记录无效文档 ID
+                return get_error_data_result(f"The datasets don't own the document(s): {invalid_docs}")  # 返回业务错误
+        for kb_id in req["kb_ids"]:  # 逐个校验数据集权限和状态
+            if not KnowledgebaseService.accessible(kb_id, tenant_id):  # 检查当前租户访问权限
+                logging.warning("[sessions.ask] trace_id=%s inaccessible_kb_id=%s", req_trace_id, kb_id)  # 记录无权限数据集
+                return get_error_data_result(f"You don't own the dataset {kb_id}.")  # 返回权限错误
+            kbs = KnowledgebaseService.query(id=kb_id)  # 查询数据集详情
+            if not kbs:  # 防止 query 结果为空时访问 kbs[0] 越界
+                logging.warning("[sessions.ask] trace_id=%s kb_not_found=%s", req_trace_id, kb_id)  # 记录不存在的数据集
+                return get_error_data_result(f"The dataset {kb_id} does not exist.")  # 返回不存在错误
+            kb = kbs[0]  # 读取数据集实体
+            if kb.chunk_num == 0:  # 检查是否有已解析内容可检索
+                logging.warning("[sessions.ask] trace_id=%s kb_empty_chunks=%s", req_trace_id, kb_id)  # 记录空数据集
+                return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")  # 返回业务错误
+        uid = tenant_id  # 下游问答使用租户 ID 作为用户标识
+        search_config = {"kb_ids": req["kb_ids"]}  # 初始化检索配置
+        if document_ids:  # 存在文档过滤则透传给检索配置
+            search_config["doc_ids"] = document_ids  # 注入文档过滤条件
+        logging.info(  # 记录流式问答启动信息
+            "[sessions.ask] trace_id=%s start_stream kb_count=%s doc_count=%s",
+            req_trace_id,
+            len(req["kb_ids"]),
+            len(document_ids) if isinstance(document_ids, list) else 0,
+        )
+    except Exception:  # 统一记录前置阶段异常堆栈
+        logging.exception("[sessions.ask] trace_id=%s pre_stream_exception", req_trace_id)  # 打印完整 traceback
+        return server_error_response(Exception("ask pre-stream failed"))  # 返回统一 500 响应
 
     async def stream():
         nonlocal req, uid
@@ -846,6 +877,7 @@ async def ask_about(tenant_id):
             async for ans in async_ask(req["question"], req["kb_ids"], uid, search_config=search_config):
                 yield "data:" + json.dumps({"code": 0, "message": "", "data": ans}, ensure_ascii=False) + "\n\n"
         except Exception as e:
+            logging.exception("[sessions.ask] trace_id=%s stream_exception", req_trace_id)  # 记录流式阶段异常堆栈
             yield "data:" + json.dumps(
                 {"code": 500, "message": str(e), "data": {"answer": "**ERROR**: " + str(e), "reference": []}},
                 ensure_ascii=False) + "\n\n"
