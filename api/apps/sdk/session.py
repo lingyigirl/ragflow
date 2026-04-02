@@ -809,6 +809,8 @@ async def delete_agent_session(tenant_id, agent_id):
 @token_required
 async def ask_about(tenant_id):
     req = await get_request_json()
+    if not isinstance(req, dict):  
+        return get_error_data_result("Invalid JSON body.") 
     if not req.get("question"):
         return get_error_data_result("`question` is required.")
     if not req.get("dataset_ids"):
@@ -828,6 +830,8 @@ async def ask_about(tenant_id):
         if not KnowledgebaseService.accessible(kb_id, tenant_id):
             return get_error_data_result(f"You don't own the dataset {kb_id}.")
         kbs = KnowledgebaseService.query(id=kb_id)
+        if not kbs: 
+            return get_error_data_result(f"The dataset {kb_id} does not exist.") 
         kb = kbs[0]
         if kb.chunk_num == 0:
             return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")
@@ -1280,6 +1284,8 @@ async def agent_ask(tenant_id, agent_id):
         if not KnowledgebaseService.accessible(kb_id, tenant_id):
             return get_error_data_result(f"You don't own the dataset {kb_id}.")
         kbs = KnowledgebaseService.query(id=kb_id)
+        if not kbs:  # 防止 query 结果为空时访问 kbs[0] 越界
+            return get_error_data_result(f"The dataset {kb_id} does not exist.")  # 返回数据集不存在的业务错误
         kb = kbs[0]
         if kb.chunk_num == 0:
             return get_error_data_result(f"The dataset {kb_id} doesn't own parsed file")
