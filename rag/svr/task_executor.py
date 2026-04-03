@@ -1099,9 +1099,7 @@ async def do_handle_task(task):
         pass
         return
     else:
-        # Standard chunking methods
-        # 默认开启分类，保持历史行为；当开关显式为 False 时跳过 LLM type 分类。
-        should_try_voucher_classify = bool(task_parser_config.get("enable_voucher_type_classify", True))
+        should_try_voucher_classify = bool(task_parser_config.get("enable_voucher_type_classify", False))
         start_ts = timer()
         chunks = await build_chunks(task, progress_callback)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
