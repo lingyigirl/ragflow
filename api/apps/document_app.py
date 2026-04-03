@@ -1747,7 +1747,7 @@ async def submit_mineru_section():
 # 新增凭证列表
 @manager.route("/identity_list", methods=["POST"]) 
 @login_required
-async def list_docs():
+async def identity_list_docs():
     kb_id = request.args.get("kb_id")
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
