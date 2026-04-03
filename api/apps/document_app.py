@@ -49,6 +49,7 @@ from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
 from rag.utils.voucher_classifier import (
+    build_voucher_classify_content,
     build_voucher_classify_content_from_content_list,
     classify_voucher_content,
     get_failed_voucher_payload,
@@ -94,6 +95,67 @@ async def _classify_voucher_type_for_mineru_doc(kb_id: str, doc_id: str):
     except Exception as ex:
         logging.warning("[voucher_type_llm] 分类异常 doc_id=%s err=%s", doc_id, ex)
         DocumentService.update_by_id(doc_id, failed_payload)
+
+
+async def _fetch_doc_content_for_voucher_classify(doc, tenant_id: str) -> str:
+    # 优先从 MinerU content_list 读取正文；无结果则回退到向量库 chunk 文本。
+    try:
+        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, doc.kb_id, f"{doc.id}/content_list.json")
+        content_list = json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
+    except Exception:
+        content_list = []
+    content = build_voucher_classify_content_from_content_list(content_list)
+    if content:
+        return content
+
+    index_name = search.index_name(tenant_id)
+    if not settings.docStoreConn.index_exist(index_name, doc.kb_id):
+        return ""
+    query = {
+        "doc_ids": [doc.id],
+        "page": 1,
+        "size": 50,
+        "question": "",
+        "sort": True,
+    }
+    sres = settings.retriever.search(query, index_name, [doc.kb_id], emb_mdl=None, highlight=False)
+    chunks = []
+    for cid in getattr(sres, "ids", []):
+        text = (getattr(sres, "field", {}) or {}).get(cid, {}).get("content_with_weight", "")
+        if text:
+            chunks.append({"content_with_weight": text})
+    return build_voucher_classify_content(chunks)
+
+
+async def _classify_voucher_type_for_doc(doc, tenant_id: str):
+    failed_payload = get_failed_voucher_payload()
+    e, kb = KnowledgebaseService.get_by_id(doc.kb_id)
+    if not e:
+        return False, failed_payload, "Dataset not found."
+    content = await _fetch_doc_content_for_voucher_classify(doc, tenant_id)
+    if not content:
+        DocumentService.update_by_id(doc.id, failed_payload)
+        return True, failed_payload, "No available content for classification."
+
+    chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese")
+    try:
+        logging.info("[voucher_type_llm] 开始判断文档类型 doc_id=%s", doc.id)
+        payload = await classify_voucher_content(chat_mdl, content, timeout=45)
+        if payload["llm_classify_success"]:
+            logging.info("[voucher_type_llm] 判断类型结果 doc_id=%s voucher_type=%s", doc.id, payload["voucher_type"])
+            logging.info("[voucher_type_llm] 开始写入数据库 doc_id=%s", doc.id)
+            ok = DocumentService.update_by_id(doc.id, payload)
+            if ok:
+                logging.info("[voucher_type_llm] 数据库写入成功 doc_id=%s", doc.id)
+                return True, payload, None
+            logging.warning("[voucher_type_llm] 数据库写入失败 doc_id=%s", doc.id)
+            return False, payload, "Database error (voucher_type update)!"
+        DocumentService.update_by_id(doc.id, failed_payload)
+        return True, failed_payload, None
+    except Exception as ex:
+        logging.warning("[voucher_type_llm] 分类异常 doc_id=%s err=%s", doc.id, ex)
+        DocumentService.update_by_id(doc.id, failed_payload)
+        return True, failed_payload, str(ex)
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
@@ -384,6 +446,27 @@ async def list_docs():
         return get_json_result(data={"total": tol, "docs": docs})
     except Exception as e:
         return server_error_response(e)
+
+
+@manager.route("/classify_voucher_type", methods=["POST"])  # noqa: F821
+@login_required
+@validate_request("doc_id")
+async def classify_voucher_type():
+    req = await get_request_json()
+    doc_id = req["doc_id"]
+    if not DocumentService.accessible(doc_id, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+    e, doc = DocumentService.get_by_id(doc_id)
+    if not e:
+        return get_data_error_result(message="Document not found!")
+    tenant_id = DocumentService.get_tenant_id(doc_id)
+    if not tenant_id:
+        return get_data_error_result(message="Tenant not found!")
+
+    ok, payload, err = await _classify_voucher_type_for_doc(doc, tenant_id)
+    if not ok:
+        return get_data_error_result(message=err or "Database error (voucher_type update)!")
+    return get_json_result(data=payload, message=err or "")
 
 
 @manager.route("/filter", methods=["POST"])  # noqa: F821
@@ -726,8 +809,6 @@ async def rename():
                     search.index_name(tenant_id),
                     doc.kb_id,
                 )
-            # 兼容增强：当请求中显式携带 voucher_type 时，同步执行人工类型修正。
-            # 不携带该参数时，保持原有 rename 行为完全不变。
             if "voucher_type" in req:
                 voucher_type = req.get("voucher_type")
                 if voucher_type is None:
@@ -1945,31 +2026,3 @@ async def identity_list_docs():
     except Exception as e:
         return server_error_response(e)
 
-@manager.route("/set_voucher_type", methods=["POST"])  # noqa: F821
-@login_required
-@validate_request("doc_id", "voucher_type")
-async def set_voucher_type():
-    req = await get_request_json()
-    doc_id = req["doc_id"]
-    if not DocumentService.accessible(doc_id, current_user.id):
-        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
-    e, doc = DocumentService.get_by_id(doc_id)
-    if not e:
-        return get_data_error_result(message="Document not found!")
-    voucher_type = req["voucher_type"]
-    if voucher_type is None:
-        return get_json_result(
-            data=False,
-            message='Lack of valid "voucher_type".',
-            code=RetCode.ARGUMENT_ERROR,
-        )
-    voucher_type = str(voucher_type).strip()
-    payload = {
-        "voucher_type": voucher_type,
-        "voucher_type_confidence": None,
-        "llm_classify_success": True,
-        "voucher_type_source": "manual",
-    }
-    if not DocumentService.update_by_id(doc_id, payload):
-        return get_data_error_result(message="Database error (voucher_type update)!")
-    return get_json_result(data=payload)
