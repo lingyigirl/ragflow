@@ -623,6 +623,11 @@ async def rm():
 async def run():
     req = await get_request_json()
     try:
+        classify_switch = req.get("enable_voucher_type_classify", False)
+        if isinstance(classify_switch, str):
+            classify_switch = classify_switch.lower() == "true"
+        classify_switch = bool(classify_switch)
+
         def _run_sync():
             for doc_id in req["doc_ids"]:
                 if not DocumentService.accessible(doc_id, current_user.id):
@@ -666,6 +671,8 @@ async def run():
                         doc.parser_config["metadata"] = kb.parser_config.get("metadata", {})
                         DocumentService.update_parser_config(doc.id, doc.parser_config)
                     doc_dict = doc.to_dict()
+                    doc_dict["parser_config"] = dict(doc_dict.get("parser_config") or {})
+                    doc_dict["parser_config"]["enable_voucher_type_classify"] = classify_switch
                     DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
 
             return get_json_result(data=True)
@@ -719,6 +726,25 @@ async def rename():
                     search.index_name(tenant_id),
                     doc.kb_id,
                 )
+            # 兼容增强：当请求中显式携带 voucher_type 时，同步执行人工类型修正。
+            # 不携带该参数时，保持原有 rename 行为完全不变。
+            if "voucher_type" in req:
+                voucher_type = req.get("voucher_type")
+                if voucher_type is None:
+                    return get_json_result(
+                        data=False,
+                        message='Lack of valid "voucher_type".',
+                        code=RetCode.ARGUMENT_ERROR,
+                    )
+                voucher_type = str(voucher_type).strip()
+                payload = {
+                    "voucher_type": voucher_type,
+                    "voucher_type_confidence": None,
+                    "llm_classify_success": True,
+                    "voucher_type_source": "manual",
+                }
+                if not DocumentService.update_by_id(req["doc_id"], payload):
+                    return get_data_error_result(message="Database error (voucher_type update)!")
             return get_json_result(data=True)
 
         return await asyncio.to_thread(_rename_sync)
