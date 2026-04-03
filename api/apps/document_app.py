@@ -753,9 +753,9 @@ async def run():
                         doc.parser_config["enable_metadata"] = kb.parser_config.get("enable_metadata", False)
                         doc.parser_config["metadata"] = kb.parser_config.get("metadata", {})
                         DocumentService.update_parser_config(doc.id, doc.parser_config)
+                    doc.parser_config["enable_voucher_type_classify"] = classify_switch
+                    DocumentService.update_parser_config(doc.id, doc.parser_config)
                     doc_dict = doc.to_dict()
-                    doc_dict["parser_config"] = dict(doc_dict.get("parser_config") or {})
-                    doc_dict["parser_config"]["enable_voucher_type_classify"] = classify_switch
                     DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
 
             return get_json_result(data=True)
