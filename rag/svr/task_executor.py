@@ -165,7 +165,6 @@ def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing...
 
 
 async def classify_voucher_type_async(task: dict, chunks: list[dict]):
-    # 分类失败时统一回填为 null + false，确保不影响原有解析流程。
     failed_payload = {
         "voucher_type": None,
         "voucher_type_confidence": None,
@@ -181,7 +180,6 @@ async def classify_voucher_type_async(task: dict, chunks: list[dict]):
         DocumentService.update_by_id(doc_id, failed_payload)
         return
 
-    # 使用租户默认 CHAT 模型（llm_name=None）进行分类。
     chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=None, lang=task["language"])
     label_options = "、".join(VOUCHER_TYPE_OPTIONS)
     system_prompt = (
@@ -203,7 +201,6 @@ async def classify_voucher_type_async(task: dict, chunks: list[dict]):
             )
         parsed = parse_voucher_classify_result(raw_response)
         if parsed["llm_classify_success"]:
-            # 只有“调用成功 + 合法标签”才写成功状态。
             DocumentService.update_by_id(
                 doc_id,
                 {
@@ -1182,7 +1179,7 @@ async def do_handle_task(task):
             progress_callback(-1, msg="Task has been canceled.")
             return
 
-        # 以后台任务方式触发凭证分类，避免影响解析主流程时序。
+
         if should_try_voucher_classify:
             asyncio.create_task(classify_voucher_type_async(task, chunks))
 
