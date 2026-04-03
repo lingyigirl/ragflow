@@ -70,7 +70,7 @@ from common.signal_utils import start_tracemalloc_and_snapshot, stop_tracemalloc
 from common.exceptions import TaskCanceledException
 from common import settings
 from common.constants import PAGERANK_FLD, TAG_FLD, SVR_CONSUMER_GROUP_NAME
-from rag.utils.voucher_classifier import parse_voucher_classify_result, build_voucher_classify_content, VOUCHER_TYPE_OPTIONS
+from rag.utils.voucher_classifier import build_voucher_classify_content, classify_voucher_content, get_failed_voucher_payload
 
 BATCH_SIZE = 64
 
@@ -165,12 +165,7 @@ def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing...
 
 
 async def classify_voucher_type_async(task: dict, chunks: list[dict]):
-    failed_payload = {
-        "voucher_type": None,
-        "voucher_type_confidence": None,
-        "llm_classify_success": False,
-        "voucher_type_source": None,
-    }
+    failed_payload = get_failed_voucher_payload()
     doc_id = task.get("doc_id")
     if not doc_id:
         return
@@ -181,35 +176,18 @@ async def classify_voucher_type_async(task: dict, chunks: list[dict]):
         return
 
     chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=None, lang=task["language"])
-    label_options = "、".join(VOUCHER_TYPE_OPTIONS)
-    system_prompt = (
-        "你是文档凭证分类助手。"
-        "请严格根据用户提供的文档正文内容进行分类，禁止依据文件名、后缀、路径、上传名猜测。"
-        f"可选标签仅有：{label_options}。"
-        "请只输出 JSON，格式为：{\"label\":\"<标签>\",\"confidence\":<0到1之间数字>}。"
-    )
-    user_prompt = f"请基于以下文档正文进行单标签分类：\n{content}"
     try:
+        logging.info("[voucher_type_llm] 开始判断文档类型 doc_id=%s", doc_id)
         async with chat_limiter:
-            raw_response = await asyncio.wait_for(
-                chat_mdl.async_chat(
-                    system_prompt,
-                    [{"role": "user", "content": user_prompt}],
-                    {"temperature": 0.01, "max_tokens": 256},
-                ),
-                timeout=45,
-            )
-        parsed = parse_voucher_classify_result(raw_response)
-        if parsed["llm_classify_success"]:
-            DocumentService.update_by_id(
-                doc_id,
-                {
-                    "voucher_type": parsed["voucher_type"],
-                    "voucher_type_confidence": parsed["voucher_type_confidence"],
-                    "llm_classify_success": True,
-                    "voucher_type_source": "llm",
-                },
-            )
+            payload = await classify_voucher_content(chat_mdl, content, timeout=45)
+        if payload["llm_classify_success"]:
+            logging.info("[voucher_type_llm] 判断类型结果 doc_id=%s voucher_type=%s", doc_id, payload["voucher_type"])
+            logging.info("[voucher_type_llm] 开始写入数据库 doc_id=%s", doc_id)
+            ok = DocumentService.update_by_id(doc_id, payload)
+            if ok:
+                logging.info("[voucher_type_llm] 数据库写入成功 doc_id=%s", doc_id)
+            else:
+                logging.warning("[voucher_type_llm] 数据库写入失败 doc_id=%s", doc_id)
             return
         DocumentService.update_by_id(doc_id, failed_payload)
     except Exception as ex:

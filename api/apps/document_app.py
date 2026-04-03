@@ -34,6 +34,7 @@ from api.db.services.file_service import FileService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.task_service import TaskService, cancel_all_task_of
 from api.db.services.user_service import UserTenantService
+from api.db.services.llm_service import LLMBundle
 from common.misc_utils import get_uuid
 from api.utils.api_utils import (
     get_data_error_result,
@@ -43,10 +44,15 @@ from api.utils.api_utils import (
 )
 from api.utils.file_utils import filename_type, thumbnail
 from common.file_utils import get_project_base_directory
-from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus
+from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus, LLMType
 from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
+from rag.utils.voucher_classifier import (
+    build_voucher_classify_content_from_content_list,
+    classify_voucher_content,
+    get_failed_voucher_payload,
+)
 from common import settings
 import requests
 import os
@@ -55,6 +61,39 @@ import zipfile
 import base64
 import shutil
 from urllib.parse import quote
+
+
+async def _classify_voucher_type_for_mineru_doc(kb_id: str, doc_id: str):
+    failed_payload = get_failed_voucher_payload()
+    try:
+        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, f"{doc_id}/content_list.json")
+        content_list = json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
+    except Exception:
+        content_list = []
+    content = build_voucher_classify_content_from_content_list(content_list)
+    if not content:
+        DocumentService.update_by_id(doc_id, failed_payload)
+        return
+    e, kb = KnowledgebaseService.get_by_id(kb_id)
+    if not e:
+        return
+    chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese")
+    try:
+        logging.info("[voucher_type_llm] 开始判断文档类型 doc_id=%s", doc_id)
+        payload = await classify_voucher_content(chat_mdl, content, timeout=45)
+        if payload["llm_classify_success"]:
+            logging.info("[voucher_type_llm] 判断类型结果 doc_id=%s voucher_type=%s", doc_id, payload["voucher_type"])
+            logging.info("[voucher_type_llm] 开始写入数据库 doc_id=%s", doc_id)
+            ok = DocumentService.update_by_id(doc_id, payload)
+            if ok:
+                logging.info("[voucher_type_llm] 数据库写入成功 doc_id=%s", doc_id)
+            else:
+                logging.warning("[voucher_type_llm] 数据库写入失败 doc_id=%s", doc_id)
+            return
+        DocumentService.update_by_id(doc_id, failed_payload)
+    except Exception as ex:
+        logging.warning("[voucher_type_llm] 分类异常 doc_id=%s err=%s", doc_id, ex)
+        DocumentService.update_by_id(doc_id, failed_payload)
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
@@ -1360,6 +1399,11 @@ async def mineru_parse():
                 kb_id if has_doc_kb else None,
                 doc_id if has_doc_kb else None,
             )
+            if has_doc_kb:
+                try:
+                    await _classify_voucher_type_for_mineru_doc(kb_id, doc_id)
+                except Exception as e:
+                    logging.warning("[voucher_type_llm] MinerU 回写分类失败 doc_id=%s err=%s", doc_id, e)
             return get_json_result(data=result_data)
         else:
             try:
