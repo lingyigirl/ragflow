@@ -707,9 +707,12 @@ async def run():
     req = await get_request_json()
     try:
         classify_switch = req.get("enable_voucher_type_classify", False)
-        if isinstance(classify_switch, str):
-            classify_switch = classify_switch.lower() == "true"
-        classify_switch = bool(classify_switch)
+        if not isinstance(classify_switch, bool):
+            return get_json_result(
+                data=False,
+                message='"enable_voucher_type_classify" must be a boolean value.',
+                code=RetCode.ARGUMENT_ERROR,
+            )
 
         def _run_sync():
             for doc_id in req["doc_ids"]:
