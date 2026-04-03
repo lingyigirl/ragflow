@@ -789,6 +789,10 @@ class Document(DataBaseModel):
     process_duration = FloatField(default=0)
     meta_fields = JSONField(null=True, default={})
     suffix = CharField(max_length=32, null=False, help_text="The real file extension suffix", index=True)
+    voucher_type = CharField(max_length=64, null=True, help_text="voucher type classified by llm", index=True)
+    llm_classify_success = BooleanField(null=False, default=False, help_text="llm classify call success and valid label")
+    voucher_type_confidence = FloatField(null=True, help_text="llm classify confidence in range 0~1")
+    voucher_type_source = CharField(max_length=16, null=True, help_text="llm|manual", index=True)
 
     run = CharField(max_length=1, null=True, help_text="start to run processing or cancel.(1: run it; 2: cancel)", default="0", index=True)
     status = CharField(max_length=1, null=True, help_text="is it validate(0: wasted, 1: validate)", default="1", index=True)
@@ -1335,6 +1339,22 @@ def migrate_db():
         pass
     try:
         migrate(migrator.add_column("document", "suffix", CharField(max_length=32, null=False, default="", help_text="The real file extension suffix", index=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("document", "voucher_type", CharField(max_length=64, null=True, help_text="voucher type classified by llm", index=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("document", "llm_classify_success", BooleanField(null=False, default=False, help_text="llm classify call success and valid label")))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("document", "voucher_type_confidence", FloatField(null=True, help_text="llm classify confidence in range 0~1")))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("document", "voucher_type_source", CharField(max_length=16, null=True, help_text="llm|manual", index=True)))
     except Exception:
         pass
     try:

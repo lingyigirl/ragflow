@@ -941,7 +941,6 @@ async def set_meta():
     except Exception as e:
         return server_error_response(e)
 
-
 @manager.route("/upload_info", methods=["POST"])  # noqa: F821
 async def upload_info():
     files = await request.files
@@ -1742,3 +1741,165 @@ async def submit_mineru_section():
                 os.remove(temp_file_path)
             except Exception:
                 logging.warning("[MinerU] 清理临时 content_list 文件失败: %s", temp_file_path)
+
+
+
+# 新增凭证列表
+@manager.route("/identity_list", methods=["POST"]) 
+@login_required
+async def list_docs():
+    kb_id = request.args.get("kb_id")
+    if not kb_id:
+        return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
+    tenants = UserTenantService.query(user_id=current_user.id)
+    for tenant in tenants:
+        if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
+            break
+    else:
+        return get_json_result(data=False, message="Only owner of dataset authorized for this operation.", code=RetCode.OPERATING_ERROR)
+    keywords = request.args.get("keywords", "")
+
+    page_number = int(request.args.get("page", 0))
+    items_per_page = int(request.args.get("page_size", 0))
+    orderby = request.args.get("orderby", "create_time")
+    if request.args.get("desc", "true").lower() == "false":
+        desc = False
+    else:
+        desc = True
+    create_time_from = int(request.args.get("create_time_from", 0))
+    create_time_to = int(request.args.get("create_time_to", 0))
+
+    req = await get_request_json()
+
+    return_empty_metadata = req.get("return_empty_metadata", False)
+    if isinstance(return_empty_metadata, str):
+        return_empty_metadata = return_empty_metadata.lower() == "true"
+
+    run_status = req.get("run_status", [])
+    if run_status:
+        invalid_status = {s for s in run_status if s not in VALID_TASK_STATUS}
+        if invalid_status:
+            return get_data_error_result(message=f"Invalid filter run status conditions: {', '.join(invalid_status)}")
+
+    types = req.get("types", [])
+    if types:
+        invalid_types = {t for t in types if t not in VALID_FILE_TYPES}
+        if invalid_types:
+            return get_data_error_result(message=f"Invalid filter conditions: {', '.join(invalid_types)} type{'s' if len(invalid_types) > 1 else ''}")
+
+    suffix = req.get("suffix", [])
+    metadata_condition = req.get("metadata_condition", {}) or {}
+    metadata = req.get("metadata", {}) or {}
+    if isinstance(metadata, dict) and metadata.get("empty_metadata"):
+        return_empty_metadata = True
+        metadata = {k: v for k, v in metadata.items() if k != "empty_metadata"}
+    if return_empty_metadata:
+        metadata_condition = {}
+        metadata = {}
+    else:
+        if metadata_condition and not isinstance(metadata_condition, dict):
+            return get_data_error_result(message="metadata_condition must be an object.")
+        if metadata and not isinstance(metadata, dict):
+            return get_data_error_result(message="metadata must be an object.")
+
+    doc_ids_filter = None
+    metas = None
+    if metadata_condition or metadata:
+        metas = DocumentService.get_flatted_meta_by_kbs([kb_id])
+
+    if metadata_condition:
+        doc_ids_filter = set(meta_filter(metas, convert_conditions(metadata_condition), metadata_condition.get("logic", "and")))
+        if metadata_condition.get("conditions") and not doc_ids_filter:
+            return get_json_result(data={"total": 0, "docs": []})
+
+    if metadata:
+        metadata_doc_ids = None
+        for key, values in metadata.items():
+            if not values:
+                continue
+            if not isinstance(values, list):
+                values = [values]
+            values = [str(v) for v in values if v is not None and str(v).strip()]
+            if not values:
+                continue
+            key_doc_ids = set()
+            for value in values:
+                key_doc_ids.update(metas.get(key, {}).get(value, []))
+            if metadata_doc_ids is None:
+                metadata_doc_ids = key_doc_ids
+            else:
+                metadata_doc_ids &= key_doc_ids
+            if not metadata_doc_ids:
+                return get_json_result(data={"total": 0, "docs": []})
+        if metadata_doc_ids is not None:
+            if doc_ids_filter is None:
+                doc_ids_filter = metadata_doc_ids
+            else:
+                doc_ids_filter &= metadata_doc_ids
+            if not doc_ids_filter:
+                return get_json_result(data={"total": 0, "docs": []})
+
+    if doc_ids_filter is not None:
+        doc_ids_filter = list(doc_ids_filter)
+
+    try:
+        docs, tol = DocumentService.get_by_kb_id(
+            kb_id,
+            page_number,
+            items_per_page,
+            orderby,
+            desc,
+            keywords,
+            run_status,
+            types,
+            suffix,
+            doc_ids_filter,
+            return_empty_metadata=return_empty_metadata,
+        )
+
+        if create_time_from or create_time_to:
+            filtered_docs = []
+            for doc in docs:
+                doc_create_time = doc.get("create_time", 0)
+                if (create_time_from == 0 or doc_create_time >= create_time_from) and (create_time_to == 0 or doc_create_time <= create_time_to):
+                    filtered_docs.append(doc)
+            docs = filtered_docs
+
+        for doc_item in docs:
+            if doc_item["thumbnail"] and not doc_item["thumbnail"].startswith(IMG_BASE64_PREFIX):
+                doc_item["thumbnail"] = f"/v1/document/image/{kb_id}-{doc_item['thumbnail']}"
+            if doc_item.get("source_type"):
+                doc_item["source_type"] = doc_item["source_type"].split("/")[0]
+
+        return get_json_result(data={"total": tol, "docs": docs})
+    except Exception as e:
+        return server_error_response(e)
+
+@manager.route("/set_voucher_type", methods=["POST"])  # noqa: F821
+@login_required
+@validate_request("doc_id", "voucher_type")
+async def set_voucher_type():
+    req = await get_request_json()
+    doc_id = req["doc_id"]
+    if not DocumentService.accessible(doc_id, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+    e, doc = DocumentService.get_by_id(doc_id)
+    if not e:
+        return get_data_error_result(message="Document not found!")
+    voucher_type = req["voucher_type"]
+    if voucher_type is None:
+        return get_json_result(
+            data=False,
+            message='Lack of valid "voucher_type".',
+            code=RetCode.ARGUMENT_ERROR,
+        )
+    voucher_type = str(voucher_type).strip()
+    payload = {
+        "voucher_type": voucher_type,
+        "voucher_type_confidence": None,
+        "llm_classify_success": True,
+        "voucher_type_source": "manual",
+    }
+    if not DocumentService.update_by_id(doc_id, payload):
+        return get_data_error_result(message="Database error (voucher_type update)!")
+    return get_json_result(data=payload)

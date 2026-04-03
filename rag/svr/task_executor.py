@@ -70,6 +70,7 @@ from common.signal_utils import start_tracemalloc_and_snapshot, stop_tracemalloc
 from common.exceptions import TaskCanceledException
 from common import settings
 from common.constants import PAGERANK_FLD, TAG_FLD, SVR_CONSUMER_GROUP_NAME
+from rag.utils.voucher_classifier import parse_voucher_classify_result, build_voucher_classify_content, VOUCHER_TYPE_OPTIONS
 
 BATCH_SIZE = 64
 
@@ -161,6 +162,62 @@ def set_progress(task_id, from_page=0, to_page=-1, prog=None, msg="Processing...
         logging.warning(f"set_progress({task_id}) got exception DoesNotExist")
     except Exception as e:
         logging.exception(f"set_progress({task_id}), progress: {prog}, progress_msg: {msg}, got exception: {e}")
+
+
+async def classify_voucher_type_async(task: dict, chunks: list[dict]):
+    # 分类失败时统一回填为 null + false，确保不影响原有解析流程。
+    failed_payload = {
+        "voucher_type": None,
+        "voucher_type_confidence": None,
+        "llm_classify_success": False,
+        "voucher_type_source": None,
+    }
+    doc_id = task.get("doc_id")
+    if not doc_id:
+        return
+
+    content = build_voucher_classify_content(chunks)
+    if not content:
+        DocumentService.update_by_id(doc_id, failed_payload)
+        return
+
+    # 使用租户默认 CHAT 模型（llm_name=None）进行分类。
+    chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=None, lang=task["language"])
+    label_options = "、".join(VOUCHER_TYPE_OPTIONS)
+    system_prompt = (
+        "你是文档凭证分类助手。"
+        "请严格根据用户提供的文档正文内容进行分类，禁止依据文件名、后缀、路径、上传名猜测。"
+        f"可选标签仅有：{label_options}。"
+        "请只输出 JSON，格式为：{\"label\":\"<标签>\",\"confidence\":<0到1之间数字>}。"
+    )
+    user_prompt = f"请基于以下文档正文进行单标签分类：\n{content}"
+    try:
+        async with chat_limiter:
+            raw_response = await asyncio.wait_for(
+                chat_mdl.async_chat(
+                    system_prompt,
+                    [{"role": "user", "content": user_prompt}],
+                    {"temperature": 0.01, "max_tokens": 256},
+                ),
+                timeout=45,
+            )
+        parsed = parse_voucher_classify_result(raw_response)
+        if parsed["llm_classify_success"]:
+            # 只有“调用成功 + 合法标签”才写成功状态。
+            DocumentService.update_by_id(
+                doc_id,
+                {
+                    "voucher_type": parsed["voucher_type"],
+                    "voucher_type_confidence": parsed["voucher_type_confidence"],
+                    "llm_classify_success": True,
+                    "voucher_type_source": "llm",
+                },
+            )
+            return
+        DocumentService.update_by_id(doc_id, failed_payload)
+    except Exception as ex:
+        logging.warning(f"classify_voucher_type_async failed for doc_id={doc_id}: {ex}")
+        DocumentService.update_by_id(doc_id, failed_payload)
 
 
 async def collect():
@@ -927,6 +984,7 @@ async def do_handle_task(task):
     task_parser_config = task["parser_config"]
     task_start_ts = timer()
     toc_thread = None
+    should_try_voucher_classify = False
     executor = concurrent.futures.ThreadPoolExecutor()
 
     # prepare the progress callback function
@@ -1067,6 +1125,7 @@ async def do_handle_task(task):
         return
     else:
         # Standard chunking methods
+        should_try_voucher_classify = True
         start_ts = timer()
         chunks = await build_chunks(task, progress_callback)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
@@ -1122,6 +1181,10 @@ async def do_handle_task(task):
         if has_canceled(task_id):
             progress_callback(-1, msg="Task has been canceled.")
             return
+
+        # 以后台任务方式触发凭证分类，避免影响解析主流程时序。
+        if should_try_voucher_classify:
+            asyncio.create_task(classify_voucher_type_async(task, chunks))
 
         task_time_cost = timer() - task_start_ts
         progress_callback(prog=1.0, msg="Task done ({:.2f}s)".format(task_time_cost))
