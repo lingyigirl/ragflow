@@ -151,6 +151,8 @@ def parse_voucher_classify_result(raw_response):
         return failed
 
     confidence = _normalize_confidence(obj.get("confidence"))
+    if confidence is None:
+        confidence = 0.0
     return {
         "voucher_type": label,
         "voucher_type_confidence": confidence,

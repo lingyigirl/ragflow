@@ -98,7 +98,6 @@ async def _classify_voucher_type_for_mineru_doc(kb_id: str, doc_id: str):
 
 
 async def _fetch_doc_content_for_voucher_classify(doc, tenant_id: str) -> str:
-    # 优先从 MinerU content_list 读取正文；无结果则回退到向量库 chunk 文本。
     try:
         content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, doc.kb_id, f"{doc.id}/content_list.json")
         content_list = json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
@@ -1876,12 +1875,41 @@ async def submit_mineru_section():
             payload = f.read()
         settings.STORAGE_IMPL.put(kb_id, target_key, payload)
 
+        tenant_id = DocumentService.get_tenant_id(doc_id)
+        if not tenant_id:
+            return get_json_result(data=False, message="Tenant not found!", code=RetCode.NOT_FOUND)
+
+        if str(doc.run) == TaskStatus.RUNNING.value:
+            cancel_all_task_of(doc_id)
+
+        if str(doc.run) == TaskStatus.DONE.value:
+            DocumentService.clear_chunk_num_when_rerun(doc.id)
+
+        parser_cfg = doc.parser_config if isinstance(doc.parser_config, dict) else {}
+        parser_cfg = dict(parser_cfg)
+        parser_cfg["use_submitted_content_list"] = True
+        parser_cfg["skip_mineru_output_upload"] = True
+        parser_cfg["skip_mineru_section_persist"] = True
+        DocumentService.update_parser_config(doc.id, parser_cfg)
+
+        info = {"run": TaskStatus.RUNNING.value, "progress": 0, "progress_msg": "", "chunk_num": 0, "token_num": 0}
+        DocumentService.update_by_id(doc_id, info)
+        TaskService.filter_delete([Task.doc_id == doc_id])
+        if settings.docStoreConn.index_exist(search.index_name(tenant_id), doc.kb_id):
+            settings.docStoreConn.delete({"doc_id": doc_id}, search.index_name(tenant_id), doc.kb_id)
+
+        kb_table_num_map = {}
+        doc_dict = doc.to_dict()
+        doc_dict["parser_config"] = parser_cfg
+        DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
+
         return get_json_result(data={
             "kb_id": kb_id,
             "doc_id": doc_id,
             "target_path": target_key,
             "record_count": record_count,
             "batch_size": batch_size,
+            "reparse_triggered": True,
         })
     except Exception as e:
         return server_error_response(e)

@@ -11,6 +11,25 @@ def test_parse_voucher_result_success_and_clamp_confidence():
     assert res["voucher_type_confidence"] == 1.0
 
 
+def test_parse_voucher_result_invalid_confidence_becomes_zero():
+    from rag.utils.voucher_classifier import parse_voucher_classify_result
+
+    raw = '{"label":"身份证","confidence":"not-a-number"}'
+    res = parse_voucher_classify_result(raw)
+    assert res["llm_classify_success"] is True
+    assert res["voucher_type"] == "身份证"
+    assert res["voucher_type_confidence"] == 0.0
+
+
+def test_parse_voucher_result_missing_confidence_becomes_zero():
+    from rag.utils.voucher_classifier import parse_voucher_classify_result
+
+    raw = '{"label":"其他"}'
+    res = parse_voucher_classify_result(raw)
+    assert res["llm_classify_success"] is True
+    assert res["voucher_type_confidence"] == 0.0
+
+
 def test_parse_voucher_result_invalid_label_returns_null():
     from rag.utils.voucher_classifier import parse_voucher_classify_result
 

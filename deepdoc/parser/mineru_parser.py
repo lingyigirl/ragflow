@@ -1573,12 +1573,55 @@ class MinerUParser(RAGFlowPdfParser):
         if _kb_mineru_backend not in (None, ""):
             backend = str(_kb_mineru_backend).strip()
         lang = parser_cfg.get('mineru_lang') or kwargs.get('lang', 'English')
-        mineru_lang_code = LANGUAGE_TO_MINERU_MAP.get(lang, 'ch')  # Defaults to Chinese if not matched
+        mineru_lang_code = LANGUAGE_TO_MINERU_MAP.get(lang, 'ch') 
         mineru_method_raw_str = parser_cfg.get('mineru_parse_method', 'auto')
         enable_formula = parser_cfg.get('mineru_formula_enable', True)
         enable_table = parser_cfg.get('mineru_table_enable', True)
+        use_submitted_content_list = bool(parser_cfg.get("use_submitted_content_list", False))
 
-        # remove spaces, or mineru crash, and _read_output fail too
+        _kb_raw = kwargs.get("kb_id")
+        _doc_raw = kwargs.get("doc_id")
+        kb_id = MinerUParser._normalize_kb_doc_ctx(_kb_raw)
+        doc_id = MinerUParser._normalize_kb_doc_ctx(_doc_raw)
+
+        if use_submitted_content_list:
+            self.logger.info(
+                "[MinerU] use_submitted_content_list=True，直接读取已提交 content_list，跳过 MinerU 重新解析与回写。kb_id=%s doc_id=%s",
+                kb_id,
+                doc_id,
+            )
+            if not kb_id or not doc_id:
+                self._emit_callback(callback, -1, "[MinerU] use_submitted_content_list 模式缺少 kb_id/doc_id。")
+                raise ValueError("use_submitted_content_list requires kb_id and doc_id")
+            content_bin = settings.STORAGE_IMPL.get(kb_id, f"{doc_id}/content_list.json")
+            if not content_bin:
+                self._emit_callback(callback, -1, "[MinerU] 未找到已提交的 content_list.json。")
+                raise FileNotFoundError(f"content_list.json not found for doc_id={doc_id}")
+            outputs = json.loads(content_bin.decode("utf-8"))
+            if not isinstance(outputs, list):
+                self._emit_callback(callback, -1, "[MinerU] content_list.json 根节点必须是 list。")
+                raise ValueError("content_list.json root must be list")
+            self._emit_callback(callback, 0.70, f"[MinerU] 已加载提交产物 blocks={len(outputs)}")
+            sections = self._transfer_to_sections(outputs, parse_method)
+            tables = self._transfer_to_tables(outputs)
+            self._emit_callback(callback, 0.78, "[MinerU] 已基于提交产物完成分块转换")
+            try:
+                from api.db.services.document_service import DocumentService
+                ok, doc = DocumentService.get_by_id(doc_id)
+                if ok and isinstance(doc.parser_config, dict):
+                    new_cfg = dict(doc.parser_config)
+                    for _flag in (
+                        "use_submitted_content_list",
+                        "skip_mineru_output_upload",
+                        "skip_mineru_section_persist",
+                    ):
+                        if _flag in new_cfg:
+                            new_cfg.pop(_flag, None)
+                    DocumentService.update_parser_config(doc_id, new_cfg)
+            except Exception as _clear_err:
+                self.logger.warning("[MinerU] 清理一次性 parser_config 开关失败: %s", _clear_err)
+            return sections, tables
+
         file_path = Path(filepath)
         pdf_file_name = file_path.stem.replace(" ", "") + ".pdf"
         pdf_file_path_valid = os.path.join(file_path.parent, pdf_file_name)
@@ -1638,10 +1681,6 @@ class MinerUParser(RAGFlowPdfParser):
             self.logger.info(f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
             self._emit_callback(callback, 0.75, f"[MinerU] Parsed {len(outputs)} blocks from PDF.")
 
-            _kb_raw = kwargs.get("kb_id")
-            _doc_raw = kwargs.get("doc_id")
-            kb_id = MinerUParser._normalize_kb_doc_ctx(_kb_raw)
-            doc_id = MinerUParser._normalize_kb_doc_ctx(_doc_raw)
             _db_async_flag = str(os.environ.get("MINERU_DB_SAVE_ASYNC", "0")).strip().lower() not in (
                 "0",
                 "false",
@@ -1673,19 +1712,26 @@ class MinerUParser(RAGFlowPdfParser):
                 )
             else:
                 try:
-                    content_list_for_minio = self._convert_content_list_to_markdown(outputs)
-                    ok = self._upload_mineru_outputs_to_minio(
-                        output_dir=final_out_dir,
-                        kb_id=kb_id,
-                        doc_id=doc_id,
-                        content_list=content_list_for_minio,
-                        callback=callback,
-                    )
-                    if not ok:
-                        self.logger.warning(
-                            "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
-                            doc_id, kb_id,
+                    if bool(parser_cfg.get("skip_mineru_output_upload", False)):
+                        self.logger.info(
+                            "[MinerU] skip_mineru_output_upload=True，跳过解析产物上传 MinIO。doc_id=%s kb_id=%s",
+                            doc_id,
+                            kb_id,
                         )
+                    else:
+                        content_list_for_minio = self._convert_content_list_to_markdown(outputs)
+                        ok = self._upload_mineru_outputs_to_minio(
+                            output_dir=final_out_dir,
+                            kb_id=kb_id,
+                            doc_id=doc_id,
+                            content_list=content_list_for_minio,
+                            callback=callback,
+                        )
+                        if not ok:
+                            self.logger.warning(
+                                "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
+                                doc_id, kb_id,
+                            )
 
                     logging.warning("#########上传解析产物流程结束#########")
                     logging.warning("#########上传解析产物流程结束#########")
@@ -1721,13 +1767,20 @@ class MinerUParser(RAGFlowPdfParser):
                     kb_id,
                     doc_id,
                 )
-                self._save_sections_to_db(
-                    outputs,
-                    kb_id,
-                    doc_id,
-                    callback=callback,
-                    progress_after_chunk=False,
-                )
+                if bool(parser_cfg.get("skip_mineru_section_persist", False)):
+                    logging.info(
+                        "[MinerU][mineru_section] skip_mineru_section_persist=True，跳过写入 mineru_section。kb_id=%s doc_id=%s",
+                        kb_id,
+                        doc_id,
+                    )
+                else:
+                    self._save_sections_to_db(
+                        outputs,
+                        kb_id,
+                        doc_id,
+                        callback=callback,
+                        progress_after_chunk=False,
+                    )
             else:
                 logging.warning(
                     "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",
