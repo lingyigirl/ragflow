@@ -1873,7 +1873,24 @@ async def submit_mineru_section():
 
         with open(temp_file_path, "rb") as f:
             payload = f.read()
-        settings.STORAGE_IMPL.put(kb_id, target_key, payload)
+        old_payload = None
+        try:
+            old_payload = settings.STORAGE_IMPL.get(kb_id, target_key)
+        except Exception:
+            old_payload = None
+        content_changed = old_payload != payload
+        if content_changed:
+            settings.STORAGE_IMPL.put(kb_id, target_key, payload)
+        else:
+            return get_json_result(data={
+                "kb_id": kb_id,
+                "doc_id": doc_id,
+                "target_path": target_key,
+                "record_count": record_count,
+                "batch_size": batch_size,
+                "content_changed": False,
+                "reparse_triggered": False,
+            })
 
         tenant_id = DocumentService.get_tenant_id(doc_id)
         if not tenant_id:
@@ -1909,6 +1926,7 @@ async def submit_mineru_section():
             "target_path": target_key,
             "record_count": record_count,
             "batch_size": batch_size,
+            "content_changed": True,
             "reparse_triggered": True,
         })
     except Exception as e:
