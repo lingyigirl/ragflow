@@ -825,7 +825,6 @@ async def rename():
                 voucher_type = str(voucher_type).strip()
                 payload = {
                     "voucher_type": voucher_type,
-                    "voucher_type_confidence": None,
                     "llm_classify_success": True,
                     "voucher_type_source": "manual",
                 }
