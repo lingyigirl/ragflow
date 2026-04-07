@@ -787,6 +787,8 @@ async def rename():
                 return get_json_result(data=False, message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
 
             for d in DocumentService.query(name=req["name"], kb_id=doc.kb_id):
+                if d.id == req["doc_id"]:
+                    continue
                 if d.name == req["name"]:
                     return get_data_error_result(message="Duplicated document name in the same dataset.")
 
