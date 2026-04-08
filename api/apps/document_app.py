@@ -249,6 +249,35 @@ async def _generate_standard_filename_by_llm(chat_mdl, content: str, timeout: in
     return _normalize_filename_from_llm(raw) 
 
 
+async def _auto_standard_filename_for_doc_background(doc_id: str): 
+    try: 
+        e, doc = DocumentService.get_by_id(doc_id) 
+        if not e or not doc: 
+            logging.warning("[auto_standard_filename_bg] doc not found doc_id=%s", doc_id) 
+            return 
+        e, kb = KnowledgebaseService.get_by_id(doc.kb_id) 
+        if not e or not kb: 
+            logging.warning("[auto_standard_filename_bg] kb not found doc_id=%s kb_id=%s", doc_id, doc.kb_id) 
+            return 
+        tenant_id = DocumentService.get_tenant_id(doc_id) 
+        if not tenant_id: 
+            logging.warning("[auto_standard_filename_bg] tenant not found doc_id=%s", doc_id) 
+            return  
+        content = await _build_auto_filename_content_from_mineru(str(doc.kb_id), doc_id) 
+        if not content: 
+            logging.info("[auto_standard_filename_bg] no content doc_id=%s", doc_id) 
+            return 
+        chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese") 
+        standard_name = await _generate_standard_filename_by_llm(chat_mdl, content, timeout=45) 
+        ok = DocumentService.update_by_id(doc_id, {"llm_name": standard_name}) 
+        if ok: 
+            logging.info("[auto_standard_filename_bg] success doc_id=%s tenant_id=%s result=%s", doc_id, tenant_id, standard_name) 
+        else: 
+            logging.warning("[auto_standard_filename_bg] db update failed doc_id=%s", doc_id) 
+    except Exception as ex: 
+        logging.warning("[auto_standard_filename_bg] failed doc_id=%s err=%s", doc_id, ex) 
+
+
 @manager.route("/upload", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("kb_id")
@@ -533,6 +562,7 @@ async def list_docs():
                 doc_item["thumbnail"] = f"/v1/document/image/{kb_id}-{doc_item['thumbnail']}"
             if doc_item.get("source_type"):
                 doc_item["source_type"] = doc_item["source_type"].split("/")[0]
+            doc_item["llm_name"] = doc_item.get("llm_name") 
 
         return get_json_result(data={"total": tol, "docs": docs})
     except Exception as e:
@@ -839,6 +869,13 @@ async def run():
                 message='"enable_voucher_type_classify" must be a boolean value.',
                 code=RetCode.ARGUMENT_ERROR,
             )
+        auto_name_switch = req.get("enable_auto_standard_filename", False)
+        if not isinstance(auto_name_switch, bool):
+            return get_json_result(
+                data=False,
+                message='"enable_auto_standard_filename" must be a boolean value.',
+                code=RetCode.ARGUMENT_ERROR,
+            )
 
         def _run_sync():
             for doc_id in req["doc_ids"]:
@@ -883,6 +920,7 @@ async def run():
                         doc.parser_config["metadata"] = kb.parser_config.get("metadata", {})
                         DocumentService.update_parser_config(doc.id, doc.parser_config)
                     doc.parser_config["enable_voucher_type_classify"] = classify_switch
+                    doc.parser_config["enable_auto_standard_filename"] = auto_name_switch
                     DocumentService.update_parser_config(doc.id, doc.parser_config)
                     doc_dict = doc.to_dict()
                     DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
@@ -1639,6 +1677,15 @@ async def mineru_parse():
             if has_doc_kb:
                 try:
                     await _classify_voucher_type_for_mineru_doc(kb_id, doc_id)
+                    e, doc = DocumentService.get_by_id(doc_id)
+                    auto_name_switch = bool(
+                        e
+                        and doc
+                        and isinstance(doc.parser_config, dict)
+                        and doc.parser_config.get("enable_auto_standard_filename", False)
+                    )
+                    if auto_name_switch:
+                        asyncio.create_task(_auto_standard_filename_for_doc_background(doc_id))
                 except Exception as e:
                     logging.warning("[voucher_type_llm] MinerU 回写分类失败 doc_id=%s err=%s", doc_id, e)
             return get_json_result(data=result_data)
