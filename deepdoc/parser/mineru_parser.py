@@ -528,7 +528,6 @@ class MinerUParser(RAGFlowPdfParser):
         subdir = None
         attempted = []
 
-        # mirror MinerU's sanitize_filename to align ZIP naming
         def _sanitize_filename(name: str) -> str:
             sanitized = re.sub(r"[/\\\.]{2,}|[/\\]", "", name)
             sanitized = re.sub(r"[^\w.-]", "_", sanitized, flags=re.UNICODE)
@@ -955,6 +954,27 @@ class MinerUParser(RAGFlowPdfParser):
 
         _progress(0.904, f"[MinerU] mineru_section：组装行数据（解析块 {_pre_n}，MinerU 自带 id {_pre_cid}）…")
 
+        def _normalize_img_path_for_mineru_section(raw_img_path: Any) -> Optional[str]:
+            """将 mineru_section 的 img_path 统一为 public_download 链接。""" 
+            if raw_img_path is None: 
+                return None 
+            raw = str(raw_img_path).strip() 
+            if not raw: 
+                return None 
+            if raw.startswith(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"): 
+                return self._mineru_str_path_for_db(raw)
+            if raw.startswith("/v1/document/download/"): 
+                normalized = raw.replace("/v1/document/download/", f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/", 1) 
+                return self._mineru_str_path_for_db(normalized) 
+            img_name = Path(raw.replace("\\", "/")).name 
+            if not img_name: 
+                return self._mineru_str_path_for_db(raw) 
+            minio_key = f"{doc_id}/images/{img_name}"
+            key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
+            ext = Path(img_name).suffix.lstrip(".") or "png" 
+            download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
+            return self._mineru_str_path_for_db(download_url) 
+
         rows: list[dict[str, Any]] = []
         missing_native_chunk_id = 0
         for idx, item in enumerate(outputs):
@@ -981,7 +1001,7 @@ class MinerUParser(RAGFlowPdfParser):
             row: dict[str, Any] = {
                 "kb_id": str(kb_id),
                 "doc_id": str(doc_id),
-                "chunk_id": chunk_id or "",  # 缺失时显式留空，避免填充合成 chunk_id。  # 中文注释
+                "chunk_id": chunk_id or "", 
                 "type": item_type_db,
                 "bbox": self._mineru_json_field_for_db(self._mineru_bbox_for_db(item.get("bbox"))),
                 "page_idx": _pi,
@@ -1031,7 +1051,7 @@ class MinerUParser(RAGFlowPdfParser):
                 if _table_body is not None and str(_table_body).strip() != "":
                     row["table_body"] = self._mineru_longtext_for_db(_table_body)
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
-                row["img_path"] = self._mineru_str_path_for_db(item.get("img_path")) 
+                row["img_path"] = _normalize_img_path_for_mineru_section(item.get("img_path")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":
                 row["sub_type"] = self._mineru_short_text_for_db(item.get("sub_type"), max_len=50)
             if "list_items" in item and item.get("list_items") is not None:

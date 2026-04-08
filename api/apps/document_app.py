@@ -192,6 +192,40 @@ async def upload():
 
     return get_json_result(data=files)
 
+# 添加上传文件后自动标准化命名功能
+@manager.route("/upload_rename", methods=["POST"]) 
+@validate_request("kb_id")
+async def upload_rename():
+    form = await request.form  
+    kb_id = form.get("kb_id") 
+    if not kb_id:
+        return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
+    files = await request.files
+    if "file" not in files:
+        return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
+
+    file_objs = files.getlist("file") 
+    for file_obj in file_objs:
+        if file_obj.filename == "":
+            return get_json_result(data=False, message="No file selected!", code=RetCode.ARGUMENT_ERROR)
+        if len(file_obj.filename.encode("utf-8")) > FILE_NAME_LEN_LIMIT:
+            return get_json_result(data=False, message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
+
+    e, kb = KnowledgebaseService.get_by_id(kb_id) 
+    if not e:
+        raise LookupError("Can't find this dataset!")
+    if not check_kb_team_permission(kb, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
+    err, files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, current_user.id) 
+    if err:
+        return get_json_result(data=files, message="\n".join(err), code=RetCode.SERVER_ERROR)
+
+    if not files:
+        return get_json_result(data=files, message="There seems to be an issue with your file format. Please verify it is correct and not corrupted.", code=RetCode.DATA_ERROR)
+    files = [f[0] for f in files]  
+
+    return get_json_result(data=files)
 
 @manager.route("/web_crawl", methods=["POST"])  # noqa: F821
 @login_required
