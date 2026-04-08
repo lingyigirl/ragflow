@@ -587,6 +587,7 @@ async def auto_standard_filename():
     try: 
         chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese") 
         standard_name = await _generate_standard_filename_by_llm(chat_mdl, content, timeout=45)  
+        DocumentService.update_by_id(doc_id, {"llm_name": standard_name})  
         logging.info("[auto_standard_filename] doc_id=%s tenant_id=%s result=%s", doc_id, tenant_id, standard_name) 
         return get_json_result(data=standard_name) 
     except Exception as ex: 
