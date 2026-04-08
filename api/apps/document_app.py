@@ -157,6 +157,98 @@ async def _classify_voucher_type_for_doc(doc, tenant_id: str):
         return True, failed_payload, str(ex)
 
 
+def _flatten_mineru_value_to_text(value): 
+    if value is None: 
+        return ""
+    if isinstance(value, str):  
+        return value.strip()
+    if isinstance(value, list): 
+        parts = [] 
+        for item in value: 
+            text = _flatten_mineru_value_to_text(item)  
+            if text: 
+                parts.append(text) 
+        return "\n".join(parts).strip() 
+    if isinstance(value, dict): 
+        parts = [] 
+        for _, item in value.items():
+            text = _flatten_mineru_value_to_text(item) 
+            if text: 
+                parts.append(text) 
+        return "\n".join(parts).strip() 
+    return str(value).strip() 
+
+
+def _normalize_filename_from_llm(raw_name: str, max_len: int = 80): 
+    name = str(raw_name or "").strip()
+    name = re.sub(r"^```[a-zA-Z]*\s*|```$", "", name, flags=re.DOTALL).strip() 
+    name = re.sub(r"[\r\n\t]+", " ", name).strip() 
+    name = name.strip("\"'`") 
+    name = re.sub(r"[\\/:*?\"<>|]+", "-", name).strip() 
+    name = re.sub(r"\s*-\s*", "-", name).strip("- ").strip() 
+    if "." in name: 
+        name = re.sub(r"\.[A-Za-z0-9]{1,8}$", "", name).strip() or name
+    if not name: 
+        name = "未知主体-文档材料-未知年份"
+    if len(name) > max_len: 
+        name = name[:max_len].rstrip("- ").strip() or "未知主体-文档材料-未知年份"
+    return name  
+
+
+async def _build_auto_filename_content_from_mineru(kb_id: str, doc_id: str, max_chars: int = 12000):  # 从mineru_section构建命名语料
+    offset = 0  
+    limit = 500 
+    sections = [] 
+    supported_types = {"text", "table_caption", "table_footnote", "table_body"} 
+    while True: 
+        rows = DocumentService.list_mineru_sections_page(kb_id=kb_id, doc_id=doc_id, offset=offset, limit=limit)  # 查询当前分页
+        if not rows: 
+            break
+        for row in rows:
+            row_type = str(row.get("type") or "").strip().lower()  
+            if row_type not in supported_types: 
+                continue
+            text_value = "" 
+            if row_type == "text": 
+                text_value = _flatten_mineru_value_to_text(row.get("text"))
+            elif row_type == "table_caption": 
+                text_value = _flatten_mineru_value_to_text(row.get("table_caption")) or _flatten_mineru_value_to_text(row.get("text"))
+            elif row_type == "table_footnote": 
+                text_value = _flatten_mineru_value_to_text(row.get("table_footnote")) or _flatten_mineru_value_to_text(row.get("text"))
+            elif row_type == "table_body": 
+                text_value = _flatten_mineru_value_to_text(row.get("table_body")) or _flatten_mineru_value_to_text(row.get("text"))
+            text_value = re.sub(r"\s+", " ", text_value).strip() 
+            if text_value and len(text_value) >= 2: 
+                sections.append(text_value) 
+        offset += len(rows) 
+        if len(rows) < limit: 
+            break
+    if not sections: 
+        return ""
+    deduped_sections = list(dict.fromkeys(sections)) 
+    merged = "\n".join(deduped_sections) 
+    return merged[:max_chars] 
+
+
+async def _generate_standard_filename_by_llm(chat_mdl, content: str, timeout: int = 45):  
+    system_prompt = (  
+        "你是文档命名助手。"
+        "请根据给定文档内容生成一个标准化中文文件名。"
+        "输出格式优先为“主体名称-文档类型-年份”。"
+        "只输出文件名字符串，不要解释，不要输出引号，不要输出扩展名。"
+    )
+    user_prompt = f"请根据以下文档内容生成标准化文件名：\n{content}" 
+    raw = await asyncio.wait_for( 
+        chat_mdl.async_chat(  
+            system_prompt,
+            [{"role": "user", "content": user_prompt}], 
+            {"temperature": 0.01, "max_tokens": 128},  
+        ),
+        timeout=timeout,  
+    )
+    return _normalize_filename_from_llm(raw) 
+
+
 @manager.route("/upload", methods=["POST"])  # noqa: F821
 @login_required
 @validate_request("kb_id")
@@ -192,40 +284,6 @@ async def upload():
 
     return get_json_result(data=files)
 
-# 添加上传文件后自动标准化命名功能
-@manager.route("/upload_rename", methods=["POST"]) 
-@validate_request("kb_id")
-async def upload_rename():
-    form = await request.form  
-    kb_id = form.get("kb_id") 
-    if not kb_id:
-        return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
-    files = await request.files
-    if "file" not in files:
-        return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
-
-    file_objs = files.getlist("file") 
-    for file_obj in file_objs:
-        if file_obj.filename == "":
-            return get_json_result(data=False, message="No file selected!", code=RetCode.ARGUMENT_ERROR)
-        if len(file_obj.filename.encode("utf-8")) > FILE_NAME_LEN_LIMIT:
-            return get_json_result(data=False, message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
-
-    e, kb = KnowledgebaseService.get_by_id(kb_id) 
-    if not e:
-        raise LookupError("Can't find this dataset!")
-    if not check_kb_team_permission(kb, current_user.id):
-        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
-
-    err, files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, current_user.id) 
-    if err:
-        return get_json_result(data=files, message="\n".join(err), code=RetCode.SERVER_ERROR)
-
-    if not files:
-        return get_json_result(data=files, message="There seems to be an issue with your file format. Please verify it is correct and not corrupted.", code=RetCode.DATA_ERROR)
-    files = [f[0] for f in files]  
-
-    return get_json_result(data=files)
 
 @manager.route("/web_crawl", methods=["POST"])  # noqa: F821
 @login_required
@@ -500,6 +558,40 @@ async def classify_voucher_type():
     if not ok:
         return get_data_error_result(message=err or "Database error (voucher_type update)!")
     return get_json_result(data=payload, message=err or "")
+
+
+@manager.route("/auto_standard_filename", methods=["POST"]) 
+@login_required  
+@validate_request("doc_id") 
+async def auto_standard_filename(): 
+    req = await get_request_json() 
+    doc_id = str(req.get("doc_id") or "").strip() 
+    if not doc_id: 
+        return get_json_result(data=False, message='Lack of "doc_id"', code=RetCode.ARGUMENT_ERROR)
+    if not DocumentService.accessible(doc_id, current_user.id):
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+    e, doc = DocumentService.get_by_id(doc_id) 
+    if not e: 
+        return get_data_error_result(message="Document not found!")
+    e, kb = KnowledgebaseService.get_by_id(doc.kb_id) 
+    if not e:  
+        return get_json_result(data=False, message="Dataset not found!", code=RetCode.NOT_FOUND)
+    if not check_kb_team_permission(kb, current_user.id): 
+        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+    tenant_id = DocumentService.get_tenant_id(doc_id) 
+    if not tenant_id:
+        return get_data_error_result(message="Tenant not found!")
+    content = await _build_auto_filename_content_from_mineru(str(doc.kb_id), doc_id) 
+    if not content: 
+        return get_json_result(data=False, message="未找到可用于命名的文档内容", code=RetCode.DATA_ERROR)
+    try: 
+        chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese") 
+        standard_name = await _generate_standard_filename_by_llm(chat_mdl, content, timeout=45)  
+        logging.info("[auto_standard_filename] doc_id=%s tenant_id=%s result=%s", doc_id, tenant_id, standard_name) 
+        return get_json_result(data=standard_name) 
+    except Exception as ex: 
+        logging.warning("[auto_standard_filename] failed doc_id=%s tenant_id=%s err=%s", doc_id, tenant_id, ex) 
+        return get_json_result(data=False, message="自动命名失败，请稍后重试", code=RetCode.SERVER_ERROR) 
 
 
 @manager.route("/filter", methods=["POST"])  # noqa: F821
