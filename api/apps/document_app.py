@@ -869,7 +869,7 @@ async def run():
                 message='"enable_voucher_type_classify" must be a boolean value.',
                 code=RetCode.ARGUMENT_ERROR,
             )
-        auto_name_switch = req.get("enable_auto_standard_filename", False)
+        auto_name_switch = req.get("enable_auto_standard_filename", True)
         if not isinstance(auto_name_switch, bool):
             return get_json_result(
                 data=False,
