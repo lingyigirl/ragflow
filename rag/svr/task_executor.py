@@ -1102,7 +1102,7 @@ async def do_handle_task(task):
         return
     else:
         should_try_voucher_classify = bool(task_parser_config.get("enable_voucher_type_classify", False))
-        should_try_auto_standard_filename = bool(task_parser_config.get("enable_auto_standard_filename", True))
+        should_try_auto_standard_filename = bool(task_parser_config.get("enable_auto_standard_filename", False))
         start_ts = timer()
         chunks = await build_chunks(task, progress_callback)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
