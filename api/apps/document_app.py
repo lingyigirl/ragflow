@@ -994,6 +994,17 @@ async def rename():
                 }
                 if not DocumentService.update_by_id(req["doc_id"], payload):
                     return get_data_error_result(message="Database error (voucher_type update)!")
+            if "llm_name" in req:
+                llm_name = req.get("llm_name")
+                if llm_name is None:
+                    return get_json_result(
+                        data=False,
+                        message='Lack of valid "llm_name".',
+                        code=RetCode.ARGUMENT_ERROR,
+                    )
+                llm_name = str(llm_name).strip()
+                if not DocumentService.update_by_id(req["doc_id"], {"llm_name": llm_name}):
+                    return get_data_error_result(message="Database error (llm_name update)!")
             return get_json_result(data=True)
 
         return await asyncio.to_thread(_rename_sync)
