@@ -71,6 +71,7 @@ from common.exceptions import TaskCanceledException
 from common import settings
 from common.constants import PAGERANK_FLD, TAG_FLD, SVR_CONSUMER_GROUP_NAME
 from rag.utils.voucher_classifier import build_voucher_classify_content, classify_voucher_content, get_failed_voucher_payload
+from rag.utils.auto_standard_filename import auto_standard_filename_async
 
 BATCH_SIZE = 64
 
@@ -960,6 +961,7 @@ async def do_handle_task(task):
     task_start_ts = timer()
     toc_thread = None
     should_try_voucher_classify = False
+    should_try_auto_standard_filename = False
     executor = concurrent.futures.ThreadPoolExecutor()
 
     # prepare the progress callback function
@@ -1100,6 +1102,7 @@ async def do_handle_task(task):
         return
     else:
         should_try_voucher_classify = bool(task_parser_config.get("enable_voucher_type_classify", False))
+        should_try_auto_standard_filename = bool(task_parser_config.get("enable_auto_standard_filename", True))
         start_ts = timer()
         chunks = await build_chunks(task, progress_callback)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
@@ -1159,6 +1162,9 @@ async def do_handle_task(task):
 
         if should_try_voucher_classify:
             asyncio.create_task(classify_voucher_type_async(task, chunks))
+
+        if should_try_auto_standard_filename:
+            asyncio.create_task(auto_standard_filename_async(task, chunks))
 
         task_time_cost = timer() - task_start_ts
         progress_callback(prog=1.0, msg="Task done ({:.2f}s)".format(task_time_cost))
