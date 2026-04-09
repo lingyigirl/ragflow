@@ -70,8 +70,18 @@ from common.signal_utils import start_tracemalloc_and_snapshot, stop_tracemalloc
 from common.exceptions import TaskCanceledException
 from common import settings
 from common.constants import PAGERANK_FLD, TAG_FLD, SVR_CONSUMER_GROUP_NAME
-from rag.utils.voucher_classifier import build_voucher_classify_content, classify_voucher_content, get_failed_voucher_payload
-from rag.utils.auto_standard_filename import auto_standard_filename_async
+from rag.utils.voucher_classifier import (
+    build_voucher_classify_content,
+    build_voucher_classify_content_from_content_list,
+    classify_voucher_content,
+    get_failed_voucher_payload,
+)
+from rag.utils.auto_standard_filename import (
+    build_auto_filename_content_from_chunks,
+    build_auto_filename_content_from_content_list,
+    build_auto_filename_content_from_mineru_sections,
+    generate_standard_filename_by_llm,
+)
 
 BATCH_SIZE = 64
 
@@ -194,6 +204,154 @@ async def classify_voucher_type_async(task: dict, chunks: list[dict]):
     except Exception as ex:
         logging.warning(f"classify_voucher_type_async failed for doc_id={doc_id}: {ex}")
         DocumentService.update_by_id(doc_id, failed_payload)
+
+
+async def _load_content_list_from_storage(task: dict) -> list:
+    kb_id = str(task.get("kb_id") or "").strip()
+    doc_id = str(task.get("doc_id") or "").strip()
+    if not kb_id or not doc_id:
+        return []
+    try:
+        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, f"{doc_id}/content_list.json")
+        return json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
+    except Exception:
+        return []
+
+
+async def _load_mineru_sections(task: dict) -> list:
+    kb_id = str(task.get("kb_id") or "").strip()
+    doc_id = str(task.get("doc_id") or "").strip()
+    if not kb_id or not doc_id:
+        return []
+    try:
+        rows = await asyncio.to_thread(
+            DocumentService.list_mineru_sections_page,
+            kb_id,
+            doc_id,
+            0,
+            2000,
+        )
+        return rows or []
+    except Exception:
+        return []
+
+
+async def _build_voucher_content_with_fallback(task: dict, chunks: list[dict]) -> str:
+    content = build_voucher_classify_content(chunks)
+    if content:
+        return content
+    content_list = await _load_content_list_from_storage(task)
+    content = build_voucher_classify_content_from_content_list(content_list)
+    if content:
+        return content
+    rows = await _load_mineru_sections(task)
+    fallback_chunks = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        merged = []
+        for key in ("text", "table_body", "table_caption", "table_footnote"):
+            value = row.get(key)
+            if value is None:
+                continue
+            value = str(value).strip()
+            if value:
+                merged.append(value)
+        if merged:
+            fallback_chunks.append({"content_with_weight": "\n".join(merged)})
+    return build_voucher_classify_content(fallback_chunks)
+
+
+async def _build_auto_name_content_with_fallback(task: dict, chunks: list[dict]) -> str:
+    content = build_auto_filename_content_from_chunks(chunks)
+    if content:
+        return content
+    content_list = await _load_content_list_from_storage(task)
+    content = build_auto_filename_content_from_content_list(content_list)
+    if content:
+        return content
+    rows = await _load_mineru_sections(task)
+    return build_auto_filename_content_from_mineru_sections(rows)
+
+
+async def _wait_for_content_with_timeout(
+    build_content_coro,
+    task: dict,
+    chunks: list[dict],
+    timeout_seconds: int = 30,
+    interval_seconds: int = 2,
+) -> str:
+    started_at = time.time()
+    content = await build_content_coro(task, chunks)
+    while not content and (time.time() - started_at) < timeout_seconds:
+        await asyncio.sleep(interval_seconds)
+        content = await build_content_coro(task, [])
+    return content or ""
+
+
+async def classify_voucher_type_with_fallback_async(task: dict, chunks: list[dict]):
+    failed_payload = get_failed_voucher_payload()
+    doc_id = task.get("doc_id")
+    if not doc_id:
+        return
+    content = await _wait_for_content_with_timeout(
+        _build_voucher_content_with_fallback,
+        task,
+        chunks,
+        timeout_seconds=30,
+        interval_seconds=2,
+    )
+    if not content:
+        logging.info("[voucher_type_llm] 30s 内未获取到可分类内容 doc_id=%s", doc_id)
+        DocumentService.update_by_id(doc_id, failed_payload)
+        return
+    chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=None, lang=task["language"])
+    try:
+        logging.info("[voucher_type_llm] 开始判断文档类型 doc_id=%s", doc_id)
+        async with chat_limiter:
+            payload = await classify_voucher_content(chat_mdl, content, timeout=45)
+        if payload["llm_classify_success"]:
+            ok = DocumentService.update_by_id(doc_id, payload)
+            if ok:
+                logging.info("[voucher_type_llm] 数据库写入成功 doc_id=%s", doc_id)
+            else:
+                logging.warning("[voucher_type_llm] 数据库写入失败 doc_id=%s", doc_id)
+            return
+        DocumentService.update_by_id(doc_id, failed_payload)
+    except Exception as ex:
+        logging.warning(f"classify_voucher_type_with_fallback_async failed for doc_id={doc_id}: {ex}")
+        DocumentService.update_by_id(doc_id, failed_payload)
+
+
+async def auto_standard_filename_with_fallback_async(task: dict, chunks: list[dict]):
+    doc_id = task.get("doc_id")
+    if not doc_id:
+        return
+    tenant_id = task.get("tenant_id")
+    if not tenant_id:
+        return
+    content = await _wait_for_content_with_timeout(
+        _build_auto_name_content_with_fallback,
+        task,
+        chunks,
+        timeout_seconds=30,
+        interval_seconds=2,
+    )
+    if not content:
+        logging.info("[auto_standard_filename] 30s 内未获取到可命名内容 doc_id=%s", doc_id)
+        return
+    chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=task.get("language") or "Chinese")
+    try:
+        logging.info("[auto_standard_filename] 开始 LLM 命名 doc_id=%s", doc_id)
+        async with chat_limiter:
+            standard_name = await generate_standard_filename_by_llm(chat_mdl, content, timeout=45)
+        ok = DocumentService.update_by_id(doc_id, {"llm_name": standard_name})
+        if ok:
+            logging.info("[auto_standard_filename] 写入成功 doc_id=%s result=%s", doc_id, standard_name)
+        else:
+            logging.warning("[auto_standard_filename] 数据库更新失败 doc_id=%s", doc_id)
+    except Exception as ex:
+        logging.warning("[auto_standard_filename] 失败 doc_id=%s err=%s", doc_id, ex)
 
 
 async def collect():
@@ -1107,6 +1265,10 @@ async def do_handle_task(task):
         chunks = await build_chunks(task, progress_callback)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
         if not chunks:
+            if should_try_voucher_classify:
+                asyncio.create_task(classify_voucher_type_with_fallback_async(task, []))
+            if should_try_auto_standard_filename:
+                asyncio.create_task(auto_standard_filename_with_fallback_async(task, []))
             progress_callback(1., msg=f"No chunk built from {task_document_name}")
             return
         progress_callback(msg="Generate {} chunks".format(len(chunks)))
@@ -1161,10 +1323,10 @@ async def do_handle_task(task):
 
 
         if should_try_voucher_classify:
-            asyncio.create_task(classify_voucher_type_async(task, chunks))
+            asyncio.create_task(classify_voucher_type_with_fallback_async(task, chunks))
 
         if should_try_auto_standard_filename:
-            asyncio.create_task(auto_standard_filename_async(task, chunks))
+            asyncio.create_task(auto_standard_filename_with_fallback_async(task, chunks))
 
         task_time_cost = timer() - task_start_ts
         progress_callback(prog=1.0, msg="Task done ({:.2f}s)".format(task_time_cost))

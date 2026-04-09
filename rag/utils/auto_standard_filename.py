@@ -21,6 +21,47 @@ def build_auto_filename_content_from_chunks(chunks, max_chars=12000):
     return merged[:max_chars]
 
 
+def build_auto_filename_content_from_content_list(content_list, max_chars=12000):
+    text_fields = ("text", "table_body", "content", "title", "table_caption", "table_footnote")
+    chunks = []
+    for item in content_list or []:
+        if not isinstance(item, dict):
+            continue
+        merged = []
+        for key in text_fields:
+            value = item.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (list, dict)):
+                value = str(value)
+            value = str(value).strip()
+            if value:
+                merged.append(value)
+        if merged:
+            chunks.append({"content_with_weight": "\n".join(merged)})
+    return build_auto_filename_content_from_chunks(chunks, max_chars=max_chars)
+
+
+def build_auto_filename_content_from_mineru_sections(rows, max_chars=12000):
+    chunks = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        merged = []
+        for key in ("text", "table_body", "table_caption", "table_footnote"):
+            value = row.get(key)
+            if value is None:
+                continue
+            if isinstance(value, (list, dict)):
+                value = str(value)
+            value = str(value).strip()
+            if value:
+                merged.append(value)
+        if merged:
+            chunks.append({"content_with_weight": "\n".join(merged)})
+    return build_auto_filename_content_from_chunks(chunks, max_chars=max_chars)
+
+
 def normalize_filename_from_llm(raw_name: str, max_len: int = 80):
     name = str(raw_name or "").strip()
     name = re.sub(r"^```[a-zA-Z]*\s*|```$", "", name, flags=re.DOTALL).strip()
