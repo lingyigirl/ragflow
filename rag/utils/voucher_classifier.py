@@ -120,6 +120,49 @@ def normalize_voucher_result_to_payload(parsed):
     return get_failed_voucher_payload()
 
 
+OPEN_VOUCHER_TYPE_HINTS = [
+    ("授权委托书", "授权委托书"),
+    ("委托书", "委托书"),
+    ("收据", "收据"),
+    ("报价单", "报价单"),
+    ("对账单", "对账单"),
+    ("验资报告", "验资报告"),
+    ("资产评估报告", "资产评估报告"),
+    ("尽调报告", "尽职调查报告"),
+    ("尽职调查", "尽职调查报告"),
+    ("承诺函", "承诺函"),
+    ("说明函", "说明函"),
+    ("通知书", "通知书"),
+    ("结清证明", "结清证明"),
+    ("还款计划", "还款计划书"),
+    ("保单", "保险保单"),
+]
+
+
+def _guess_open_voucher_type(content: str):
+    normalized = str(content or "").strip()
+    if not normalized:
+        return None, 0.0
+    for keyword, voucher_type in OPEN_VOUCHER_TYPE_HINTS:
+        if keyword in normalized:
+            return voucher_type, 0.82
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    first_lines = lines[:20]
+    type_pattern = re.compile(r"([\u4e00-\u9fa5A-Za-z0-9]{2,20}(?:证明|证书|报告|合同|发票|凭证|执照|章程|明细|流水|清单|函|单))")
+    for line in first_lines:
+        matched = type_pattern.search(line)
+        if matched:
+            return matched.group(1), 0.72
+    all_matches = type_pattern.findall(normalized[:4000])
+    if all_matches:
+        counter = {}
+        for item in all_matches:
+            counter[item] = counter.get(item, 0) + 1
+        best = max(counter, key=counter.get)
+        return best, min(0.75, 0.58 + 0.03 * counter[best])
+    return "未识别凭证", 0.51
+
+
 async def classify_voucher_content(chat_mdl, content: str, timeout=45):
     import asyncio
 
@@ -135,6 +178,15 @@ async def classify_voucher_content(chat_mdl, content: str, timeout=45):
         timeout=timeout,
     )
     parsed = parse_voucher_classify_result(raw_response)
+    if parsed.get("llm_classify_success") and parsed.get("voucher_type") == "其他":
+        inferred_type, inferred_confidence = _guess_open_voucher_type(content)
+        if inferred_type:
+            return {
+                "voucher_type": inferred_type,
+                "voucher_type_confidence": max(parsed.get("voucher_type_confidence") or 0.0, inferred_confidence),
+                "llm_classify_success": True,
+                "voucher_type_source": "rule_generated_from_other",
+            }
     return normalize_voucher_result_to_payload(parsed)
 
 
