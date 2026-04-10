@@ -76,6 +76,7 @@ class DocumentService(CommonService):
             cls.model.voucher_type_confidence,
             cls.model.voucher_type_source,
             cls.model.llm_name, 
+            cls.model.llm_content,
             cls.model.create_time,
             cls.model.create_date,
             cls.model.update_time,

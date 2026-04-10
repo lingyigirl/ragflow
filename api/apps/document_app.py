@@ -249,7 +249,7 @@ async def _generate_standard_filename_by_llm(chat_mdl, content: str, timeout: in
     return _normalize_filename_from_llm(raw) 
 
 
-async def _auto_standard_filename_for_doc_background(doc_id: str): 
+async def _auto_standard_filename_for_doc_background(doc_id: str, llm_content=None):  # 支持可选llm_content入参并回写document字段
     try: 
         e, doc = DocumentService.get_by_id(doc_id) 
         if not e or not doc: 
@@ -269,7 +269,10 @@ async def _auto_standard_filename_for_doc_background(doc_id: str):
             return 
         chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese") 
         standard_name = await _generate_standard_filename_by_llm(chat_mdl, content, timeout=45) 
-        ok = DocumentService.update_by_id(doc_id, {"llm_name": standard_name}) 
+        payload = {"llm_name": standard_name} 
+        if llm_content is not None: 
+            payload["llm_content"] = str(llm_content) 
+        ok = DocumentService.update_by_id(doc_id, payload) 
         if ok: 
             logging.info("[auto_standard_filename_bg] success doc_id=%s tenant_id=%s result=%s", doc_id, tenant_id, standard_name) 
         else: 
@@ -596,6 +599,7 @@ async def classify_voucher_type():
 async def auto_standard_filename(): 
     req = await get_request_json() 
     doc_id = str(req.get("doc_id") or "").strip() 
+    llm_content = req.get("llm_content")  # 读取可选llm_content入参
     if not doc_id: 
         return get_json_result(data=False, message='Lack of "doc_id"', code=RetCode.ARGUMENT_ERROR)
     if not DocumentService.accessible(doc_id, current_user.id):
@@ -617,7 +621,10 @@ async def auto_standard_filename():
     try: 
         chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang=kb.language or "Chinese") 
         standard_name = await _generate_standard_filename_by_llm(chat_mdl, content, timeout=45)  
-        DocumentService.update_by_id(doc_id, {"llm_name": standard_name})  
+        payload = {"llm_name": standard_name}  # 先写入LLM标准名称
+        if llm_content is not None:  # 用户传入llm_content时同步更新document.llm_content
+            payload["llm_content"] = str(llm_content)  # 将llm_content转字符串后保存
+        DocumentService.update_by_id(doc_id, payload)  
         logging.info("[auto_standard_filename] doc_id=%s tenant_id=%s result=%s", doc_id, tenant_id, standard_name) 
         return get_json_result(data=standard_name) 
     except Exception as ex: 
