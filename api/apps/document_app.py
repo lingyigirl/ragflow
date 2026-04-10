@@ -249,7 +249,7 @@ async def _generate_standard_filename_by_llm(chat_mdl, content: str, timeout: in
     return _normalize_filename_from_llm(raw) 
 
 
-async def _auto_standard_filename_for_doc_background(doc_id: str, llm_content=None):  # 支持可选llm_content入参并回写document字段
+async def _auto_standard_filename_for_doc_background(doc_id: str, llm_content=None):  
     try: 
         e, doc = DocumentService.get_by_id(doc_id) 
         if not e or not doc: 
@@ -1012,6 +1012,17 @@ async def rename():
                 llm_name = str(llm_name).strip()
                 if not DocumentService.update_by_id(req["doc_id"], {"llm_name": llm_name}):
                     return get_data_error_result(message="Database error (llm_name update)!")
+            if "llm_content" in req:
+                llm_content = req.get("llm_content")
+                if llm_content is None:
+                    return get_json_result(
+                        data=False,
+                        message='Lack of valid "llm_content".',
+                        code=RetCode.ARGUMENT_ERROR,
+                    )
+                llm_content = str(llm_content)
+                if not DocumentService.update_by_id(req["doc_id"], {"llm_content": llm_content}):
+                    return get_data_error_result(message="Database error (llm_content update)!")
             return get_json_result(data=True)
 
         return await asyncio.to_thread(_rename_sync)
