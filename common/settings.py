@@ -205,6 +205,8 @@ def init_settings():
     rerank_entry = _parse_model_entry(llm_default_models.get("rerank_model", RERANK_MDL))
     asr_entry = _parse_model_entry(llm_default_models.get("asr_model", ASR_MDL))
     image2text_entry = _parse_model_entry(llm_default_models.get("image2text_model", IMAGE2TEXT_MDL))
+    chat_entry = _merge_model_entry_with_env(chat_entry, "CHAT")
+    embedding_entry = _merge_model_entry_with_env(embedding_entry, "EMBEDDING")
 
     global CHAT_CFG, EMBEDDING_CFG, RERANK_CFG, ASR_CFG, IMAGE2TEXT_CFG
     CHAT_CFG = _resolve_per_model_config(chat_entry, LLM_FACTORY, API_KEY, LLM_BASE_URL)
@@ -349,7 +351,7 @@ def check_and_install_torch():
 
 def _parse_model_entry(entry):
     if isinstance(entry, str):
-        return {"name": entry, "factory": None, "api_key": None, "base_url": None}
+        return {"name": entry, "factory": None, "api_key": None, "base_url": None, "max_tokens": None}
     if isinstance(entry, dict):
         name = entry.get("name") or entry.get("model") or ""
         return {
@@ -357,8 +359,9 @@ def _parse_model_entry(entry):
             "factory": entry.get("factory"),
             "api_key": entry.get("api_key"),
             "base_url": entry.get("base_url"),
+            "max_tokens": _to_int_or_none(entry.get("max_tokens")),
         }
-    return {"name": "", "factory": None, "api_key": None, "base_url": None}
+    return {"name": "", "factory": None, "api_key": None, "base_url": None, "max_tokens": None}
 
 
 def _resolve_per_model_config(entry_dict, backup_factory, backup_api_key, backup_base_url):
@@ -375,7 +378,35 @@ def _resolve_per_model_config(entry_dict, backup_factory, backup_api_key, backup
         "factory": m_factory,
         "api_key": m_api_key,
         "base_url": m_base_url,
+        "max_tokens": _to_int_or_none(entry_dict.get("max_tokens")),
     }
+
+
+def _to_int_or_none(value):
+    try:
+        return int(value) if value is not None and str(value).strip() != "" else None
+    except Exception:
+        return None
+
+
+def _merge_model_entry_with_env(entry_dict, model_prefix):
+    merged = dict(entry_dict or {})
+    env_factory = os.getenv(f"DEFAULT_{model_prefix}_FACTORY", "").strip()
+    env_model_name = os.getenv(f"DEFAULT_{model_prefix}_MODEL_NAME", "").strip()
+    env_api_base = os.getenv(f"DEFAULT_{model_prefix}_API_BASE", "").strip()
+    env_api_key = os.getenv(f"DEFAULT_{model_prefix}_API_KEY", "").strip()
+    env_max_tokens = _to_int_or_none(os.getenv(f"DEFAULT_{model_prefix}_MAX_TOKENS"))
+    if env_factory:
+        merged["factory"] = env_factory
+    if env_model_name:
+        merged["name"] = env_model_name
+    if env_api_base:
+        merged["base_url"] = env_api_base
+    if env_api_key:
+        merged["api_key"] = env_api_key
+    if env_max_tokens is not None:
+        merged["max_tokens"] = env_max_tokens
+    return merged
 
 def print_rag_settings():
     logging.info(f"MAX_CONTENT_LENGTH: {DOC_MAXIMUM_SIZE}")

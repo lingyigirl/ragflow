@@ -70,9 +70,29 @@ def get_init_tenant_llm(user_id):
                     "model_type": llm.model_type,
                     "api_key": model_configs.get(llm.model_type, {}).get("api_key", factory_config["api_key"]),
                     "api_base": model_configs.get(llm.model_type, {}).get("base_url", factory_config["base_url"]),
-                    "max_tokens": llm.max_tokens if llm.max_tokens else 8192,
+                    "max_tokens": model_configs.get(llm.model_type, {}).get("max_tokens") or llm.max_tokens or 8192,
                 }
             )
+
+    for model_type, cfg in ((LLMType.CHAT, settings.CHAT_CFG), (LLMType.EMBEDDING, settings.EMBEDDING_CFG)):
+        cfg_model = (cfg or {}).get("model", "")
+        cfg_factory = (cfg or {}).get("factory", "")
+        if not cfg_model or not cfg_factory:
+            continue
+        model_name = cfg_model.split("@")[0].strip()
+        if not model_name:
+            continue
+        tenant_llm.append(
+            {
+                "tenant_id": user_id,
+                "llm_factory": cfg_factory,
+                "llm_name": model_name,
+                "model_type": model_type,
+                "api_key": (cfg or {}).get("api_key", ""),
+                "api_base": (cfg or {}).get("base_url", ""),
+                "max_tokens": (cfg or {}).get("max_tokens") or 8192,
+            }
+        )
 
     unique = {}
     for item in tenant_llm:

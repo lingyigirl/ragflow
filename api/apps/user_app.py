@@ -62,6 +62,13 @@ from common import settings
 from common.http_client import async_request
 
 
+def _ensure_default_llm_for_user(user_id):
+    try:
+        TenantLLMService.ensure_default_openai_compatible_for_tenant(user_id)
+    except Exception as e:
+        logging.warning("ensure default llm failed for user %s: %s", user_id, e)
+
+
 @manager.route("/login", methods=["POST", "GET"])  # noqa: F821
 async def login():
     """
@@ -127,6 +134,7 @@ async def login():
         response_data = user.to_json()
         user.access_token = get_uuid()
         login_user(user)
+        _ensure_default_llm_for_user(user.id)
         user.update_time = current_timestamp()
         user.update_date = datetime_format(datetime.now())
         user.save()
@@ -249,6 +257,7 @@ async def oauth_callback(channel):
                 # Try to log in
                 user = users[0]
                 login_user(user)
+                _ensure_default_llm_for_user(user.id)
                 return redirect(f"/?auth={user.get_id()}")
 
             except Exception as e:
@@ -263,6 +272,7 @@ async def oauth_callback(channel):
             return redirect("/?error=user_inactive")
 
         login_user(user)
+        _ensure_default_llm_for_user(user.id)
         user.save()
         return redirect(f"/?auth={user.get_id()}")
     except Exception as e:
@@ -342,6 +352,7 @@ async def github_callback():
             # Try to log in
             user = users[0]
             login_user(user)
+            _ensure_default_llm_for_user(user.id)
             return redirect("/?auth=%s" % user.get_id())
         except Exception as e:
             rollback_user_registration(user_id)
@@ -354,6 +365,7 @@ async def github_callback():
     if user and hasattr(user, 'is_active') and user.is_active == "0":
         return redirect("/?error=user_inactive")
     login_user(user)
+    _ensure_default_llm_for_user(user.id)
     user.save()
     return redirect("/?auth=%s" % user.get_id())
 
@@ -446,6 +458,7 @@ async def feishu_callback():
             # Try to log in
             user = users[0]
             login_user(user)
+            _ensure_default_llm_for_user(user.id)
             return redirect("/?auth=%s" % user.get_id())
         except Exception as e:
             rollback_user_registration(user_id)
@@ -458,6 +471,7 @@ async def feishu_callback():
         return redirect("/?error=user_inactive")
     user.access_token = get_uuid()
     login_user(user)
+    _ensure_default_llm_for_user(user.id)
     user.save()
     return redirect("/?auth=%s" % user.get_id())
 
@@ -747,6 +761,7 @@ async def user_add():
             raise Exception(f"Same email: {email_address} exists!")
         user = users[0]
         login_user(user)
+        _ensure_default_llm_for_user(user.id)
         return await construct_response(
             data=user.to_json(),
             auth=user.get_id(),

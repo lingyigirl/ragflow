@@ -44,10 +44,22 @@ redis:
   password: '${REDIS_PASSWORD:-infini_rag_flow}'
   host: '${REDIS_HOST:-redis}:6379'
 user_default_llm:
+  factory: '${DEFAULT_CHAT_FACTORY:-OpenAI-API-Compatible}'
+  api_key: '${DEFAULT_CHAT_API_KEY:-}'
+  base_url: '${DEFAULT_CHAT_API_BASE:-}'
   default_models:
+    chat_model:
+      name: '${DEFAULT_CHAT_MODEL_NAME:-}'
+      factory: '${DEFAULT_CHAT_FACTORY:-OpenAI-API-Compatible}'
+      api_key: '${DEFAULT_CHAT_API_KEY:-}'
+      base_url: '${DEFAULT_CHAT_API_BASE:-}'
+      max_tokens: ${DEFAULT_CHAT_MAX_TOKENS:-8192}
     embedding_model:
-      api_key: 'xxx'
-      base_url: 'http://${TEI_HOST}:80'
+      name: '${DEFAULT_EMBEDDING_MODEL_NAME:-}'
+      factory: '${DEFAULT_EMBEDDING_FACTORY:-OpenAI-API-Compatible}'
+      api_key: '${DEFAULT_EMBEDDING_API_KEY:-}'
+      base_url: '${DEFAULT_EMBEDDING_API_BASE:-http://${TEI_HOST}:80}'
+      max_tokens: ${DEFAULT_EMBEDDING_MAX_TOKENS:-8192}
 # postgres:
 #   name: '${POSTGRES_DBNAME:-rag_flow}'
 #   user: '${POSTGRES_USER:-rag_flow}'

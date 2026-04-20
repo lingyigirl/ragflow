@@ -36,6 +36,37 @@ class TenantLLMService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def ensure_default_openai_compatible_for_tenant(cls, tenant_id: str):
+        from api.db.services.llm_service import get_init_tenant_llm
+
+        default_rows = get_init_tenant_llm(tenant_id)
+        for row in default_rows:
+            if row.get("model_type") not in (LLMType.CHAT.value, LLMType.EMBEDDING.value):
+                continue
+            existing = cls.get_or_none(
+                tenant_id=tenant_id,
+                llm_factory=row.get("llm_factory"),
+                llm_name=row.get("llm_name"),
+            )
+            if not existing:
+                cls.save(**row)
+                continue
+            patch = {}
+            if not existing.api_key and row.get("api_key"):
+                patch["api_key"] = row.get("api_key")
+            if not existing.api_base and row.get("api_base"):
+                patch["api_base"] = row.get("api_base")
+            try:
+                existing_max_tokens = int(existing.max_tokens) if existing.max_tokens is not None else 0
+            except Exception:
+                existing_max_tokens = 0
+            if (existing_max_tokens <= 0) and row.get("max_tokens"):
+                patch["max_tokens"] = row.get("max_tokens")
+            if patch:
+                cls.filter_update([cls.model.id == existing.id], patch)
+
+    @classmethod
+    @DB.connection_context()
     def get_api_key(cls, tenant_id, model_name):
         mdlnm, fid = TenantLLMService.split_model_name_and_factory(model_name)
         if not fid:
