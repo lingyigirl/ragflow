@@ -2279,3 +2279,30 @@ async def identity_list_docs():
     except Exception as e:
         return server_error_response(e)
 
+@manager.route("/batch_file_progress", methods=["POST"]) 
+@login_required 
+async def batch_doc_progress(): 
+    req = await get_request_json() 
+    doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
+    if not isinstance(doc_ids, list):
+        return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR)
+    normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()] 
+    if not normalized_doc_ids:
+        return get_json_result(data={})
+    progress_map = {} 
+    try: 
+        for doc_id in normalized_doc_ids:
+            if not DocumentService.accessible(doc_id, current_user.id):
+                return get_json_result( 
+                    data=False,
+                    code=RetCode.OPERATING_ERROR,
+                )
+            e, doc = DocumentService.get_by_id(doc_id) 
+            if not e or not doc:
+                progress_map[doc_id] = None  
+                continue 
+            progress_map[doc_id] = doc.progress if doc.progress is not None else 0 
+        return get_json_result(progress=progress_map)
+    except Exception as e:
+        return server_error_response(e)
+
