@@ -1390,12 +1390,6 @@ async def mineru_parse():
         parse_id = get_uuid()
         
         pdf_minio_path = None
-        try:
-            pdf_location = f"mineru_parse/{parse_id}/original_{file_obj.filename}"
-            settings.STORAGE_IMPL.put(user_id, pdf_location, file_content)
-            pdf_minio_path = f"{user_id}/{pdf_location}"
-        except Exception:
-            pass
         
         if hasattr(file_obj, 'seek'):
             file_obj.seek(0)
@@ -1503,6 +1497,20 @@ async def mineru_parse():
                 content_list_url = None
                 markdown_url = None
                 markdown_file = None
+                pdf_storage_path = pdf_path
+                pdf_file = None
+                for candidate_pdf in extract_path.rglob("*.pdf"):
+                    pdf_file = candidate_pdf
+                    break
+                if pdf_file:
+                    with open(pdf_file, "rb") as f:
+                        pdf_bytes = f.read()
+                    pdf_location = f"{base_prefix}/{pdf_file.name}"
+                    settings.STORAGE_IMPL.put(user_id, pdf_location, pdf_bytes)
+                    if kb_id and doc_id:
+                        kb_pdf_location = f"{doc_id}/{pdf_file.name}"
+                        settings.STORAGE_IMPL.put(kb_id, kb_pdf_location, pdf_bytes)
+                    pdf_storage_path = f"{user_id}/{pdf_location}"
                 for md_file in extract_path.rglob("*.md"):
                     markdown_file = md_file
                     with open(md_file, "r", encoding="utf-8") as f:
@@ -1672,7 +1680,7 @@ async def mineru_parse():
                     "image_count": len(image_urls),
                     "count": len(content_list) if content_list else 0,
                     "source": "file_parse",
-                    "pdf_minio_path": pdf_path,
+                    "pdf_minio_path": pdf_storage_path,
                 }
                 return result
                 
