@@ -2287,8 +2287,7 @@ async def identity_list_docs():
     except Exception as e:
         return server_error_response(e)
 
-@manager.route("/batch_file_progress", methods=["POST"]) 
-@login_required 
+@manager.route("/batch_file_progress", methods=["POST"])
 async def batch_doc_progress(): 
     req = await get_request_json() 
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
