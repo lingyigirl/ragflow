@@ -2288,28 +2288,30 @@ async def identity_list_docs():
         return server_error_response(e)
 
 @manager.route("/batch_file_progress", methods=["POST"])
-async def batch_doc_progress(): 
-    req = await get_request_json() 
+@token_required
+def batch_doc_progress(tenant_id):
+    injected_user_id = str(tenant_id).strip() 
+    if not injected_user_id: 
+        return get_json_result(data=False, message="Invalid API key tenant.", code=settings.RetCode.AUTHENTICATION_ERROR) 
+    req = request.get_json(silent=True) or {} 
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
-    if not isinstance(doc_ids, list):
-        return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR)
+    if not isinstance(doc_ids, list): 
+        return get_json_result(data=False, code=settings.RetCode.ARGUMENT_ERROR) 
     normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()] 
     if not normalized_doc_ids:
-        return get_json_result(data={})
-    progress_map = {} 
+        return get_json_result(data=[]) 
+    progress_list = [] 
     try: 
         for doc_id in normalized_doc_ids:
-            if not DocumentService.accessible(doc_id, current_user.id):
-                return get_json_result( 
-                    data=False,
-                    code=RetCode.OPERATING_ERROR,
-                )
+            if not DocumentService.accessible(doc_id, injected_user_id): 
+                return get_json_result(data=False, code=settings.RetCode.OPERATING_ERROR) 
             e, doc = DocumentService.get_by_id(doc_id) 
-            if not e or not doc:
-                progress_map[doc_id] = None  
-                continue 
-            progress_map[doc_id] = doc.progress if doc.progress is not None else 0 
-        return get_json_result(progress=progress_map)
+            if not e or not doc: 
+                progress_list.append({"fileId": doc_id, "progress": 0.0}) 
+                continue  
+            progress_value = float(doc.progress) if doc.progress is not None else 0.0 
+            progress_list.append({"fileId": doc_id, "progress": progress_value}) 
+        return get_json_result(data=progress_list) 
     except Exception as e:
         return server_error_response(e)
 
