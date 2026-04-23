@@ -20,12 +20,13 @@ import os.path
 import pathlib
 import re
 from pathlib import Path
-from quart import request, make_response
+from quart import request, make_response, current_app
+from quart_auth import Unauthorized
 from api.apps import current_user, login_required
 from api.common.check_team_permission import check_kb_team_permission
 from api.constants import FILE_NAME_LEN_LIMIT, IMG_BASE64_PREFIX
 from api.db import VALID_FILE_TYPES, FileType
-from api.db.db_models import Task
+from api.db.db_models import Task, APIToken
 from api.db.services import duplicate_name
 from api.db.services.document_service import DocumentService, doc_upload_and_parse
 from common.metadata_utils import meta_filter, convert_conditions
@@ -279,6 +280,22 @@ async def _auto_standard_filename_for_doc_background(doc_id: str, llm_content=No
             logging.warning("[auto_standard_filename_bg] db update failed doc_id=%s", doc_id) 
     except Exception as ex: 
         logging.warning("[auto_standard_filename_bg] failed doc_id=%s err=%s", doc_id, ex) 
+
+def login_or_token_required(func):
+    async def wrapper(*args, **kwargs):
+        if current_user:
+            return await current_app.ensure_async(func)(*args, **kwargs)
+        authorization_str = request.headers.get("Authorization")
+        if authorization_str:
+            authorization_list = authorization_str.split()
+            if len(authorization_list) >= 2:
+                objs = APIToken.query(token=authorization_list[1])
+                if objs:
+                    kwargs["tenant_id"] = objs[0].tenant_id
+                    return await current_app.ensure_async(func)(*args, **kwargs)
+        raise Unauthorized()
+
+    return wrapper
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
@@ -864,11 +881,14 @@ async def rm():
 
 
 @manager.route("/run", methods=["POST"])  # noqa: F821
-@login_required
+@login_or_token_required
 @validate_request("doc_ids", "run")
-async def run():
+async def run(tenant_id=None):
     req = await get_request_json()
     try:
+        requester_id = current_user.id if current_user else str(tenant_id or "").strip()
+        if not requester_id:
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
         classify_switch = req.get("enable_voucher_type_classify", False)
         if not isinstance(classify_switch, bool):
             return get_json_result(
@@ -886,7 +906,7 @@ async def run():
 
         def _run_sync():
             for doc_id in req["doc_ids"]:
-                if not DocumentService.accessible(doc_id, current_user.id):
+                if not DocumentService.accessible(doc_id, requester_id):
                     return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
             kb_table_num_map = {}
