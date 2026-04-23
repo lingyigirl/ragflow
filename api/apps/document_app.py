@@ -40,7 +40,7 @@ from api.utils.api_utils import (
     get_data_error_result,
     get_json_result,
     server_error_response,
-    validate_request, get_request_json,
+    validate_request, get_request_json, token_required,
 )
 from api.utils.file_utils import filename_type, thumbnail
 from common.file_utils import get_project_base_directory
@@ -2292,11 +2292,11 @@ async def identity_list_docs():
 def batch_doc_progress(tenant_id):
     injected_user_id = str(tenant_id).strip() 
     if not injected_user_id: 
-        return get_json_result(data=False, message="Invalid API key tenant.", code=settings.RetCode.AUTHENTICATION_ERROR) 
+        return get_json_result(data=False, message="Invalid API key tenant.", code=RetCode.AUTHENTICATION_ERROR) 
     req = request.get_json(silent=True) or {} 
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
     if not isinstance(doc_ids, list): 
-        return get_json_result(data=False, code=settings.RetCode.ARGUMENT_ERROR) 
+        return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR) 
     normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()] 
     if not normalized_doc_ids:
         return get_json_result(data=[]) 
@@ -2304,7 +2304,7 @@ def batch_doc_progress(tenant_id):
     try: 
         for doc_id in normalized_doc_ids:
             if not DocumentService.accessible(doc_id, injected_user_id): 
-                return get_json_result(data=False, code=settings.RetCode.OPERATING_ERROR) 
+                return get_json_result(data=False, code=RetCode.OPERATING_ERROR) 
             e, doc = DocumentService.get_by_id(doc_id) 
             if not e or not doc: 
                 progress_list.append({"fileId": doc_id, "progress": 0.0}) 
