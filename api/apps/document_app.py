@@ -19,6 +19,7 @@ import logging
 import os.path
 import pathlib
 import re
+from functools import wraps
 from pathlib import Path
 from quart import request, make_response, current_app
 from quart_auth import Unauthorized
@@ -282,14 +283,16 @@ async def _auto_standard_filename_for_doc_background(doc_id: str, llm_content=No
         logging.warning("[auto_standard_filename_bg] failed doc_id=%s err=%s", doc_id, ex) 
 
 def login_or_token_required(func):
+    @wraps(func)
     async def wrapper(*args, **kwargs):
         if current_user:
             return await current_app.ensure_async(func)(*args, **kwargs)
         authorization_str = request.headers.get("Authorization")
         if authorization_str:
             authorization_list = authorization_str.split()
-            if len(authorization_list) >= 2:
-                objs = APIToken.query(token=authorization_list[1])
+            token = authorization_list[1].strip() if len(authorization_list) >= 2 else authorization_str.strip()
+            if token:
+                objs = APIToken.query(token=token)
                 if objs:
                     kwargs["tenant_id"] = objs[0].tenant_id
                     return await current_app.ensure_async(func)(*args, **kwargs)
@@ -887,6 +890,7 @@ async def run(tenant_id=None):
     req = await get_request_json()
     try:
         requester_id = current_user.id if current_user else str(tenant_id or "").strip()
+        is_api_key_mode = not bool(current_user)
         if not requester_id:
             return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
         classify_switch = req.get("enable_voucher_type_classify", False)
@@ -906,7 +910,10 @@ async def run(tenant_id=None):
 
         def _run_sync():
             for doc_id in req["doc_ids"]:
-                if not DocumentService.accessible(doc_id, requester_id):
+                can_access = DocumentService.accessible(doc_id, requester_id)
+                if not can_access and is_api_key_mode:
+                    can_access = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
+                if not can_access:
                     return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
             kb_table_num_map = {}
