@@ -2343,9 +2343,26 @@ def batch_doc_progress(tenant_id):
 
 
 @manager.route("/direct_upload_parse", methods=["POST"])  # noqa: F821
-@login_required
 async def upload_parse_user_kb():
     try:
+        from api.db.db_models import MineruSection
+        form = await request.form
+        req_token = (form.get("token") or "").strip()
+        requester_id = str(current_user.id) if current_user else ""
+        tenant_id = ""
+        kb_name = ""
+        if req_token:
+            token_objs = APIToken.query(token=req_token)
+            if not token_objs:
+                return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
+            tenant_id = str(token_objs[0].tenant_id)
+            kb_name = req_token
+        elif requester_id:
+            tenant_id = requester_id
+            kb_name = requester_id
+        else:
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+
         files = await request.files
         if "file" not in files:
             return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
@@ -2356,10 +2373,9 @@ async def upload_parse_user_kb():
             if len(file_obj.filename.encode("utf-8")) > FILE_NAME_LEN_LIMIT:
                 return get_json_result(data=False, message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
 
-        tenant_id = str(current_user.id)
-        ok, kb = KnowledgebaseService.get_by_name(tenant_id, tenant_id)
+        ok, kb = KnowledgebaseService.get_by_name(kb_name, tenant_id)
         if not ok or not kb:
-            created, payload = KnowledgebaseService.create_with_name(name=tenant_id, tenant_id=tenant_id, parser_id=ParserType.NAIVE.value)
+            created, payload = KnowledgebaseService.create_with_name(name=kb_name, tenant_id=tenant_id, parser_id=ParserType.NAIVE.value)
             if not created:
                 return payload
             if not KnowledgebaseService.save(**payload):
@@ -2368,7 +2384,8 @@ async def upload_parse_user_kb():
             if not ok or not kb:
                 return get_data_error_result(message="Can't find this dataset!")
 
-        err, uploaded_files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, current_user.id)
+        uploader_id = requester_id or tenant_id
+        err, uploaded_files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, uploader_id)
         if err:
             return get_json_result(data=[f[0] for f in uploaded_files] if uploaded_files else [], message="\n".join(err), code=RetCode.SERVER_ERROR)
         if not uploaded_files:
@@ -2377,6 +2394,8 @@ async def upload_parse_user_kb():
                 message="There seems to be an issue with your file format. Please verify it is correct and not corrupted.",
                 code=RetCode.DATA_ERROR,
             )
+        if not MineruSection.table_exists():
+            MineruSection.create_table(safe=True)
 
         run_info = {"run": TaskStatus.RUNNING.value, "progress": 0, "progress_msg": "", "chunk_num": 0, "token_num": 0}
         kb_table_num_map = {}
@@ -2386,6 +2405,8 @@ async def upload_parse_user_kb():
             "mineru_backend": "hybrid-auto-engine",
             "mineru_parse_method": "auto",
             "mineru_lang": "Chinese",
+            "skip_mineru_section_persist": False,
+            "use_submitted_content_list": False,
         }
 
         for doc_dict, _ in uploaded_files:
