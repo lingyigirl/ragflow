@@ -2182,7 +2182,6 @@ async def submit_mineru_section():
                 logging.warning("[MinerU] 清理临时 content_list 文件失败: %s", temp_file_path)
 
 
-
 # 新增凭证列表
 @manager.route("/identity_list", methods=["POST"]) 
 @login_required
@@ -2342,3 +2341,72 @@ def batch_doc_progress(tenant_id):
     except Exception as e:
         return server_error_response(e)
 
+
+@manager.route("/direct_upload_parse", methods=["POST"])  # noqa: F821
+@login_required
+async def upload_parse_user_kb():
+    try:
+        files = await request.files
+        if "file" not in files:
+            return get_json_result(data=False, message="No file part!", code=RetCode.ARGUMENT_ERROR)
+        file_objs = files.getlist("file")
+        for file_obj in file_objs:
+            if file_obj.filename == "":
+                return get_json_result(data=False, message="No file selected!", code=RetCode.ARGUMENT_ERROR)
+            if len(file_obj.filename.encode("utf-8")) > FILE_NAME_LEN_LIMIT:
+                return get_json_result(data=False, message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
+
+        tenant_id = str(current_user.id)
+        ok, kb = KnowledgebaseService.get_by_name(tenant_id, tenant_id)
+        if not ok or not kb:
+            created, payload = KnowledgebaseService.create_with_name(name=tenant_id, tenant_id=tenant_id, parser_id=ParserType.NAIVE.value)
+            if not created:
+                return payload
+            if not KnowledgebaseService.save(**payload):
+                return get_data_error_result(message="Database error (Knowledgebase create)!")
+            ok, kb = KnowledgebaseService.get_by_id(payload["id"])
+            if not ok or not kb:
+                return get_data_error_result(message="Can't find this dataset!")
+
+        err, uploaded_files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, current_user.id)
+        if err:
+            return get_json_result(data=[f[0] for f in uploaded_files] if uploaded_files else [], message="\n".join(err), code=RetCode.SERVER_ERROR)
+        if not uploaded_files:
+            return get_json_result(
+                data=[],
+                message="There seems to be an issue with your file format. Please verify it is correct and not corrupted.",
+                code=RetCode.DATA_ERROR,
+            )
+
+        run_info = {"run": TaskStatus.RUNNING.value, "progress": 0, "progress_msg": "", "chunk_num": 0, "token_num": 0}
+        kb_table_num_map = {}
+        doc_ids = []
+        parser_cfg_patch = {
+            "layout_recognize": "MinerU",
+            "mineru_backend": "hybrid-auto-engine",
+            "mineru_parse_method": "auto",
+            "mineru_lang": "Chinese",
+        }
+
+        for doc_dict, _ in uploaded_files:
+            doc_id = doc_dict["id"]
+            doc_ids.append(doc_id)
+            current_parser_cfg = doc_dict.get("parser_config") if isinstance(doc_dict.get("parser_config"), dict) else {}
+            parser_cfg = dict(current_parser_cfg)
+            parser_cfg.update(parser_cfg_patch)
+            DocumentService.update_by_id(doc_id, {"parser_id": ParserType.NAIVE.value, **run_info})
+            DocumentService.update_parser_config(doc_id, parser_cfg)
+            doc_dict["parser_id"] = ParserType.NAIVE.value
+            doc_dict["parser_config"] = parser_cfg
+            DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
+
+        return get_json_result(
+            data={
+                "kb_id": kb.id,
+                "kb_name": kb.name,
+                "doc_ids": doc_ids,
+                "run_started": True,
+            }
+        )
+    except Exception as e:
+        return server_error_response(e)
