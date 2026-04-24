@@ -884,15 +884,27 @@ async def rm():
 
 
 @manager.route("/run", methods=["POST"])  # noqa: F821
-@login_or_token_required
 @validate_request("doc_ids", "run")
-async def run(tenant_id=None):
+async def run():
     req = await get_request_json()
     try:
-        requester_id = current_user.id if current_user else str(tenant_id or "").strip()
-        is_api_key_mode = not bool(current_user)
-        if not requester_id:
-            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+        requester_id = ""
+        is_api_key_mode = False
+        no_auth_mode = False
+        if current_user:
+            requester_id = str(current_user.id).strip()
+        else:
+            authorization_str = request.headers.get("Authorization")
+            if authorization_str:
+                authorization_list = authorization_str.split()
+                token = authorization_list[1].strip() if len(authorization_list) >= 2 else authorization_str.strip()
+                token_objs = APIToken.query(token=token) if token else []
+                if not token_objs:
+                    return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
+                requester_id = str(token_objs[0].tenant_id).strip()
+                is_api_key_mode = True
+            else:
+                no_auth_mode = True
         classify_switch = req.get("enable_voucher_type_classify", False)
         if not isinstance(classify_switch, bool):
             return get_json_result(
@@ -909,12 +921,13 @@ async def run(tenant_id=None):
             )
 
         def _run_sync():
-            for doc_id in req["doc_ids"]:
-                can_access = DocumentService.accessible(doc_id, requester_id)
-                if not can_access and is_api_key_mode:
-                    can_access = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
-                if not can_access:
-                    return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+            if not no_auth_mode:
+                for doc_id in req["doc_ids"]:
+                    can_access = DocumentService.accessible(doc_id, requester_id)
+                    if not can_access and is_api_key_mode:
+                        can_access = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
+                    if not can_access:
+                        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
             kb_table_num_map = {}
             for id in req["doc_ids"]:
@@ -2314,11 +2327,7 @@ async def identity_list_docs():
         return server_error_response(e)
 
 @manager.route("/batch_file_progress", methods=["POST"])
-@token_required
-def batch_doc_progress(tenant_id):
-    injected_user_id = str(tenant_id).strip() 
-    if not injected_user_id: 
-        return get_json_result(data=False, message="Invalid API key tenant.", code=RetCode.AUTHENTICATION_ERROR) 
+def batch_doc_progress():
     req = request.get_json(silent=True) or {} 
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
     if not isinstance(doc_ids, list): 
@@ -2329,8 +2338,6 @@ def batch_doc_progress(tenant_id):
     progress_list = [] 
     try: 
         for doc_id in normalized_doc_ids:
-            if not DocumentService.accessible(doc_id, injected_user_id): 
-                return get_json_result(data=False, code=RetCode.OPERATING_ERROR) 
             e, doc = DocumentService.get_by_id(doc_id) 
             if not e or not doc: 
                 progress_list.append({"fileId": doc_id, "progress": 0.0}) 
@@ -2347,21 +2354,11 @@ async def upload_parse_user_kb():
     try:
         from api.db.db_models import MineruSection
         form = await request.form
-        req_token = (form.get("token") or "").strip()
-        requester_id = str(current_user.id) if current_user else ""
-        tenant_id = ""
-        kb_name = ""
-        if req_token:
-            token_objs = APIToken.query(token=req_token)
-            if not token_objs:
-                return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
-            tenant_id = str(token_objs[0].tenant_id)
-            kb_name = req_token
-        elif requester_id:
-            tenant_id = requester_id
-            kb_name = requester_id
-        else:
-            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+        req_usr_id = (form.get("usr_id") or "").strip()
+        if not req_usr_id:
+            return get_json_result(data=False, message='Lack of "usr_id"', code=RetCode.ARGUMENT_ERROR)
+        tenant_id = req_usr_id
+        kb_name = req_usr_id
 
         files = await request.files
         if "file" not in files:
@@ -2384,7 +2381,7 @@ async def upload_parse_user_kb():
             if not ok or not kb:
                 return get_data_error_result(message="Can't find this dataset!")
 
-        uploader_id = requester_id or tenant_id
+        uploader_id = req_usr_id
         err, uploaded_files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, uploader_id)
         if err:
             return get_json_result(data=[f[0] for f in uploaded_files] if uploaded_files else [], message="\n".join(err), code=RetCode.SERVER_ERROR)
