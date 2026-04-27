@@ -35,7 +35,7 @@ from api.db.services.file2document_service import File2DocumentService
 from api.db.services.file_service import FileService
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.services.task_service import TaskService, cancel_all_task_of
-from api.db.services.user_service import UserTenantService, TenantService
+from api.db.services.user_service import UserService, UserTenantService, TenantService
 from api.db.services.llm_service import LLMBundle
 from common.misc_utils import get_uuid
 from api.utils.api_utils import (
@@ -46,7 +46,7 @@ from api.utils.api_utils import (
 )
 from api.utils.file_utils import filename_type, thumbnail
 from common.file_utils import get_project_base_directory
-from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus, LLMType
+from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus, LLMType, StatusEnum
 from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
@@ -2358,14 +2358,13 @@ async def upload_parse_user_kb():
         if not req_usr_id:
             return get_json_result(data=False, message='Lack of "usr_id"', code=RetCode.ARGUMENT_ERROR)
         kb_name = req_usr_id
-        ok_tenant, tenant = TenantService.get_by_id(req_usr_id)
-        if ok_tenant and tenant:
-            tenant_id = str(tenant.id)
-        else:
-            tenants = TenantService.query()
-            if not tenants:
-                return get_data_error_result(message="Tenant not found.")
-            tenant_id = str(tenants[0].id)
+        ok_user, user = UserService.get_by_id(req_usr_id)
+        if not ok_user or not user:
+            return get_data_error_result(message="User not found.")
+        user_tenants = UserTenantService.query(user_id=req_usr_id, status=StatusEnum.VALID.value)
+        if not user_tenants:
+            return get_data_error_result(message="Tenant not found.")
+        tenant_id = str(user_tenants[0].tenant_id)
 
         files = await request.files
         if "file" not in files:
