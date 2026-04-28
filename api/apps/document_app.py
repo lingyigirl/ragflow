@@ -2434,3 +2434,138 @@ async def upload_parse_user_kb():
         )
     except Exception as e:
         return server_error_response(e)
+
+
+def _normalize_id_list(value):
+    if value is None:
+        return []
+    if isinstance(value, list):
+        raw_items = value
+    else:
+        raw_items = [value]
+    normalized = []
+    for item in raw_items:
+        item_str = str(item).strip() if item is not None else ""
+        if item_str:
+            normalized.append(item_str)
+    return list(dict.fromkeys(normalized))
+
+
+def _resolve_tenant_id_for_public_ask(kb_ids: list[str], doc_ids: list[str]):
+    if kb_ids:
+        e, kb = KnowledgebaseService.get_by_id(kb_ids[0])
+        if not e or not kb:
+            return False, f"Dataset {kb_ids[0]} not found.", ""
+        return True, "", str(kb.tenant_id)
+    if doc_ids:
+        tenant_id = str(DocumentService.get_tenant_id(doc_ids[0]) or "")
+        if not tenant_id:
+            return False, f"Document {doc_ids[0]} not found.", ""
+        return True, "", tenant_id
+    return False, 'When anonymous, at least one of "kb_id" or "doc_id" is required.', ""
+
+
+def _to_float_param(req: dict, key: str, default: float):
+    value = req.get(key, default)
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+async def _collect_prompt_context_by_ids(tenant_id: str, kb_ids: list[str], doc_ids: list[str]):
+    context_parts = []
+    visited_doc_ids = set()
+
+    for kb_id in kb_ids:
+        e, kb = KnowledgebaseService.get_by_id(kb_id)
+        if not e or not kb:
+            return False, f"Dataset {kb_id} not found.", ""
+        docs_in_kb = DocumentService.query(kb_id=kb_id)
+        for doc in docs_in_kb:
+            if str(doc.id) in visited_doc_ids:
+                continue
+            content = await _fetch_doc_content_for_voucher_classify(doc, str(kb.tenant_id))
+            if content:
+                context_parts.append(f"[KB:{kb_id}][DOC:{doc.id}]\n{content}")
+                visited_doc_ids.add(str(doc.id))
+
+    for doc_id in doc_ids:
+        if doc_id in visited_doc_ids:
+            continue
+        ok, doc = DocumentService.get_by_id(doc_id)
+        if not ok or not doc:
+            return False, f"Document {doc_id} not found.", ""
+        content = await _fetch_doc_content_for_voucher_classify(doc, str(DocumentService.get_tenant_id(doc_id) or tenant_id))
+        if content:
+            context_parts.append(f"[KB:{doc.kb_id}][DOC:{doc.id}]\n{content}")
+            visited_doc_ids.add(str(doc.id))
+
+    if not context_parts:
+        return True, "", ""
+    merged_context = "\n\n".join(context_parts)
+    return True, "", merged_context[:12000]
+
+
+@manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
+async def ask_by_docs(tenant_id=None):
+    req = await get_request_json()
+    if not isinstance(req, dict):
+        return get_json_result(data=False, message="Invalid JSON body.", code=RetCode.ARGUMENT_ERROR)
+
+    question = str(req.get("question") or "").strip()
+    if not question:
+        return get_json_result(data=False, message='Lack of "question"', code=RetCode.ARGUMENT_ERROR)
+
+    kb_ids = _normalize_id_list(req.get("kb_id"))
+    doc_ids = _normalize_id_list(req.get("doc_id"))
+
+    tenant_id = str(getattr(current_user, "id", "") or "")
+    if not tenant_id:
+        ok, err_msg, tenant_id = _resolve_tenant_id_for_public_ask(kb_ids, doc_ids)
+        if not ok:
+            return get_json_result(data=False, message=err_msg, code=RetCode.ARGUMENT_ERROR)
+
+    llm_options = {
+        "temperature": _to_float_param(req, "temperature", 0.2),
+        "top_p": _to_float_param(req, "top_p", 0.7),
+        "repetition_penalty": _to_float_param(req, "repetition_penalty", 1.05),
+        "presence_penalty": _to_float_param(req, "presence_penalty", 0.0),
+        "frequency_penalty": _to_float_param(req, "frequency_penalty", 0.0),
+    }
+
+    chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang="Chinese")
+
+    use_doc_grounding = bool(kb_ids or doc_ids)
+    if use_doc_grounding:
+        ok, err_msg, doc_context = await _collect_prompt_context_by_ids(tenant_id, kb_ids, doc_ids)
+        if not ok:
+            return get_json_result(data=False, message=err_msg, code=RetCode.OPERATING_ERROR)
+        if not doc_context:
+            return get_json_result(data=False, message="No available document content found.", code=RetCode.DATA_ERROR)
+        system_prompt = (
+            "你是文档问答助手。请严格基于给定文档内容回答问题。"
+        )
+        user_prompt = f"【文档内容】\n{doc_context}\n\n【问题】\n{question}"
+        answer = await chat_mdl.async_chat(
+            system_prompt,
+            [{"role": "user", "content": user_prompt}],
+            llm_options,
+        )
+    else:
+        system_prompt = "你是一个有帮助的助手，请直接回答用户问题。"
+        answer = await chat_mdl.async_chat(
+            system_prompt,
+            [{"role": "user", "content": question}],
+            llm_options,
+        )
+
+    return get_json_result(
+        data={
+            "answer": answer,
+            "used_kb_ids": kb_ids,
+            "used_doc_ids": doc_ids,
+            "grounded_by_documents": use_doc_grounding,
+            "llm_options": llm_options,
+        }
+    )
