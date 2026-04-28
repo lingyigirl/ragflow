@@ -50,6 +50,7 @@ from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus,
 from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
+from rag.llm import ChatModel
 from rag.utils.voucher_classifier import (
     build_voucher_classify_content,
     build_voucher_classify_content_from_content_list,
@@ -2508,7 +2509,7 @@ async def _collect_prompt_context_by_ids(tenant_id: str, kb_ids: list[str], doc_
 
 
 @manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
-async def ask_by_docs(tenant_id=None):
+async def ask_by_docs():
     req = await get_request_json()
     if not isinstance(req, dict):
         return get_json_result(data=False, message="Invalid JSON body.", code=RetCode.ARGUMENT_ERROR)
@@ -2520,12 +2521,6 @@ async def ask_by_docs(tenant_id=None):
     kb_ids = _normalize_id_list(req.get("kb_id"))
     doc_ids = _normalize_id_list(req.get("doc_id"))
 
-    tenant_id = str(getattr(current_user, "id", "") or "")
-    if not tenant_id:
-        ok, err_msg, tenant_id = _resolve_tenant_id_for_public_ask(kb_ids, doc_ids)
-        if not ok:
-            return get_json_result(data=False, message=err_msg, code=RetCode.ARGUMENT_ERROR)
-
     llm_options = {
         "temperature": _to_float_param(req, "temperature", 0.2),
         "top_p": _to_float_param(req, "top_p", 0.7),
@@ -2534,11 +2529,20 @@ async def ask_by_docs(tenant_id=None):
         "frequency_penalty": _to_float_param(req, "frequency_penalty", 0.0),
     }
 
-    chat_mdl = LLMBundle(tenant_id, LLMType.CHAT, llm_name=None, lang="Chinese")
+    chat_cfg = settings.CHAT_CFG or {}
+    llm_factory = str(chat_cfg.get("factory") or "")
+    llm_model = str(chat_cfg.get("model") or "")
+    llm_api_key = str(chat_cfg.get("api_key") or "")
+    llm_base_url = str(chat_cfg.get("base_url") or "")
+
+    if not llm_factory or llm_factory not in ChatModel or not llm_model:
+        return get_json_result(data=False, message="Default chat model is not configured correctly.", code=RetCode.OPERATING_ERROR)
+
+    chat_mdl = ChatModel[llm_factory](llm_api_key, llm_model, base_url=llm_base_url)
 
     use_doc_grounding = bool(kb_ids or doc_ids)
     if use_doc_grounding:
-        ok, err_msg, doc_context = await _collect_prompt_context_by_ids(tenant_id, kb_ids, doc_ids)
+        ok, err_msg, doc_context = await _collect_prompt_context_by_ids("", kb_ids, doc_ids)
         if not ok:
             return get_json_result(data=False, message=err_msg, code=RetCode.OPERATING_ERROR)
         if not doc_context:
@@ -2559,6 +2563,8 @@ async def ask_by_docs(tenant_id=None):
             [{"role": "user", "content": question}],
             llm_options,
         )
+    if isinstance(answer, tuple):
+        answer = answer[0]
 
     return get_json_result(
         data={
