@@ -2531,9 +2531,14 @@ async def ask_by_docs():
 
     chat_cfg = settings.CHAT_CFG or {}
     llm_factory = str(chat_cfg.get("factory") or "")
-    llm_model = str(chat_cfg.get("model") or "")
+    raw_llm_model = str(chat_cfg.get("model") or "")
     llm_api_key = str(chat_cfg.get("api_key") or "")
     llm_base_url = str(chat_cfg.get("base_url") or "")
+    llm_model = raw_llm_model
+    if "@" in raw_llm_model:
+        model_name, model_factory = raw_llm_model.rsplit("@", 1)
+        if model_factory == llm_factory and model_name.strip():
+            llm_model = model_name.strip()
 
     if not llm_factory or llm_factory not in ChatModel or not llm_model:
         return get_json_result(data=False, message="Default chat model is not configured correctly.", code=RetCode.OPERATING_ERROR)
