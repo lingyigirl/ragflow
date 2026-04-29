@@ -2536,7 +2536,19 @@ async def ask_by_docs():
         "frequency_penalty": _to_float_param(req, "frequency_penalty", 0.0),
     }
 
-    chat_cfg = settings.CHAT_CFG or {}
+    env_chat_cfg = {
+        "factory": os.getenv("DEFAULT_CHAT_FACTORY", "").strip(),
+        "model": os.getenv("DEFAULT_CHAT_MODEL_NAME", "").strip(),
+        "api_key": os.getenv("DEFAULT_CHAT_API_KEY", "").strip(),
+        "base_url": os.getenv("DEFAULT_CHAT_API_BASE", "").strip(),
+    }
+    env_embedding_cfg = {
+        "factory": os.getenv("DEFAULT_EMBEDDING_FACTORY", "").strip(),
+        "model": os.getenv("DEFAULT_EMBEDDING_MODEL_NAME", "").strip(),
+        "api_key": os.getenv("DEFAULT_EMBEDDING_API_KEY", "").strip(),
+        "base_url": os.getenv("DEFAULT_EMBEDDING_API_BASE", "").strip(),
+    }
+    chat_cfg = env_chat_cfg if env_chat_cfg["factory"] or env_chat_cfg["model"] else (settings.CHAT_CFG or {})
     llm_factory = str(chat_cfg.get("factory") or "").strip()
     raw_llm_model = str(chat_cfg.get("model") or "").strip()
     llm_api_key = str(chat_cfg.get("api_key") or "").strip()
@@ -2551,12 +2563,17 @@ async def ask_by_docs():
         if model_factory.strip() == llm_factory and model_name.strip():
             llm_model = model_name.strip()
     logging.info(
-        "[ask_by_docs] chat_cfg 检查 factory=%s raw_model=%s parsed_model=%s has_api_key=%s base_url=%s",
+        "[ask_by_docs] chat_cfg 检查 source=%s factory=%s raw_model=%s parsed_model=%s has_api_key=%s base_url=%s env_embedding_factory=%s env_embedding_model=%s has_embedding_api_key=%s embedding_base_url=%s",
+        "env" if chat_cfg is env_chat_cfg else "settings",
         llm_factory,
         raw_llm_model,
         llm_model,
         bool(llm_api_key),
         llm_base_url,
+        env_embedding_cfg["factory"],
+        env_embedding_cfg["model"],
+        bool(env_embedding_cfg["api_key"]),
+        env_embedding_cfg["base_url"],
     )
 
     if not llm_factory or llm_factory not in ChatModel or not llm_model:
