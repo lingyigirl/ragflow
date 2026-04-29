@@ -2526,6 +2526,7 @@ async def ask_by_docs():
 
     kb_ids = _normalize_id_list(req.get("kb_id"))
     doc_ids = _normalize_id_list(req.get("doc_id"))
+    logging.info("[ask_by_docs] 请求参数已解析 question_len=%s kb_count=%s doc_count=%s", len(question), len(kb_ids), len(doc_ids))
 
     llm_options = {
         "temperature": _to_float_param(req, "temperature", 0.2),
@@ -2536,17 +2537,43 @@ async def ask_by_docs():
     }
 
     chat_cfg = settings.CHAT_CFG or {}
-    llm_factory = str(chat_cfg.get("factory") or "")
-    raw_llm_model = str(chat_cfg.get("model") or "")
-    llm_api_key = str(chat_cfg.get("api_key") or "")
-    llm_base_url = str(chat_cfg.get("base_url") or "")
+    llm_factory = str(chat_cfg.get("factory") or "").strip()
+    raw_llm_model = str(chat_cfg.get("model") or "").strip()
+    llm_api_key = str(chat_cfg.get("api_key") or "").strip()
+    llm_base_url = str(chat_cfg.get("base_url") or "").strip()
     llm_model = raw_llm_model
+    if llm_factory and llm_factory not in ChatModel:
+        matched_factory = next((k for k in ChatModel.keys() if str(k).strip().lower() == llm_factory.lower()), None)
+        if matched_factory:
+            llm_factory = str(matched_factory)
     if "@" in raw_llm_model:
         model_name, model_factory = raw_llm_model.rsplit("@", 1)
-        if model_factory == llm_factory and model_name.strip():
+        if model_factory.strip() == llm_factory and model_name.strip():
             llm_model = model_name.strip()
+    logging.info(
+        "[ask_by_docs] chat_cfg 检查 factory=%s raw_model=%s parsed_model=%s has_api_key=%s base_url=%s",
+        llm_factory,
+        raw_llm_model,
+        llm_model,
+        bool(llm_api_key),
+        llm_base_url,
+    )
 
     if not llm_factory or llm_factory not in ChatModel or not llm_model:
+        try:
+            available_factories = sorted([str(k) for k in ChatModel.keys()])
+        except Exception:
+            available_factories = []
+        logging.warning(
+            "[ask_by_docs] 默认模型配置异常 invalid_factory_empty=%s invalid_factory_not_found=%s invalid_model_empty=%s factory=%s raw_model=%s parsed_model=%s available_factories=%s",
+            not llm_factory,
+            bool(llm_factory) and llm_factory not in ChatModel,
+            not llm_model,
+            llm_factory,
+            raw_llm_model,
+            llm_model,
+            available_factories,
+        )
         return get_json_result(data=False, message="Default chat model is not configured correctly.", code=RetCode.OPERATING_ERROR)
 
     chat_mdl = ChatModel[llm_factory](llm_api_key, llm_model, base_url=llm_base_url)
