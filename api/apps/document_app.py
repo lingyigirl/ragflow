@@ -2328,24 +2328,24 @@ async def identity_list_docs():
         return server_error_response(e)
 
 @manager.route("/batch_file_progress", methods=["POST"])
-def batch_doc_progress():
-    req = request.get_json(silent=True) or {} 
+async def batch_doc_progress():
+    req = await request.get_json(silent=True) or {}
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
-    if not isinstance(doc_ids, list): 
-        return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR) 
-    normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()] 
+    if not isinstance(doc_ids, list):
+        return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR)
+    normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()]
     if not normalized_doc_ids:
-        return get_json_result(data=[]) 
-    progress_list = [] 
-    try: 
+        return get_json_result(data=[])
+    progress_list = []
+    try:
         for doc_id in normalized_doc_ids:
-            e, doc = DocumentService.get_by_id(doc_id) 
-            if not e or not doc: 
-                progress_list.append({"fileId": doc_id, "progress": 0.0}) 
-                continue  
-            progress_value = float(doc.progress) if doc.progress is not None else 0.0 
-            progress_list.append({"fileId": doc_id, "progress": progress_value}) 
-        return get_json_result(data=progress_list) 
+            e, doc = DocumentService.get_by_id(doc_id)
+            if not e or not doc:
+                progress_list.append({"fileId": doc_id, "progress": 0.0})
+                continue
+            progress_value = float(doc.progress) if doc.progress is not None else 0.0
+            progress_list.append({"fileId": doc_id, "progress": progress_value})
+        return get_json_result(data=progress_list)
     except Exception as e:
         return server_error_response(e)
 
