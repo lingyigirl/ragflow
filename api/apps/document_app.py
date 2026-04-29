@@ -2329,8 +2329,14 @@ async def identity_list_docs():
 
 @manager.route("/batch_file_progress", methods=["POST"])
 async def batch_doc_progress():
-    req = await request.get_json(silent=True) or {}
+    req = await get_request_json()
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
+    if isinstance(doc_ids, str):
+        try:
+            parsed_doc_ids = json.loads(doc_ids)
+        except Exception:
+            parsed_doc_ids = None
+        doc_ids = parsed_doc_ids if isinstance(parsed_doc_ids, list) else []
     if not isinstance(doc_ids, list):
         return get_json_result(data=False, code=RetCode.ARGUMENT_ERROR)
     normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if doc_id is not None and str(doc_id).strip()]
