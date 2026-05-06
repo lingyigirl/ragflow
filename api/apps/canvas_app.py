@@ -501,18 +501,24 @@ def list_canvas():
     else:
         desc = True
     owner_ids = [id for id in request.args.get("owner_ids", "").strip().split(",") if id]
+    agent_types = [
+        x.strip().lower() for x in request.args.get("agent_types", "").split(",")
+        if x.strip()
+    ]
     if not owner_ids:
         tenants = TenantService.get_joined_tenants_by_user_id(current_user.id)
         tenants = [m["tenant_id"] for m in tenants]
         tenants.append(current_user.id)
         canvas, total = UserCanvasService.get_by_tenant_ids(
             tenants, current_user.id, page_number,
-            items_per_page, orderby, desc, keywords, canvas_category)
+            items_per_page, orderby, desc, keywords, canvas_category,
+            agent_types if agent_types else None)
     else:
         tenants = owner_ids
         canvas, total = UserCanvasService.get_by_tenant_ids(
             tenants, current_user.id, 0,
-            0, orderby, desc, keywords, canvas_category)
+            0, orderby, desc, keywords, canvas_category,
+            agent_types if agent_types else None)
     return get_json_result(data={"canvas": canvas, "total": total})
 
 

@@ -77,6 +77,7 @@ export declare interface IFlow {
   nickname: string;
   operator_permission: number;
   canvas_category: string;
+  agent_type?: string | null;
 }
 
 export interface IFlowTemplate {

@@ -140,7 +140,8 @@ class UserCanvasService(CommonService):
     @DB.connection_context()
     def get_by_tenant_ids(cls, joined_tenant_ids, user_id,
                           page_number, items_per_page,
-                          orderby, desc, keywords, canvas_category=None
+                          orderby, desc, keywords, canvas_category=None,
+                          agent_types=None
                           ):
         fields = [
             cls.model.id,
@@ -154,6 +155,7 @@ class UserCanvasService(CommonService):
             User.avatar.alias('tenant_avatar'),
             cls.model.update_time,
             cls.model.canvas_category,
+            cls.model.agent_type,
         ]
         if keywords:
             agents = cls.model.select(*fields).join(User, on=(cls.model.user_id == User.id)).where(
@@ -166,6 +168,23 @@ class UserCanvasService(CommonService):
             )
         if canvas_category:
             agents = agents.where(cls.model.canvas_category == canvas_category)
+        if agent_types:
+            ors = []
+            for raw in agent_types:
+                at = (raw or '').strip().lower()
+                if at == 'none':
+                    ors.append(
+                        cls.model.agent_type.is_null(True)
+                        | (cls.model.agent_type == 'none')
+                        | (cls.model.agent_type == '')
+                    )
+                elif at in ('personal', 'enterprise'):
+                    ors.append(cls.model.agent_type == at)
+            if ors:
+                combined = ors[0]
+                for ex in ors[1:]:
+                    combined = combined | ex
+                agents = agents.where(combined)
         if desc:
             agents = agents.order_by(cls.model.getter_by(orderby).desc())
         else:

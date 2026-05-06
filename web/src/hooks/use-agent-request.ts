@@ -128,6 +128,9 @@ export const useFetchAgentListByPage = () => {
     ? filterValue.canvasCategory
     : [];
   const owner = filterValue.owner;
+  const agentType = Array.isArray(filterValue.agentType)
+    ? filterValue.agentType
+    : [];
 
   const requestParams: Record<string, any> = {
     keywords: debouncedSearchString,
@@ -139,6 +142,10 @@ export const useFetchAgentListByPage = () => {
 
   if (Array.isArray(owner) && owner.length > 0) {
     requestParams.owner_ids = owner.join(',');
+  }
+
+  if (agentType.length > 0) {
+    requestParams.agent_types = agentType.join(',');
   }
 
   const { data, isFetching: loading } = useQuery<{
@@ -316,6 +323,9 @@ export const useSetAgent = (showMessage: boolean = true) => {
         }
         queryClient.invalidateQueries({
           queryKey: [AgentApiAction.FetchAgentListByPage],
+        });
+        queryClient.invalidateQueries({
+          queryKey: [AgentApiAction.FetchAgentList],
         });
       }
       return data;
