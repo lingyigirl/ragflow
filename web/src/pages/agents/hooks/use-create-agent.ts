@@ -1,9 +1,10 @@
-import { AgentCategory, Operator } from '@/constants/agent';
+import { AgentCategory, AgentGlobals, Operator } from '@/constants/agent';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { EmptyDsl, useSetAgent } from '@/hooks/use-agent-request';
 import { DSL } from '@/interfaces/database/agent';
 
 import { FileId, initialParserValues } from '@/pages/agent/constant';
+import { cloneDeep } from 'lodash';
 import { useCallback } from 'react';
 import { FlowType } from '../constant';
 import { FormSchemaType } from '../create-agent-form';
@@ -84,9 +85,17 @@ export function useCreateAgentOrPipeline() {
   const handleCreateAgentOrPipeline = useCallback(
     async (data: FormSchemaType) => {
       const isAgent = data.type === FlowType.Agent;
+      // 克隆 DSL 并向 globals 写入创建时选择的「类型」，避免改动全局常量引用
+      const nextDsl = cloneDeep(
+        isAgent ? EmptyDsl : DataflowEmptyDsl,
+      ) as DSL;
+      nextDsl.globals = {
+        ...(nextDsl.globals ?? {}),
+        [AgentGlobals.AgentPartyType]: data.partyType,
+      };
       const ret = await setAgent({
         title: data.name,
-        dsl: isAgent ? (EmptyDsl as DSL) : (DataflowEmptyDsl as DSL),
+        dsl: nextDsl,
         canvas_category: isAgent
           ? AgentCategory.AgentCanvas
           : AgentCategory.DataflowCanvas,

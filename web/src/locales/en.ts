@@ -2007,6 +2007,10 @@ This process aggregates variables from multiple branches into a single variable 
       ceateAgent: 'Agent flow',
       createPipeline: 'Ingestion pipeline',
       chooseAgentType: 'Choose agent type',
+      agentPartyTypeLabel: 'Type',
+      agentPartyTypeNone: 'None',
+      agentPartyTypePersonal: 'Individual',
+      agentPartyTypeEnterprise: 'Enterprise',
       parser: 'Parser',
       parserDescription:
         'Extracts raw text and structure from files for downstream processing.',

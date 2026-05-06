@@ -7,13 +7,21 @@ import { z } from 'zod';
 import { RAGFlowFormItem } from '@/components/ragflow-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { TagRenameId } from '@/constants/knowledge';
 import { IModalProps } from '@/interfaces/common';
 import { cn } from '@/lib/utils';
 import { BrainCircuit, Check, Route } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlowType } from './constant';
+import { AgentPartyType, FlowType } from './constant';
 import { NameFormField, NameFormSchema } from './name-form-field';
 
 export type CreateAgentFormProps = IModalProps<any> & {
@@ -80,6 +88,7 @@ export const FormSchema = z.object({
   tag: z.string().trim().optional(),
   description: z.string().trim().optional(),
   type: z.nativeEnum(FlowType).optional(),
+  partyType: z.nativeEnum(AgentPartyType),
 });
 
 export type FormSchemaType = z.infer<typeof FormSchema>;
@@ -93,7 +102,11 @@ export function CreateAgentForm({
 
   const form = useForm<FormSchemaType>({
     resolver: zodResolver(FormSchema),
-    defaultValues: { name: '', type: FlowType.Agent },
+    defaultValues: {
+      name: '',
+      type: FlowType.Agent,
+      partyType: AgentPartyType.None,
+    },
   });
 
   async function onSubmit(data: FormSchemaType) {
@@ -120,6 +133,32 @@ export function CreateAgentForm({
           </RAGFlowFormItem>
         )}
         <NameFormField></NameFormField>
+        {}
+        <RAGFlowFormItem name="partyType" label={t('flow.agentPartyTypeLabel')}>
+          {(field) => (
+            <Select
+              value={field.value}
+              onValueChange={field.onChange}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-bg-base">
+                <SelectGroup>
+                  <SelectItem value={AgentPartyType.None}>
+                    {t('flow.agentPartyTypeNone')}
+                  </SelectItem>
+                  <SelectItem value={AgentPartyType.Personal}>
+                    {t('flow.agentPartyTypePersonal')}
+                  </SelectItem>
+                  <SelectItem value={AgentPartyType.Enterprise}>
+                    {t('flow.agentPartyTypeEnterprise')}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+          )}
+        </RAGFlowFormItem>
       </form>
     </Form>
   );
