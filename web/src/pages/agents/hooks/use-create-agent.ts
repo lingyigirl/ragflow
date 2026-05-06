@@ -85,7 +85,6 @@ export function useCreateAgentOrPipeline() {
   const handleCreateAgentOrPipeline = useCallback(
     async (data: FormSchemaType) => {
       const isAgent = data.type === FlowType.Agent;
-      // 克隆 DSL 并向 globals 写入创建时选择的「类型」，避免改动全局常量引用
       const nextDsl = cloneDeep(
         isAgent ? EmptyDsl : DataflowEmptyDsl,
       ) as DSL;
@@ -99,6 +98,7 @@ export function useCreateAgentOrPipeline() {
         canvas_category: isAgent
           ? AgentCategory.AgentCanvas
           : AgentCategory.DataflowCanvas,
+        ...(isAgent ? { agent_type: data.partyType } : {}),
       });
 
       if (ret.code === 0) {

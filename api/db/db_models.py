@@ -956,6 +956,7 @@ class UserCanvas(DataBaseModel):
     description = TextField(null=True, help_text="Canvas description")
     canvas_type = CharField(max_length=32, null=True, help_text="Canvas type", index=True)
     canvas_category = CharField(max_length=32, null=False, default="agent_canvas", help_text="Canvas category: agent_canvas|dataflow_canvas", index=True)
+    agent_type = CharField(max_length=32, null=True, help_text="none|personal|enterprise", index=True)
     dsl = JSONField(null=True, default={})
 
     class Meta:
@@ -1389,6 +1390,10 @@ def migrate_db():
         pass
     try:
         migrate(migrator.add_column("user_canvas", "canvas_category", CharField(max_length=32, null=False, default="agent_canvas", help_text="agent_canvas|dataflow_canvas", index=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("user_canvas", "agent_type", CharField(max_length=32, null=True, help_text="none|personal|enterprise", index=True)))
     except Exception:
         pass
     try:

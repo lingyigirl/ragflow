@@ -62,6 +62,9 @@ export default function AgentTemplates() {
         dsl,
         avatar: template?.avatar,
         canvas_category: canvasCategory,
+        ...(canvasCategory === AgentCategory.AgentCanvas
+          ? { agent_type: payload.partyType }
+          : {}),
       });
 
       if (ret?.code === 0) {
