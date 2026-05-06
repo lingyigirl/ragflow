@@ -1,181 +1,1026 @@
-#
-#  Copyright 2025 The InfiniFlow Authors. All Rights Reserved.
-#
-#  Licensed under the Apache License, Version 2.0 (the "License");
-#  you may not use this file except in compliance with the License.
-#  You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-#  Unless required by applicable law or agreed to in writing, software
-#  distributed under the License is distributed on an "AS IS" BASIS,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-#  See the License for the specific language governing permissions and
-#  limitations under the License.
-#
+# -*- coding: utf-8 -*-
 
-import logging
-from io import BytesIO
+import copy
 import re
+import os
+import time
+import asyncio
+import aiohttp
+import itertools
+from dotenv import load_dotenv 
+from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
 
-from deepdoc.parser.utils import get_text
-from rag.app import naive
-from rag.nlp import rag_tokenizer, tokenize
-from deepdoc.parser import PdfParser, ExcelParser, HtmlParser
-from deepdoc.parser.figure_parser import vision_figure_parser_docx_wrapper
-from rag.app.naive import by_plaintext, PARSERS
-from common.parser_config_utils import normalize_layout_recognizer
+from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
+from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+import logging
 
+load_dotenv()
 
-class Pdf(PdfParser):
-    def __call__(self, filename, binary=None, from_page=0,
-                 to_page=100000, zoomin=3, callback=None):
-        from timeit import default_timer as timer
-        start = timer()
-        callback(msg="OCR started")
-        self.__images__(
-            filename if not binary else binary,
-            zoomin,
-            from_page,
-            to_page,
-            callback
-        )
-        callback(msg="OCR finished ({:.2f}s)".format(timer() - start))
-
-        start = timer()
-        self._layouts_rec(zoomin, drop=False)
-        callback(0.63, "Layout analysis ({:.2f}s)".format(timer() - start))
-        logging.debug("layouts cost: {}s".format(timer() - start))
-
-        start = timer()
-        self._table_transformer_job(zoomin)
-        callback(0.65, "Table analysis ({:.2f}s)".format(timer() - start))
-
-        start = timer()
-        self._text_merge()
-        callback(0.67, "Text merged ({:.2f}s)".format(timer() - start))
-        tbls = self._extract_table_figure(True, zoomin, True, True)
-        self._concat_downward()
-
-        sections = [(b["text"], self.get_position(b, zoomin))
-                    for i, b in enumerate(self.boxes)]
-        return [(txt, "") for txt, _ in sorted(sections, key=lambda x: (
-            x[-1][0][0], x[-1][0][3], x[-1][0][1]))], tbls
+TITLE_NUM_RE = re.compile(r'^(\d+(?:\.\d+)*)')
 
 
-def chunk(filename, binary=None, from_page=0, to_page=100000,
-          lang="Chinese", callback=None, **kwargs):
-    """
-        Supported file formats are docx, pdf, excel, txt.
-        One file forms a chunk which maintains original text order.
-    """
-    parser_config = kwargs.get(
-        "parser_config", {
-            "chunk_token_num": 512, "delimiter": "\n!?。；！？", "layout_recognize": "DeepDOC"})
-    eng = lang.lower() == "english"  # is_english(cks)
+def is_html_table(txt) -> bool:
+    if not isinstance(txt, str):
+        return False
+    lower = txt.lower()
+    return ("<table" in lower) and ("<tr" in lower or "<td" in lower)
 
-    if re.search(r"\.docx$", filename, re.IGNORECASE):
-        callback(0.1, "Start to parse.")
-        sections, tbls = naive.Docx()(filename, binary)
-        tbls = vision_figure_parser_docx_wrapper(sections=sections, tbls=tbls, callback=callback, **kwargs)
-        sections = [s for s, _ in sections if s]
-        for (_, html), _ in tbls:
-            sections.append(html)
-        callback(0.8, "Finish parsing.")
 
-    elif re.search(r"\.pdf$", filename, re.IGNORECASE):
-        layout_recognizer, parser_model_name = normalize_layout_recognizer(
-            parser_config.get("layout_recognize", "DeepDOC")
-        )
+def normalize_text_for_title(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    s = text.strip()
+    return re.sub(r"\s+", "", s)
 
-        if isinstance(layout_recognizer, bool):
-            layout_recognizer = "DeepDOC" if layout_recognizer else "Plain Text"
 
-        name = layout_recognizer.strip().lower()
-        parser = PARSERS.get(name, by_plaintext)
-        callback(0.1, "Start to parse.")
+def get_section_title_level(text: str) -> int:
+    if not isinstance(text, str) or not text.strip():
+        return 0
+    text_stripped = normalize_text_for_title(text)
+    if not text_stripped:
+        return 0
 
-        sections, tbls, pdf_parser = parser(
-            filename=filename,
-            binary=binary,
-            from_page=from_page,
-            to_page=to_page,
-            lang=lang,
-            callback=callback,
-            pdf_cls=Pdf,
-            layout_recognizer=layout_recognizer,
-            mineru_llm_name=parser_model_name,
-            **kwargs
-        )
+    level2_patterns = [
+        r'^\d+[\.、](?!\d)',
+        r'^[（(][一二三四五六七八九十]+[）)](?!\d)',
+        r'^第[一二三四五六七八九十百千\d]+条',
+    ]
+    
+    level3_patterns = [
+        r'^\d+\.\d(?!\d)',
+        r'^（\d+）',
+        r'^\d+）',
+    ]
 
-        if not sections and not tbls:
-            return []
+    level4_patterns = [
+        r'^\d+\.\d+\.\d+',
+    ]
 
-        if name in ["tcadp", "docling", "mineru"]:
-            parser_config["chunk_token_num"] = 0
+    level1_patterns = [
+        # r'^第[一二三四五六七八九十百千\d]+章',
+        r'^[一二三四五六七八九十]',
+    ]
+    
+    for pattern in level4_patterns:
+        if re.match(pattern, text_stripped):
+            return 4
 
-        callback(0.8, "Finish parsing.")
+    for pattern in level3_patterns:
+        if re.match(pattern, text_stripped):
+            return 3
+    
+    for pattern in level2_patterns:
+        if re.match(pattern, text_stripped):
+            return 2
+    
+    for pattern in level1_patterns:
+        if re.match(pattern, text_stripped):
+            return 1
+    
+    m = TITLE_NUM_RE.match(text_stripped)
+    if m:
+        dot_count = m.group(1).count('.')
+        if dot_count >= 3:
+            return dot_count + 1
+    
+    return 0
 
-        for (img, rows), poss in tbls:
-            if not rows:
-                continue
-            sections.append((rows if isinstance(rows, str) else rows[0],
-                             [(p[0] + 1 - from_page, p[1], p[2], p[3], p[4]) for p in poss]))
-        sections = [s for s, _ in sections if s]
 
-    elif re.search(r"\.xlsx?$", filename, re.IGNORECASE):
-        callback(0.1, "Start to parse.")
-        excel_parser = ExcelParser()
-        sections = excel_parser.html(binary, 1000000000)
+def strip_position_stamp(text):
+    return re.sub(r'@@\d+(?:\s+[+-]?\d+(?:\.\d+)?){4}##', '', text)
 
-    elif re.search(r"\.(txt|md|markdown|mdx)$", filename, re.IGNORECASE):
-        callback(0.1, "Start to parse.")
-        txt = get_text(filename, binary)
-        sections = txt.split("\n")
-        sections = [s for s in sections if s]
-        callback(0.8, "Finish parsing.")
+def count_length(text):
+    return len(text)
 
-    elif re.search(r"\.(htm|html)$", filename, re.IGNORECASE):
-        callback(0.1, "Start to parse.")
-        sections = HtmlParser()(filename, binary)
-        sections = [s for s in sections if s]
-        callback(0.8, "Finish parsing.")
 
-    elif re.search(r"\.doc$", filename, re.IGNORECASE):
-        callback(0.1, "Start to parse.")
+def index_format(idx, line, title_level=None):
+    if title_level is not None:
+        return f'{idx} @ [level={title_level}] {line}'
+    return f'{idx} @ {line}'
+
+def parse_answer_chunking_point(answer_string):
+    points = []
+    for line in answer_string.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split(',')]
+        if len(parts) < 2:
+            continue
         try:
-            from tika import parser as tika_parser
-        except Exception as e:
-            callback(0.8, f"tika not available: {e}. Unsupported .doc parsing.")
-            logging.warning(f"tika not available: {e}. Unsupported .doc parsing for {filename}.")
-            return []
+            point = int(parts[0])
+            level = int(parts[1])
+            if level == 1:
+                points.append(point)
+        except:
+            continue
+    return sorted(set(points))
 
-        binary = BytesIO(binary)
-        doc_parsed = tika_parser.from_buffer(binary)
-        if doc_parsed.get('content', None) is not None:
-            sections = doc_parsed['content'].split('\n')
-            sections = [s for s in sections if s]
-        callback(0.8, "Finish parsing.")
+def build_splits(origin_lines, points):
+    if not origin_lines:
+        return []
 
+    sorted_points = sorted(
+        p for p in points
+        if isinstance(p, int) and 0 <= p < len(origin_lines)
+    )
+
+    splits = []
+    prev = 0
+    for p in sorted_points:
+        if p > prev:
+            splits.append((prev, p))
+            prev = p
+    if prev < len(origin_lines):
+        splits.append((prev, len(origin_lines)))
+
+    return splits
+
+
+def _docs_have_content(docs):
+    for item in docs or []:
+        text = item.get("content_with_weight") if isinstance(item, dict) else None
+        if isinstance(text, str) and text.strip():
+            return True
+    return False
+
+
+def _collect_positions_from_docs(docs):
+    poss = []
+    for item in docs or []:
+        if not isinstance(item, dict):
+            continue
+        for pos in item.get("position_int") or []:
+            if isinstance(pos, (list, tuple)) and len(pos) >= 5:
+                poss.append(tuple(pos[:5]))
+    return poss
+
+
+def _fallback_general_docs(filename, binary, lang, callback, kwargs, reason):
+    from rag.app import naive as naive_app
+    from rag.app import picture as picture_app
+
+    parser_config = copy.deepcopy(kwargs.get("parser_config") or {})
+    last_exc = None
+
+    if callback:
+        callback(0.2, f"{reason} Falling back to stable parser.")
+
+    if re.search(r"\.pdf$", filename, re.IGNORECASE):
+        layouts = []
+        preferred = str(parser_config.get("layout_recognize", "")).strip()
+        for layout in [preferred, "DeepDOC", "Plain Text"]:
+            if layout and layout != "MinerU" and layout not in layouts:
+                layouts.append(layout)
+
+        for layout in layouts:
+            fallback_kwargs = dict(kwargs)
+            fallback_conf = copy.deepcopy(parser_config)
+            fallback_conf["layout_recognize"] = layout
+            fallback_kwargs["parser_config"] = fallback_conf
+            try:
+                docs = naive_app.chunk(
+                    filename,
+                    binary=binary,
+                    lang=lang,
+                    callback=callback,
+                    **fallback_kwargs,
+                ) or []
+                if _docs_have_content(docs):
+                    logging.info("Fallback parser succeeded for %s with layout_recognize=%s", filename, layout)
+                    return docs
+            except Exception as exc:
+                last_exc = exc
+                logging.exception("Fallback parser failed for %s with layout_recognize=%s", filename, layout)
+
+    elif re.search(r"\.(jpe?g|png)$", filename, re.IGNORECASE):
+        tenant_id = kwargs.get("tenant_id")
+        if tenant_id is not None:
+            fallback_kwargs = dict(kwargs)
+            fallback_conf = copy.deepcopy(parser_config)
+            fallback_conf["layout_recognize"] = "OCR"
+            fallback_kwargs["parser_config"] = fallback_conf
+            try:
+                docs = picture_app.chunk(
+                    filename,
+                    binary=binary,
+                    tenant_id=tenant_id,
+                    lang=lang,
+                    callback=callback,
+                    **fallback_kwargs,
+                ) or []
+                if _docs_have_content(docs):
+                    logging.info("Fallback picture parser succeeded for %s", filename)
+                    return docs
+            except Exception as exc:
+                last_exc = exc
+                logging.exception("Fallback picture parser failed for %s", filename)
     else:
-        raise NotImplementedError(
-            "file type not supported yet(doc, docx, pdf, txt supported)")
+        fallback_kwargs = dict(kwargs)
+        fallback_conf = copy.deepcopy(parser_config)
+        fallback_conf["layout_recognize"] = "DeepDOC"
+        fallback_kwargs["parser_config"] = fallback_conf
+        try:
+            docs = naive_app.chunk(
+                filename,
+                binary=binary,
+                lang=lang,
+                callback=callback,
+                **fallback_kwargs,
+            ) or []
+            if _docs_have_content(docs):
+                logging.info("Fallback generic parser succeeded for %s", filename)
+                return docs
+        except Exception as exc:
+            last_exc = exc
+            logging.exception("Fallback generic parser failed for %s", filename)
 
-    doc = {
-        "docnm_kwd": filename,
-        "title_tks": rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Z]+$", "", filename))
+    if last_exc:
+        logging.warning("Fallback parser produced no content for %s after error: %s", filename, last_exc)
+    return []
+
+
+def _collapse_to_single_chunk(docs, doc, eng):
+    merged = []
+    for item in docs or []:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("content_with_weight")
+        if isinstance(text, str) and text.strip():
+            merged.append(text.strip())
+
+    if not merged:
+        return []
+
+    chunk_docs = tokenize_chunks(["\n".join(merged)], doc, eng)
+    poss = _collect_positions_from_docs(docs)
+    if poss:
+        add_positions(chunk_docs[0], poss)
+    else:
+        chunk_docs[0]["position_int"] = []
+        chunk_docs[0]["page_num_int"] = []
+        chunk_docs[0]["top_int"] = []
+    return chunk_docs
+
+class InfModel:
+    def __init__(self, model_path, max_new_token, window_size, model_deploy='ip:port', 
+                 api_url=None, api_key=None, temperature=0.0, max_retries=20):
+        self.model_path = model_path
+        self.max_new_token = max_new_token
+        self.window_size = window_size
+        self.model_deploy = model_deploy
+        self.api_url = api_url
+        self.api_key = api_key
+        self.temperature = temperature
+        self.max_retries = max_retries
+        self.inf_func = self.inf_api
+
+    def apply_chat_template(self, question, known_answer_str=''):
+        prefix_ans = known_answer_str
+        return f"""<|im_start|>user\n{question}<|im_end|>\n<|im_start|>assistant\n<think>\n</think>\n\n{prefix_ans}"""
+
+    async def inf_api(self, question, request_id, known_answer_str=''):
+        text = self.apply_chat_template(question, known_answer_str)
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        post_data = {
+            "model": self.model_path,
+            "messages": [{"role": "user", "content": text}],
+            "temperature": self.temperature,
+            "max_tokens": self.max_new_token,
+        }
+
+        api_endpoint = self.api_url or "http://172.19.0.3:8080/v1/chat/completions"
+        if "/chat/completions" not in api_endpoint:
+            api_endpoint = api_endpoint.rstrip("/") + "/chat/completions"
+
+        async with aiohttp.ClientSession() as session:
+            for attempt in range(self.max_retries):
+                try:
+                    async with session.post(api_endpoint, json=post_data, headers=headers, timeout=aiohttp.ClientTimeout(total=300)) as resp:
+                        if resp.status != 200:
+                            error_text = await resp.text()
+                            raise RuntimeError(f"HTTP {resp.status}: {error_text}")
+                        pred = await resp.json()
+                        if 'error' in pred:
+                            raise RuntimeError(pred['error'].get('message', str(pred['error'])))
+                        choices = pred.get('choices', [])
+                        if not choices:
+                            raise RuntimeError(f"Empty choices: {pred}")
+                        pred_text = choices[0].get('message', {}).get('content', "")
+                        return pred_text, text
+                except Exception as e:
+                    if attempt < self.max_retries - 1:
+                        await asyncio.sleep(min(5*(attempt+1), 30))
+                    else:
+                        raise RuntimeError(f"Max retries reached: {e}")
+
+def build_chunk_points_by_title_level(lines_with_level):
+    if not lines_with_level:
+        return [0]
+
+    levels = [
+        item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0
+        for item in lines_with_level
+    ]
+    n = len(levels)
+
+    level_to_indices = {}
+    for i, lvl in enumerate(levels):
+        if lvl > 0:
+            level_to_indices.setdefault(lvl, []).append(i)
+
+    chunk_starts = [0]
+    for i, lvl in enumerate(levels):
+        # 不再切分
+        if lvl > 0 and len(level_to_indices.get(lvl, [])) < 0:
+            if i not in chunk_starts:
+                chunk_starts.append(i)
+
+    if n not in chunk_starts:
+        chunk_starts.append(n)
+
+    return sorted(set(chunk_starts))
+
+
+class InferenceEngine:
+    def __init__(self, model_path, window_size, model_deploy, max_new_token=4096, 
+                 api_url=None, api_key=None, temperature=0.0, max_retries=20):
+        self.window_size = window_size
+        self.model = InfModel(model_path, max_new_token, window_size, model_deploy,
+                              api_url=api_url, api_key=api_key, temperature=temperature, max_retries=max_retries)
+        self.request_ids = ("".join(x) for x in itertools.product("0123456789", repeat=9))
+
+    async def iterative_inf(self, document, limit=-1, lines_with_level=None):
+        original_lines_with_level = lines_with_level
+        enable_llm_merging = False
+        level1_chunk_points = None
+        if original_lines_with_level is not None and len(original_lines_with_level) > 0:
+            level1_indices = set()
+            for idx, item in enumerate(original_lines_with_level):
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    text_content = item[0]
+                else:
+                    text_content = str(item)
+                computed_level = get_section_title_level(strip_position_stamp(text_content))
+                if computed_level == 1:
+                    level1_indices.add(idx)
+            level1_chunk_points = sorted(set([0] + list(level1_indices)))
+        blocks = []
+        block_to_original_mapping = []
+        input_count = len(original_lines_with_level) if original_lines_with_level else 0
+
+        if lines_with_level is not None and len(lines_with_level) > 0:
+            base_points = build_chunk_points_by_title_level(lines_with_level)
+            
+            if base_points:
+                for block_idx, (s, e) in enumerate(zip(base_points, base_points[1:] + [len(lines_with_level)])):
+                    if s < len(lines_with_level) and e <= len(lines_with_level) and s < e:
+                        chunk_lines = lines_with_level[s:e]
+                        if chunk_lines:
+                            texts = []
+                            max_level = 0
+                            for idx_in_chunk, x in enumerate(chunk_lines):
+                                if isinstance(x, (list, tuple)) and len(x) >= 2:
+                                    text_content = x[0]
+                                    text_level = x[1]
+                                    texts.append(text_content)
+                                    max_level = max(max_level, text_level)
+                                else:
+                                    text_content = str(x)
+                                    texts.append(text_content)
+                            
+                            block_text = '\n'.join(texts)
+                            blocks.append((block_text, max_level))
+                            block_to_original_mapping.append((s, e))
+            
+            if blocks:
+                lines_with_level = blocks
+        else:
+            if lines_with_level is None:
+                lines_with_level = []
+            if not blocks:
+                block_to_original_mapping = []
+
+        if lines_with_level is not None and len(lines_with_level) > 0:
+            lines = []
+            origin_lines = []
+            for item in lines_with_level:
+                if isinstance(item, (list, tuple)) and len(item) >= 2:
+                    line_text, title_level = item[0], item[1]
+                else:
+                    line_text = str(item)
+                    title_level = 0
+                lines.append(line_text)
+                origin_lines.append(strip_position_stamp(line_text))
+        else:
+            lines = list(filter(lambda l: l.strip(), map(str.strip, document.split('\n'))))
+            origin_lines = [strip_position_stamp(l) for l in lines]
+            lines_with_level = [(l, 0) for l in lines]
+
+        global_chunk_points = [[]]
+        raw_qa = []
+        error_count = 0
+        
+        if enable_llm_merging and blocks and block_to_original_mapping:
+            current_blocks = blocks[:]
+            current_mapping = block_to_original_mapping[:]
+
+            for target_level in [4, 3, 2, 1]:
+                same_level_ranges = []
+                current_start = None
+
+                for block_idx, block_item in enumerate(current_blocks):
+                    if isinstance(block_item, (list, tuple)) and len(block_item) >= 2:
+                        block_level = block_item[1]
+                    else:
+                        block_level = 0
+                    
+                    if block_level == target_level:
+                        if current_start is None:
+                            current_start = block_idx
+                    else:
+                        if current_start is not None:
+                            same_level_ranges.append((current_start, block_idx, target_level))
+                            current_start = None
+                
+                if current_start is not None:
+                    same_level_ranges.append((current_start, len(current_blocks), target_level))
+
+                level_merge_points = set()
+                level_merge_points.add(0)
+                
+                for range_idx, (range_start, range_end, range_level) in enumerate(same_level_ranges):
+                    if range_end - range_start <= 1:
+                        level_merge_points.add(range_start)
+                        if range_end < len(current_blocks):
+                            level_merge_points.add(range_end)
+                        continue
+                    
+                    range_blocks = current_blocks[range_start:range_end]
+                    range_blocks_for_input = [(block_item[0] if isinstance(block_item, (list, tuple)) else str(block_item), 
+                                              block_item[1] if isinstance(block_item, (list, tuple)) and len(block_item) >= 2 else 0)
+                                             for block_item in range_blocks]
+                    
+                    range_prompt = (
+                        "You are a senior financial analyst and document understanding expert. "
+                        "The following semantic blocks are from the SAME title level (level=" + str(range_level) + ") "
+                        "and are ADJACENT in the PDF document. "
+                        "Your task is to determine if these blocks are semantically continuous and can be merged.\n\n"
+                        "CRITICAL RULES:\n"
+                        "1. You can ONLY merge adjacent blocks within this range.\n"
+                        "2. You CANNOT skip any block, CANNOT split blocks, CANNOT create new boundaries.\n"
+                        "3. You can merge some blocks, all blocks, or keep all blocks separate.\n"
+                        "4. Output ONLY the starting block indices (0-based within this range) where a new chunk should start.\n"
+                        "5. Format: '{block_index}, 1, yes' for each chunk start.\n"
+                        "6. The first block (index 0) is always a chunk start.\n\n"
+                        ">>> Input blocks (same level, adjacent):\n"
+                    )
+                    
+                    range_question = range_prompt
+                    for local_idx, (block_text, block_level) in enumerate(range_blocks_for_input):
+                        range_question += index_format(local_idx, block_text, block_level)
+                    
+                    start_time = time.time()
+                    try:
+                        answer, revised_question = await self.model.inf_func(
+                            range_question, next(self.request_ids)
+                        )
+                        end_time = time.time()
+                        
+                        tmp = {
+                            'level': target_level,
+                            'range_idx': range_idx,
+                            'range_start': range_start,
+                            'range_end': range_end,
+                            'range_level': range_level,
+                            'question': revised_question,
+                            'answer': answer,
+                            'time': end_time - start_time,
+                            'question_token_num': count_length(range_question),
+                            'answer_token_num': count_length(answer)
+                        }
+                        
+                        points = parse_answer_chunking_point(answer)
+                        
+                        if points:
+                            global_points = [range_start + p for p in points if 0 <= p < (range_end - range_start)]
+                            global_points = sorted(set(global_points))
+                            
+                            if global_points and global_points[0] == range_start:
+                                validated_points = [p for p in global_points if range_start <= p <= range_end]
+                                if validated_points and validated_points[-1] <= range_end:
+                                    for p in validated_points:
+                                        level_merge_points.add(p)
+                                    level_merge_points.add(range_end)
+                                    tmp['status'] = 'check ok'
+                                    tmp['validated_points'] = validated_points
+                                else:
+                                    tmp['status'] = 'invalid points'
+                                    error_count += 1
+                                    level_merge_points.add(range_start)
+                                    level_merge_points.add(range_end)
+                            else:
+                                tmp['status'] = 'first point error'
+                                error_count += 1
+                                level_merge_points.add(range_start)
+                                level_merge_points.add(range_end)
+                        else:
+                            tmp['status'] = 'empty points'
+                            error_count += 1
+                            level_merge_points.add(range_start)
+                            level_merge_points.add(range_end)
+                        
+                        raw_qa.append(tmp)
+                        
+                    except Exception as e:
+                        error_count += 1
+                        level_merge_points.add(range_start)
+                        level_merge_points.add(range_end)
+                
+                level_merge_points.add(len(current_blocks))
+                
+                for block_idx, block_item in enumerate(current_blocks):
+                    if isinstance(block_item, (list, tuple)) and len(block_item) >= 2:
+                        block_level = block_item[1]
+                    else:
+                        block_level = 0
+                    if block_level != target_level:
+                        level_merge_points.add(block_idx)
+                        if block_idx + 1 < len(current_blocks):
+                            level_merge_points.add(block_idx + 1)
+                
+                merge_points = sorted(list(level_merge_points))
+                
+                new_blocks = []
+                new_mapping = []
+                
+                for i in range(len(merge_points) - 1):
+                    chunk_start = merge_points[i]
+                    chunk_end = merge_points[i + 1]
+                    
+                    merged_texts = []
+                    merged_max_level = 0
+                    merged_orig_start = None
+                    merged_orig_end = None
+                    
+                    for block_idx in range(chunk_start, chunk_end):
+                        if block_idx < len(current_blocks):
+                            block_item = current_blocks[block_idx]
+                            if isinstance(block_item, (list, tuple)) and len(block_item) >= 2:
+                                block_text = block_item[0]
+                                block_level = block_item[1]
+                            else:
+                                block_text = str(block_item)
+                                block_level = 0
+                            
+                            merged_texts.append(block_text)
+                            merged_max_level = max(merged_max_level, block_level)
+                            
+                            if block_idx < len(current_mapping):
+                                orig_start, orig_end = current_mapping[block_idx]
+                                if merged_orig_start is None:
+                                    merged_orig_start = orig_start
+                                merged_orig_end = orig_end
+                    
+                    if merged_texts:
+                        merged_text = '\n'.join(merged_texts)
+                        new_blocks.append((merged_text, merged_max_level))
+                        if merged_orig_start is not None and merged_orig_end is not None:
+                            new_mapping.append((merged_orig_start, merged_orig_end))
+                
+                current_blocks = new_blocks
+                current_mapping = new_mapping
+
+            validated_block_points = list(range(len(current_blocks) + 1))
+            
+            final_points = [0]
+            for i in range(len(validated_block_points) - 1):
+                chunk_block_start = validated_block_points[i]
+                chunk_block_end = validated_block_points[i + 1] - 1
+
+                if 0 <= chunk_block_end < len(current_mapping):
+                    _, end_orig = current_mapping[chunk_block_end]
+                    if end_orig not in final_points and end_orig <= len(original_lines_with_level):
+                        final_points.append(end_orig)
+            
+            if original_lines_with_level and len(original_lines_with_level) not in final_points:
+                final_points.append(len(original_lines_with_level))
+            
+            final_points = sorted(set(final_points))
+            global_chunk_points[0] = sorted(set(final_points))
+        else:
+            if level1_chunk_points is not None:
+                final_points = level1_chunk_points
+            else:
+                level1_indices = set()
+                if lines_with_level is not None and len(lines_with_level) > 0:
+                    for idx, item in enumerate(lines_with_level):
+                        if isinstance(item, (list, tuple)) and len(item) >= 2:
+                            text_content = item[0]
+                        else:
+                            text_content = str(item)
+                        computed_level = get_section_title_level(strip_position_stamp(text_content))
+                        if computed_level == 1:
+                            level1_indices.add(idx)
+                final_points = sorted(set([0] + list(level1_indices)))
+            
+            if 0 not in final_points:
+                final_points.insert(0, 0)
+            
+            global_chunk_points[0] = sorted(set(final_points))
+
+        if global_chunk_points and global_chunk_points[0]:
+            chunk_points = global_chunk_points[0]
+            chunk_points = sorted(set(chunk_points))
+            if 0 not in chunk_points:
+                chunk_points.insert(0, 0)
+            if original_lines_with_level:
+                max_idx = len(original_lines_with_level)
+                chunk_points = [p for p in chunk_points if 0 <= p <= max_idx]
+                if max_idx not in chunk_points:
+                    chunk_points.append(max_idx)
+            global_chunk_points[0] = sorted(set(chunk_points))
+        
+        if original_lines_with_level and len(original_lines_with_level) > 0:
+            original_lines_text = [item[0] if isinstance(item, (list, tuple)) else str(item) for item in original_lines_with_level]
+            original_lines_stripped = [strip_position_stamp(l) for l in original_lines_text]
+            splits = build_splits(original_lines_stripped, global_chunk_points[0] if global_chunk_points and global_chunk_points[0] else [])
+        else:
+            splits = build_splits(origin_lines, global_chunk_points[0] if global_chunk_points and global_chunk_points[0] else [])
+
+        if splits:
+            seen_ranges = set()
+            validated_splits = []
+            prev_end = 0
+            
+            for start_idx, end_idx in splits:
+                if start_idx >= end_idx:
+                    continue
+                
+                if start_idx < prev_end:
+                    start_idx = prev_end
+                    if start_idx >= end_idx:
+                        continue
+                
+                split_key = (start_idx, end_idx)
+                if split_key not in seen_ranges:
+                    seen_ranges.add(split_key)
+                    validated_splits.append(split_key)
+                    prev_end = end_idx
+            
+            validated_splits = sorted(validated_splits, key=lambda x: x[0])
+            splits = validated_splits
+
+        num_points = len(global_chunk_points[0]) if global_chunk_points and global_chunk_points[0] else 0
+
+        result = {
+            'multi_level_seg_points': global_chunk_points,
+            'raw_qa': raw_qa,
+            'error_count': error_count,
+            'splits': splits
+        }
+        return result
+
+
+def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
+    llm_config = {
+        "model_path": kwargs.get("model_path", os.environ.get("HICHUNK_MODEL_PATH", "qwen3-30b-a3b-instruct-2507-fp8")),
+        "window_size": kwargs.get("window_size", int(os.environ.get("HICHUNK_WINDOW_SIZE", "16384"))),
+        "model_deploy": kwargs.get("model_deploy", "ip:port"),
+        "max_new_token": kwargs.get("max_new_token", int(os.environ.get("HICHUNK_MAX_TOKEN", "8192"))),
+        "api_url": kwargs.get("api_url", os.environ.get("HICHUNK_API_URL", "http://172.19.0.3:8080/v1/chat/completions")), 
+        "api_key": kwargs.get("api_key", os.environ.get("HICHUNK_API_KEY", "gpustack_293c70e664a90d95_b9d12e775692d8770d509f842e0ee81f")),         
+        "temperature": kwargs.get("temperature", 0.0),
+        "max_retries": kwargs.get("max_retries", 20)
     }
+
+    parser_config = kwargs.get("parser_config", {"chunk_token_num": 512, "delimiter": "\n!?。！？；，、"})
+    parser_config = copy.deepcopy(parser_config)
+    limit = kwargs.get("limit", int(os.environ.get("HICHUNK_LIMIT", "100")))
+
+    normalized_doc_name = re.sub(r"\.(xlsx?|xlsm)$", ".pdf", filename, flags=re.IGNORECASE)
+    doc = {"docnm_kwd": normalized_doc_name}
+    doc["title_tks"] = rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Z]+$", "", doc["docnm_kwd"]))
     doc["title_sm_tks"] = rag_tokenizer.fine_grained_tokenize(doc["title_tks"])
-    tokenize(doc, "\n".join(sections), eng)
-    return [doc]
+    eng = lang.lower() == "english"
 
+    sections, tbls = [], []
+    table_indices_in_mineru = []  
 
-if __name__ == "__main__":
-    import sys
+    is_mineru_doc = re.search(r"\.(pdf|xlsx?|xlsm)$", filename, re.IGNORECASE)
+    is_mineru_img = re.search(r"\.(jpe?g|png)$", filename, re.IGNORECASE)
+    if is_mineru_doc or is_mineru_img:
+        is_excel_mineru_path = bool(re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE))
+        if callback:
+            callback(0.1, "Start MinerU parsing (PDF or image).")
 
+        mineru_executable = os.environ.get("MINERU_EXECUTABLE", "mineru")
+        mineru_api = parser_config.get("mineru_api_base") or resolve_mineru_api_from_env()
+        mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api)
 
-    def dummy(prog=None, msg=""):
-        pass
+        backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
+        if not mineru_parser.check_installation():
+            if is_excel_mineru_path:
+                logging.error(
+                    "[MinerU][Excel] MinerU 不可用，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
+                    filename,
+                    backend,
+                    parser_config,
+                )
+                if callback:
+                    callback(-1, "Excel+MinerU：MinerU 不可用，已禁用 naive 回退，请检查 MINERU_EXECUTABLE / mineru_api_base。")
+                raise RuntimeError("Excel+MinerU: MinerU unavailable, naive fallback disabled for spreadsheet.")
+            return _collapse_to_single_chunk(
+                _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU is unavailable."),
+                doc,
+                eng,
+            )
 
-    chunk(sys.argv[1], from_page=0, to_page=10, callback=dummy)
+        logging.info("[MinerU] Start parse: file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
+        try:
+            mineru_sections, mineru_tables = mineru_parser.parse_document(
+                filepath=filename,
+                binary=binary,
+                callback=callback,
+                output_dir=os.environ.get("MINERU_OUTPUT_DIR", ""),
+                backend=backend,
+                delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
+            )
+        except KeyError as exc:
+            if str(exc).strip("'\"") == "type":
+                if is_excel_mineru_path:
+                    logging.exception(
+                        "[MinerU][Excel] 输出缺少 type，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
+                        filename,
+                        backend,
+                        parser_config,
+                    )
+                    if callback:
+                        callback(
+                            -1,
+                            f"Excel+MinerU：MinerU 输出缺少 type，已禁用 naive 回退。file={filename} backend={backend}",
+                        )
+                    raise RuntimeError("Excel+MinerU: MinerU output missing 'type', naive fallback disabled.") from exc
+                logging.exception("MinerU parser output misses 'type'; file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
+                return _collapse_to_single_chunk(
+                    _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU output missing 'type'."),
+                    doc,
+                    eng,
+                )
+            else:
+                raise
+        except Exception as exc:
+            if is_excel_mineru_path:
+                logging.exception(
+                    "[MinerU][Excel] 解析失败，已禁用 naive 回退: file=%s backend=%s parser_config=%s exc_type=%s exc_repr=%r",
+                    filename,
+                    backend,
+                    parser_config,
+                    type(exc).__name__,
+                    exc,
+                )
+                if callback:
+                    callback(
+                        -1,
+                        f"Excel+MinerU 解析失败（已禁用 naive 回退）: {type(exc).__name__}: {exc!s}. file={filename} backend={backend}",
+                    )
+                raise RuntimeError(f"Excel+MinerU parse failed, naive fallback disabled: {exc!s}") from exc
+            logging.exception("MinerU parser failed; file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
+            return _collapse_to_single_chunk(
+                _fallback_general_docs(filename, binary, lang, callback, kwargs, f"MinerU parse failed: {exc}"),
+                doc,
+                eng,
+            )
+
+        for idx, item in enumerate(mineru_sections):
+            text = (item[0] if len(item) >= 1 else "").strip()
+            preview = (text[:])
+            preview = preview.replace("\n", " ").replace("\r", " ")
+            logging.info("  [%d] %s", idx + 1, preview)
+
+        count_before_dedup = len(mineru_sections)
+        unique_sections = []
+        seen_key = set()
+        for item in mineru_sections:
+            text = (item[0] if len(item) >= 1 else "").strip()
+            pos = item[1] if len(item) > 1 else None
+            if not text:
+                unique_sections.append(item)
+                continue
+            if is_html_table(text):
+                key = ("tab", hash(text))
+            else:
+                pos_hash = hash(str(pos)) if pos is not None else None
+                key = ("sec", hash(text), pos_hash)
+            if key not in seen_key:
+                unique_sections.append(item)
+                seen_key.add(key)
+            else:
+                pass  
+        mineru_sections = unique_sections
+
+        mineru_sections_with_level = []
+        for item in mineru_sections:
+            if len(item) == 2:
+                text, pos_tag = item
+                text = " ".join((text or "").strip().split())
+                title_level = 0 if is_html_table(text) else get_section_title_level(text)
+                mineru_sections_with_level.append((text, pos_tag, title_level))
+            elif len(item) == 3:
+                text = " ".join((item[0] or "").strip().split())
+                title_level = 0 if is_html_table(text) else get_section_title_level(text)
+                mineru_sections_with_level.append((text, item[1], title_level))
+            else:
+                text = item[0] if len(item) > 0 else ""
+                pos_tag = item[1] if len(item) > 1 else None
+                text = " ".join((text or "").strip().split())
+                title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
+                mineru_sections_with_level.append((text, pos_tag, title_level))
+
+        mineru_sections = mineru_sections_with_level
+        levels_display = []
+        for item in mineru_sections:
+            text = item[0] if len(item) >= 1 else ""
+            lv = item[2] if len(item) >= 3 else 0
+            levels_display.append("tab" if is_html_table(text) else lv)
+        lines_with_level_for_chunk = [
+            (item[0], item[2]) if len(item) >= 3 else (item[0] if len(item) >= 1 else "", 0)
+            for item in mineru_sections
+        ]
+        base_points = build_chunk_points_by_title_level(lines_with_level_for_chunk)
+        chunks_levels = [
+            levels_display[s:e]
+            for s, e in zip(base_points, base_points[1:] + [len(levels_display)])
+            if s < e
+        ]
+        # logging.info(
+        #     "[第二步 标题层级] 划分列表（0=原文 1=一级 2=二级 3=三级 4=四级标题 tab=表格）: %s",
+        #     chunks_levels,
+        # )
+
+        def _normalize_pos_list(poss):
+            norm = []
+            if not poss:
+                return norm
+            for p in poss:
+                try:
+                    if not isinstance(p, (list, tuple)) or len(p) < 5:
+                        continue
+                    pn = p[0][0] if isinstance(p[0], list) else p[0]
+                    norm.append((pn, p[1], p[2], p[3], p[4]))
+                except Exception:
+                    continue
+            return norm
+
+        for idx, section_item in enumerate(mineru_sections):
+            if len(section_item) >= 2:
+                text, pos_tag = section_item[0], section_item[1]
+                title_level = section_item[2] if len(section_item) >= 3 else 0
+            else:
+                text = section_item[0] if len(section_item) > 0 else ""
+                pos_tag = None
+                title_level = 0
+            
+            poss = _normalize_pos_list(mineru_parser.extract_positions(pos_tag)) if pos_tag else []
+            if is_html_table(text):
+                tbls.append(((None, text), poss if poss else []))
+                table_indices_in_mineru.append(idx)
+                sections.append((text, idx, poss, 0))
+            else:
+                sections.append((text, idx, poss, title_level))
+        
+                        
+        if mineru_tables:
+            for table_item in mineru_tables:
+                if isinstance(table_item, tuple) and len(table_item) == 2:
+                    table_text, table_pos = table_item
+                    if table_text is None:
+                        continue
+                    table_text = str(table_text).strip()
+                    if not table_text:
+                        continue
+                    poss = _normalize_pos_list(mineru_parser.extract_positions(table_pos)) if table_pos else []
+                    tbls.append(((None, table_text), poss))
+                else:
+                    if table_item is None:
+                        continue
+                    fallback_text = str(table_item).strip()
+                    if not fallback_text:
+                        continue
+                    tbls.append(((None, fallback_text), []))
+
+        if not hasattr(mineru_parser, 'outlines'):
+            mineru_parser.outlines = []
+
+        if callback:
+            callback(0.3, "Finish MinerU parsing.")
+
+    lines = []
+    section_idx_mapping = []
+    for i, section_item in enumerate(sections):
+        if len(section_item) >= 3:
+            txt, sec_id, poss = section_item[0], section_item[1], section_item[2]
+            title_level = section_item[3] if len(section_item) >= 4 else 0
+        else:
+            txt = section_item[0] if len(section_item) > 0 else ""
+            sec_id = section_item[1] if len(section_item) > 1 else i
+            poss = section_item[2] if len(section_item) > 2 else []
+            title_level = 0
+        
+        if txt and txt.strip():
+            lines.append((txt, title_level))
+            section_idx_mapping.append(i) 
+  
+    lines_with_level_for_inf = [
+        (
+            item[0] if isinstance(item, (list, tuple)) else str(item),
+            item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0,
+        )
+        for item in lines
+    ]
+    base_points = build_chunk_points_by_title_level(lines_with_level_for_inf)
+    if not base_points:
+        base_points = [0]
+    if 0 not in base_points:
+        base_points.insert(0, 0)
+    if len(lines_with_level_for_inf) not in base_points:
+        base_points.append(len(lines_with_level_for_inf))
+    base_points = sorted(set(base_points))
+    origin_lines_for_split = [strip_position_stamp(text) for text, _ in lines_with_level_for_inf]
+    result = {
+        "multi_level_seg_points": [base_points],
+        "raw_qa": [],
+        "error_count": 0,
+        "splits": build_splits(origin_lines_for_split, base_points),
+    }
+
+    # splits_from_inf = result.get('splits', [])
+    # logging.info("[第三步 智能分块] 输出 | 得到 splits 数: %d", len(splits_from_inf))
+
+    if len(lines) != len(section_idx_mapping):
+        if len(section_idx_mapping) < len(lines):
+            last_idx = section_idx_mapping[-1] if section_idx_mapping else 0
+            section_idx_mapping.extend([last_idx] * (len(lines) - len(section_idx_mapping)))
+        else:
+            section_idx_mapping = section_idx_mapping[:len(lines)]
+
+    if not lines or len(lines) == 0:
+        return _collapse_to_single_chunk(
+            _fallback_general_docs(filename, binary, lang, callback, kwargs, "No text extracted from MinerU path."),
+            doc,
+            eng,
+        )
+    inline_lines = []
+    for item in lines:
+        line_text = item[0] if isinstance(item, (list, tuple)) and len(item) >= 1 else str(item) if item else ""
+        if line_text and str(line_text).strip():
+            inline_lines.append(str(line_text))
+    if not inline_lines:
+        return _collapse_to_single_chunk(
+            _fallback_general_docs(filename, binary, lang, callback, kwargs, "No non-empty lines available for One chunk."),
+            doc,
+            eng,
+        )
+    chunks = ['\n'.join(inline_lines)]
+
+    poss_list = []
+    for line_idx in range(len(lines)):
+        if 0 <= line_idx < len(section_idx_mapping):
+            sec_idx = section_idx_mapping[line_idx]
+            if 0 <= sec_idx < len(sections):
+                section_item = sections[sec_idx]
+                if len(section_item) > 2 and section_item[2]:
+                    poss_list.extend(section_item[2])
+    chunk_positions = [poss_list]
+
+    chunk_docs = tokenize_chunks(chunks, doc, eng)
+
+    for i, chunk_doc in enumerate(chunk_docs):
+        if i < len(chunk_positions):
+            if chunk_positions[i]:
+                add_positions(chunk_doc, chunk_positions[i])
+            else:
+                chunk_doc["position_int"] = []
+                chunk_doc["page_num_int"] = []
+                chunk_doc["top_int"] = []
+        else:
+            chunk_doc["position_int"] = []
+            chunk_doc["page_num_int"] = []
+            chunk_doc["top_int"] = []
+        
+        if "position_int" in chunk_doc and chunk_doc["position_int"]:
+            chunk_doc["position_int"] = [
+                list(pos) if isinstance(pos, tuple) else pos 
+                for pos in chunk_doc["position_int"]
+            ]
+    
+    res = chunk_docs
+
+    if callback:
+        callback(1.0, "Finish chunking.")
+
+    return res

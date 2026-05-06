@@ -387,6 +387,7 @@ def get_parser_config(chunk_method, parser_config):
         "laws": {"raptor": {"use_raptor": False}, "graphrag": {"use_graphrag": False}},
         "presentation": {"raptor": {"use_raptor": False}, "graphrag": {"use_graphrag": False}},
         "one": None,
+        "hichunk": None,
         "knowledge_graph": {
             "chunk_token_num": 8192,
             "delimiter": r"\n",

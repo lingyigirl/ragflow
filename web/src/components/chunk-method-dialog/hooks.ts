@@ -15,6 +15,7 @@ const ParserListMap = new Map([
       'one',
       'qa',
       'knowledge_graph',
+      'hichunk',
     ],
   ],
   [
@@ -50,6 +51,7 @@ const ParserListMap = new Map([
       'qa',
       'table',
       'knowledge_graph',
+      'hichunk',
     ],
   ],
   [
@@ -67,7 +69,7 @@ const ParserListMap = new Map([
   ],
   [
     ['md', 'mdx'],
-    ['naive', 'qa', 'knowledge_graph'],
+    ['naive', 'qa', 'knowledge_graph', 'hichunk'],
   ],
   [['json'], ['naive', 'knowledge_graph']],
   [['eml'], ['email']],
@@ -104,7 +106,14 @@ export const useFetchParserListOnMount = (documentExtension: string) => {
   return { parserList: nextParserList };
 };
 
-const hideAutoKeywords = ['qa', 'table', 'resume', 'knowledge_graph', 'tag'];
+const hideAutoKeywords = [
+  'qa',
+  'table',
+  'resume',
+  'knowledge_graph',
+  'tag',
+  'hichunk',
+];
 
 export const useShowAutoKeywords = () => {
   const showAutoKeywords = useCallback((selectedTag: string) => {

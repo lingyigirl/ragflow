@@ -304,6 +304,8 @@ export default {
         </p><p>
         如果你要總結的東西需要一篇文章的全部上下文，並且所選LLM的上下文長度覆蓋了文檔長度，你可以嘗試這種方法。
         </p>`,
+      hichunk: `<p>適用於透過 <b>MinerU</b> 解析的 <b>PDF、Excel（轉 PDF 路徑）、圖片</b> 等；解析後結合標題層級與規則完成智慧分塊，可選接入相容 OpenAI 的推理服務。</p>
+      <p>請在資料集側設定嵌入模型與 PageRank；PDF 情境下可在單一文件解析對話框中選擇版面辨識與 MinerU 相關選項。</p>`,
       knowledgeGraph: `<p>支援的檔案格式為<b>DOCX、EXCEL、PPT、IMAGE、PDF、TXT、MD、JSON、EML</b>
 
 <p>文件分塊後，使用分塊擷取整個文件的知識圖譜和心智圖。此方法將簡單的方法應用於區塊檔案：

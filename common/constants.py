@@ -102,6 +102,7 @@ class ParserType(StrEnum):
     NAIVE = "naive"
     PICTURE = "picture"
     ONE = "one"
+    HICHUNK = "hichunk"
     AUDIO = "audio"
     EMAIL = "email"
     KG = "knowledge_graph"

@@ -1,7 +1,7 @@
 const getImageName = (prefix: string, length: number) =>
   new Array(length)
     .fill(0)
-    .map((x, idx) => `chunk-method/${prefix}-0${idx + 1}`);
+    .map((_, idx) => `chunk-method/${prefix}-0${idx + 1}`);
 
 export const ImageMap = {
   book: getImageName('book', 4),
@@ -15,6 +15,7 @@ export const ImageMap = {
   resume: getImageName('resume', 2),
   table: getImageName('table', 2),
   one: getImageName('one', 2),
+  hichunk: getImageName('naive', 2),
   knowledge_graph: getImageName('knowledge-graph', 2),
   tag: getImageName('tag', 2),
 };

@@ -75,6 +75,7 @@ const hidePagesChunkMethods = [
   DocumentParserType.Picture,
   DocumentParserType.Resume,
   DocumentParserType.One,
+  DocumentParserType.Hichunk,
   DocumentParserType.KnowledgeGraph,
 ];
 
@@ -204,7 +205,10 @@ export function ChunkMethodDialog({
     return (
       isPdf &&
       hidePagesChunkMethods
-        .filter((x) => x !== DocumentParserType.One)
+        .filter(
+          (x) =>
+            x !== DocumentParserType.One && x !== DocumentParserType.Hichunk,
+        )
         .every((x) => x !== selectedTag)
     );
   }, [selectedTag, isPdf]);
