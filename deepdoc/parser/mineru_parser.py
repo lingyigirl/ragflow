@@ -47,6 +47,14 @@ if LOCK_KEY_pdfplumber not in sys.modules:
     sys.modules[LOCK_KEY_pdfplumber] = threading.Lock()
 
 
+def resolve_mineru_api_from_env() -> str:
+    for key in ("MINERU_APISERVER", "mineru_apiserver", "MINERU_API_BASE", "mineru_api_base"):
+        value = os.environ.get(key, "")
+        if value:
+            return value.strip().rstrip("/")
+    return ""
+
+
 class MinerUContentType(StrEnum):
     IMAGE = "image"
     TABLE = "table"
