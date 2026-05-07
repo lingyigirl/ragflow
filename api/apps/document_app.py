@@ -42,7 +42,7 @@ from api.utils.api_utils import (
     get_data_error_result,
     get_json_result,
     server_error_response,
-    validate_request, get_request_json, token_required,
+    validate_request, get_request_json, token_required, get_parser_config,
 )
 from api.utils.file_utils import filename_type, thumbnail
 from common.file_utils import get_project_base_directory
@@ -1194,6 +1194,8 @@ async def change_parser():
 
         if (doc.type == FileType.VISUAL and req["parser_id"] != "picture") or (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req["parser_id"] != "presentation"):
             return get_data_error_result(message="Not supported yet!")
+        if not req.get("parser_config"):
+            req["parser_config"] = get_parser_config(req["parser_id"], None)
         if "parser_config" in req:
             DocumentService.update_parser_config(doc.id, req["parser_config"])
         reset_doc()
