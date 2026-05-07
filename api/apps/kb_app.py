@@ -31,7 +31,7 @@ from api.db.services.pipeline_operation_log_service import PipelineOperationLogS
 from api.db.services.task_service import TaskService, GRAPH_RAPTOR_FAKE_DOC_ID
 from api.db.services.user_service import TenantService, UserTenantService
 from api.utils.api_utils import get_error_data_result, server_error_response, get_data_error_result, validate_request, not_allowed_parameters, \
-    get_request_json, get_parser_config, deep_merge
+    get_request_json
 from api.db import VALID_FILE_TYPES
 from api.db.services.knowledgebase_service import KnowledgebaseService
 from api.db.db_models import File
@@ -119,15 +119,6 @@ async def update():
             KnowledgebaseService.query(name=req["name"], tenant_id=current_user.id, status=StatusEnum.VALID.value)) >= 1:
             return get_data_error_result(
                 message="Duplicated dataset name.")
-
-        if req.get("parser_config"):
-            req["parser_config"] = deep_merge(kb.parser_config, req["parser_config"])
-
-        if (chunk_method := req.get("parser_id")) and chunk_method != kb.parser_id:
-            if not req.get("parser_config"):
-                req["parser_config"] = get_parser_config(chunk_method, None)
-        elif "parser_config" in req and not req["parser_config"]:
-            del req["parser_config"]
 
         del req["kb_id"]
         connectors = []

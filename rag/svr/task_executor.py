@@ -102,9 +102,8 @@ FACTORY = {
     ParserType.AUDIO.value: audio,
     ParserType.EMAIL.value: email,
     ParserType.KG.value: naive,
-    ParserType.TAG.value: tag,
+    ParserType.TAG.value: tag
 }
-FACTORY["hichunk"] = hichunk
 
 TASK_TYPE_TO_PIPELINE_TASK_TYPE = {
     "dataflow": PipelineTaskType.PARSE,
@@ -431,14 +430,7 @@ async def build_chunks(task, progress_callback):
                                               (int(settings.DOC_MAXIMUM_SIZE / 1024 / 1024)))
         return []
 
-    parser_id = (task.get("parser_id") or "").strip().lower()
-    chunker = FACTORY.get(parser_id)
-    if chunker is None:
-        known = ", ".join(sorted(FACTORY.keys()))
-        err = "Unsupported parser_id=%r (registered: %s)" % (parser_id, known)
-        logging.error(err)
-        set_progress(task["id"], prog=-1, msg=err)
-        raise RuntimeError(err)
+    chunker = FACTORY[task["parser_id"].lower()]
     try:
         st = timer()
         bucket, name = File2DocumentService.get_storage_address(doc_id=task["doc_id"])

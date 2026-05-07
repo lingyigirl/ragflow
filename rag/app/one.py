@@ -723,14 +723,22 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
-        _mineru_srv = (parser_config.get("mineru_server_url") or "").strip() or (
-            os.environ.get("MINERU_SERVER_URL", "").strip().rstrip("/") or None
-        )  # vlm-http-client 等后端需要的服务地址
-        _mineru_ok, _mineru_reason = mineru_parser.check_installation(backend=backend, server_url=_mineru_srv)  # 探活结果为元组(bool,说明)
-        if not _mineru_ok:  # 原写法 if not (...) 对已解包不适用；此处与 hichunk 一致：失败后仍尝试解析
-            logging.warning("[MinerU][one] 解析前 API 探活未通过(%s)，仍继续 parse_document。", _mineru_reason)
-            if callback:  # 任务进度提示，不视为致命错误
-                callback(0.11, "[MinerU] API 探活未通过，仍尝试解析")
+        if not mineru_parser.check_installation():
+            if is_excel_mineru_path:
+                logging.error(
+                    "[MinerU][Excel] MinerU 不可用，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
+                    filename,
+                    backend,
+                    parser_config,
+                )
+                if callback:
+                    callback(-1, "Excel+MinerU：MinerU 不可用，已禁用 naive 回退，请检查 MINERU_EXECUTABLE / mineru_api_base。")
+                raise RuntimeError("Excel+MinerU: MinerU unavailable, naive fallback disabled for spreadsheet.")
+            return _collapse_to_single_chunk(
+                _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU is unavailable."),
+                doc,
+                eng,
+            )
 
         logging.info("[MinerU] Start parse: file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
         try:
@@ -741,10 +749,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 output_dir=os.environ.get("MINERU_OUTPUT_DIR", ""),
                 backend=backend,
                 delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
-                lang=lang,
-                parser_config=parser_config,
-                kb_id=kwargs.get("kb_id"),
-                doc_id=kwargs.get("doc_id"),
             )
         except KeyError as exc:
             if str(exc).strip("'\"") == "type":

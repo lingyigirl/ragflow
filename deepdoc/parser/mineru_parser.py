@@ -47,14 +47,6 @@ if LOCK_KEY_pdfplumber not in sys.modules:
     sys.modules[LOCK_KEY_pdfplumber] = threading.Lock()
 
 
-def resolve_mineru_api_from_env() -> str:
-    for key in ("MINERU_APISERVER", "mineru_apiserver", "MINERU_API_BASE", "mineru_api_base"):
-        value = os.environ.get(key, "")
-        if value:
-            return value.strip().rstrip("/")
-    return ""
-
-
 class MinerUContentType(StrEnum):
     IMAGE = "image"
     TABLE = "table"
@@ -285,6 +277,8 @@ class MinerUParser(RAGFlowPdfParser):
         output_path = tempfile.mkdtemp(prefix=f"{pdf_file_name}_{options.method}_", dir=str(output_dir))
         output_zip_path = os.path.join(str(output_dir), f"{Path(output_path).name}.zip")
 
+        files = {"files": (pdf_file_name + ".pdf", open(pdf_file_path, "rb"), "application/pdf")}
+
         data = {
             "output_dir": "./output",
             "lang_list": options.lang,
@@ -315,15 +309,8 @@ class MinerUParser(RAGFlowPdfParser):
         try:
             self.logger.info(f"[MinerU] invoke api: {self.mineru_api}/file_parse backend={options.backend} server_url={data.get('server_url')}")
             self._emit_callback(callback, 0.20, f"[MinerU] invoke api: {self.mineru_api}/file_parse")
-            with open(pdf_file_path, "rb") as _upload_fp:
-                files = {"files": (pdf_file_name + ".pdf", _upload_fp, "application/pdf")}
-                response = requests.post(
-                    url=f"{self.mineru_api}/file_parse",
-                    files=files,
-                    data=data,
-                    headers=headers,
-                    timeout=1800,
-                )
+            response = requests.post(url=f"{self.mineru_api}/file_parse", files=files, data=data, headers=headers,
+                                     timeout=1800)
 
             response.raise_for_status()
             if response.headers.get("Content-Type") == "application/zip":
@@ -1582,40 +1569,10 @@ class MinerUParser(RAGFlowPdfParser):
             self._emit_callback(callback, -1, f"[MinerU] 上传解析产物到MinIO失败: {e}")
             return False
 
-    @staticmethod
-    def _binary_payload_to_bytes(binary: Any) -> bytes:
-        if binary is None:
-            return b""
-        if isinstance(binary, (bytes, bytearray, memoryview)):
-            return bytes(binary)
-        read_fn = getattr(binary, "read", None)
-        if callable(read_fn):
-            seek_fn = getattr(binary, "seek", None)
-            if callable(seek_fn):
-                try:
-                    seek_fn(0)
-                except (OSError, ValueError, TypeError):
-                    pass
-            data = read_fn()
-            if not isinstance(data, (bytes, bytearray, memoryview)):
-                raise TypeError("binary.read() must return bytes-like data")
-            return bytes(data)
-        raise TypeError(f"unsupported binary type for MinerU: {type(binary)}")
-
-    def parse_document(
-        self,
-        filepath: str | PathLike[str],
-        binary: Any = None,
-        callback: Optional[Callable] = None,
-        **kwargs: Any,
-    ) -> tuple:
-        """与 parse_pdf 行为一致，供 hichunk / one 等模块按约定名称调用。"""
-        return self.parse_pdf(filepath=filepath, binary=binary, callback=callback, **kwargs)
-
     def parse_pdf(
             self,
             filepath: str | PathLike[str],
-            binary: Any = None,
+            binary: BytesIO | bytes,
             callback: Optional[Callable] = None,
             *,
             output_dir: Optional[str] = None,
@@ -1692,9 +1649,8 @@ class MinerUParser(RAGFlowPdfParser):
         if binary:
             temp_dir = Path(tempfile.mkdtemp(prefix="mineru_bin_pdf_"))
             temp_pdf = temp_dir / pdf_file_name
-            _bin_bytes = MinerUParser._binary_payload_to_bytes(binary)
             with open(temp_pdf, "wb") as f:
-                f.write(_bin_bytes)
+                f.write(binary)
             pdf = temp_pdf
             self.logger.info(f"[MinerU] Received binary PDF -> {temp_pdf}")
             self._emit_callback(callback, 0.15, f"[MinerU] Received binary PDF -> {temp_pdf}")

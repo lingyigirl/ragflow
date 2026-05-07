@@ -340,7 +340,10 @@ def generate_confirmation_token():
 
 
 def get_parser_config(chunk_method, parser_config):
-    chunk_method = (chunk_method or "naive").strip().lower() or "naive"
+    if not chunk_method:
+        chunk_method = "naive"
+
+    # Define default configurations for each chunking method
     base_defaults = {
         "table_context_size": 0,
         "image_context_size": 0,
@@ -395,13 +398,6 @@ def get_parser_config(chunk_method, parser_config):
         "email": None,
         "picture": None,
     }
-
-    if chunk_method not in key_mapping:
-        logging.warning(
-            "get_parser_config: unknown chunk_method=%r, merge base_defaults with parser_config only",
-            chunk_method,
-        )
-        return deep_merge(base_defaults, parser_config or {})
 
     default_config = key_mapping[chunk_method]
 
