@@ -442,7 +442,23 @@ async def build_chunks(task, progress_callback):
     try:
         st = timer()
         bucket, name = File2DocumentService.get_storage_address(doc_id=task["doc_id"])
+        if parser_id == "hichunk":
+            logging.info(
+                "[KB-HiChunk 1/14] build_chunks 拉取对象存储 bucket=%r name=%r doc_id=%s kb_id=%s",
+                bucket,
+                name,
+                task.get("doc_id"),
+                task.get("kb_id"),
+            )
         binary = await get_storage_binary(bucket, name)
+        if parser_id == "hichunk":
+            logging.info(
+                "[KB-HiChunk 2/14] 对象存储读取完成 耗时=%.3fs binary_len=%s location=%s name=%s",
+                timer() - st,
+                len(binary) if binary is not None else None,
+                task.get("location"),
+                task.get("name"),
+            )
         logging.info("From minio({}) {}/{}".format(timer() - st, task["location"], task["name"]))
     except TimeoutError:
         progress_callback(-1, "Internal server error: Fetch file from minio timeout. Could you try it again.")

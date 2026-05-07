@@ -749,6 +749,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 output_dir=os.environ.get("MINERU_OUTPUT_DIR", ""),
                 backend=backend,
                 delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
+                lang=lang,
+                parser_config=parser_config,
+                kb_id=kwargs.get("kb_id"),
+                doc_id=kwargs.get("doc_id"),
             )
         except KeyError as exc:
             if str(exc).strip("'\"") == "type":
