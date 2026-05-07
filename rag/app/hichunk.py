@@ -12,6 +12,7 @@ from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_position
 
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
 from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+from rag.app import naive as naive_app
 import logging
 
 load_dotenv()
@@ -146,7 +147,6 @@ def _docs_have_content(docs):
 
 
 def _fallback_general_docs(filename, binary, lang, callback, kwargs, reason):
-    from rag.app import naive as naive_app
     from rag.app import picture as picture_app
 
     parser_config = copy.deepcopy(kwargs.get("parser_config") or {})
@@ -677,6 +677,11 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     is_mineru_doc = re.search(r"\.(pdf|xlsx?|xlsm)$", filename, re.IGNORECASE)
     is_mineru_img = re.search(r"\.(jpe?g|png)$", filename, re.IGNORECASE)
+    if not is_mineru_doc and not is_mineru_img:
+        if callback:
+            callback(0.05, "[HiChunk] 该文件后缀不支持 MinerU，已切换到与 naive 相同的通用解析分块链路。")
+        logging.info("[hichunk] 非 PDF/Excel/图片，委托 naive.chunk: filename=%s", filename)
+        return naive_app.chunk(filename, binary=binary, lang=lang, callback=callback, **kwargs) or []
     if is_mineru_doc or is_mineru_img:
         is_excel_mineru_path = bool(re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE))
         if callback:

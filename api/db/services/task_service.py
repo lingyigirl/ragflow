@@ -123,7 +123,7 @@ class TaskService(CommonService):
         docs = list(docs.dicts())
         # Assuming docs = list(docs.dicts())
         if docs:
-            kb_config = docs[0]['kb_parser_config']  # Dict from Knowledgebase.parser_config
+            kb_config = docs[0].get("kb_parser_config") or {}
             mineru_method = kb_config.get('mineru_parse_method', 'auto')
             mineru_formula = kb_config.get('mineru_formula_enable', True)
             mineru_table = kb_config.get('mineru_table_enable', True)
