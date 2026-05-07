@@ -2365,18 +2365,21 @@ async def batch_doc_progress():
 async def upload_parse_user_kb():
     try:
         from api.db.db_models import MineruSection
-        form = await request.form
-        req_usr_id = (form.get("usr_id") or "").strip()
-        if not req_usr_id:
-            return get_json_result(data=False, message='Lack of "usr_id"', code=RetCode.ARGUMENT_ERROR)
-        kb_name = req_usr_id
-        ok_user, user = UserService.get_by_id(req_usr_id)
-        if not ok_user or not user:
+        form = await request.form 
+        req_user_id = (form.get("user_id") or "").strip() 
+        if not req_user_id: 
+            return get_json_result(data=False, message='Lack of "user_id"', code=RetCode.ARGUMENT_ERROR)
+        user_tenants = UserTenantService.query(user_id=req_user_id, status=StatusEnum.VALID.value)
+        if not user_tenants: 
+            return get_data_error_result(message="User tenant relation not found.")
+        ok_user, user = UserService.get_by_id(req_user_id)
+        if not ok_user or not user: 
             return get_data_error_result(message="User not found.")
-        user_tenants = UserTenantService.query(user_id=req_usr_id, status=StatusEnum.VALID.value)
-        if not user_tenants:
-            return get_data_error_result(message="Tenant not found.")
-        tenant_id = str(user_tenants[0].tenant_id)
+        for ut in user_tenants:
+            if str(ut.user_id) != str(user.id):
+                return get_data_error_result(message="User tenant mismatch.")
+        tenant_id = str(user_tenants[0].tenant_id) 
+        kb_name = req_user_id 
 
         files = await request.files
         if "file" not in files:
