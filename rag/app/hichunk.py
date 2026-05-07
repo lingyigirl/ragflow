@@ -688,19 +688,14 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
-        _mineru_ok, _ = mineru_parser.check_installation()
-        if not _mineru_ok:
-            if is_excel_mineru_path:
-                logging.error(
-                    "[MinerU][Excel] MinerU 不可用，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
-                    filename,
-                    backend,
-                    parser_config,
-                )
-                if callback:
-                    callback(-1, "Excel+MinerU：MinerU 不可用，已禁用 naive 回退，请检查 MINERU_EXECUTABLE / mineru_api_base。")
-                raise RuntimeError("Excel+MinerU: MinerU unavailable, naive fallback disabled for spreadsheet.")
-            return _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU is unavailable.")
+        _mineru_srv = (parser_config.get("mineru_server_url") or "").strip() or (
+            os.environ.get("MINERU_SERVER_URL", "").strip().rstrip("/") or None
+        )  # vlm-http-client 等后端需要的服务地址
+        _mineru_ok, _mineru_reason = mineru_parser.check_installation(backend=backend, server_url=_mineru_srv)  # 解析前探活，返回(bool,说明)
+        if not _mineru_ok:  # 探活失败不中断： openapi 探测失败不等于 file_parse 不可用
+            logging.warning("[MinerU][hichunk] 解析前 API 探活未通过(%s)，仍继续 parse_document。", _mineru_reason)
+            if callback:  # 向任务进度条提示仍可继续解析
+                callback(0.11, "[MinerU] API 探活未通过，仍尝试解析")
 
         logging.info("[MinerU] Start parse: file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
         try:
