@@ -864,24 +864,37 @@ async def change_status():
 
 
 @manager.route("/rm", methods=["POST"])  # noqa: F821
-@login_required
 @validate_request("doc_id")
 async def rm():
-    req = await get_request_json()
-    doc_ids = req["doc_id"]
-    if isinstance(doc_ids, str):
-        doc_ids = [doc_ids]
+    req = await get_request_json()  
+    doc_ids = req["doc_id"] 
+    if isinstance(doc_ids, str): 
+        doc_ids = [doc_ids] 
+
+    if current_user: 
+        requester_id = str(current_user.id).strip() 
+    else: 
+        raw_uid = req.get("user_id") 
+        if raw_uid is None or (isinstance(raw_uid, str) and not raw_uid.strip()): 
+            return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR) 
+        req_user_id = str(raw_uid).strip() 
+        ok_user, user = UserService.get_by_id(req_user_id) 
+        if not ok_user or not user: 
+            return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR) 
+        if str(getattr(user, "status", "")) != StatusEnum.VALID.value: 
+            return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR) 
+        requester_id = req_user_id 
 
     for doc_id in doc_ids:
-        if not DocumentService.accessible4deletion(doc_id, current_user.id):
-            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+        if not DocumentService.accessible4deletion(doc_id, requester_id): 
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR) 
 
-    errors = await asyncio.to_thread(FileService.delete_docs, doc_ids, current_user.id)
+    errors = await asyncio.to_thread(FileService.delete_docs, doc_ids, requester_id) 
 
-    if errors:
-        return get_json_result(data=False, message=errors, code=RetCode.SERVER_ERROR)
+    if errors: 
+        return get_json_result(data=False, message=errors, code=RetCode.SERVER_ERROR) 
 
-    return get_json_result(data=True)
+    return get_json_result(data=True) 
 
 
 @manager.route("/run", methods=["POST"])  # noqa: F821
