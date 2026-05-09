@@ -50,6 +50,8 @@ from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus,
 from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
+from rag.prompts.generator import kb_prompt
+from rag.app.tag import label_question
 from rag.llm import ChatModel
 from rag.utils.voucher_classifier import (
     build_voucher_classify_content,
@@ -2391,8 +2393,14 @@ async def upload_parse_user_kb():
         for ut in user_tenants:
             if str(ut.user_id) != str(user.id):
                 return get_data_error_result(message="User tenant mismatch.")
-        tenant_id = str(user_tenants[0].tenant_id) 
-        kb_name = req_user_id 
+        tenant_id = None
+        for ut in user_tenants:
+            if str(ut.tenant_id) == str(user.id):
+                tenant_id = str(ut.tenant_id)
+                break
+        if not tenant_id:
+            return get_data_error_result(message="Personal workspace not found.")
+        kb_name = req_user_id
 
         files = await request.files
         if "file" not in files:
@@ -2501,38 +2509,92 @@ def _to_float_param(req: dict, key: str, default: float):
         return default
 
 
-async def _collect_prompt_context_by_ids(tenant_id: str, kb_ids: list[str], doc_ids: list[str]):
-    context_parts = []
-    visited_doc_ids = set()
+def _to_int_value(value, default: int):
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
-    for kb_id in kb_ids:
-        e, kb = KnowledgebaseService.get_by_id(kb_id)
-        if not e or not kb:
-            return False, f"Dataset {kb_id} not found.", ""
-        docs_in_kb = DocumentService.query(kb_id=kb_id)
-        for doc in docs_in_kb:
-            if str(doc.id) in visited_doc_ids:
-                continue
-            content = await _fetch_doc_content_for_voucher_classify(doc, str(kb.tenant_id))
-            if content:
-                context_parts.append(f"[KB:{kb_id}][DOC:{doc.id}]\n{content}")
-                visited_doc_ids.add(str(doc.id))
 
+def _to_float_value(value, default: float):
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coalesce_param(req: dict, nested: dict, key: str):
+    if key in req and req[key] is not None:
+        return req[key]
+    if nested and key in nested and nested[key] is not None:
+        return nested[key]
+    return None
+
+
+async def _collect_prompt_context_by_retrieval(
+    question: str,
+    kb_ids: list[str],
+    doc_ids: list[str],
+    page_size: int,
+    similarity_threshold: float,
+    vector_similarity_weight: float,
+    retrieval_top: int,
+):
+    resolved_kb_ids = list(dict.fromkeys(kb_ids))
     for doc_id in doc_ids:
-        if doc_id in visited_doc_ids:
-            continue
         ok, doc = DocumentService.get_by_id(doc_id)
         if not ok or not doc:
             return False, f"Document {doc_id} not found.", ""
-        content = await _fetch_doc_content_for_voucher_classify(doc, str(DocumentService.get_tenant_id(doc_id) or tenant_id))
-        if content:
-            context_parts.append(f"[KB:{doc.kb_id}][DOC:{doc.id}]\n{content}")
-            visited_doc_ids.add(str(doc.id))
-
-    if not context_parts:
+        kid = str(doc.kb_id).strip()
+        if kid and kid not in resolved_kb_ids:
+            resolved_kb_ids.append(kid)
+    if not resolved_kb_ids:
+        return False, "No dataset scope for retrieval.", ""
+    kbs = list(KnowledgebaseService.get_by_ids(resolved_kb_ids))
+    found_ids = {str(kb.id) for kb in kbs}
+    for kid in resolved_kb_ids:
+        if kid not in found_ids:
+            return False, f"Dataset {kid} not found.", ""
+    is_knowledge_graph = all(getattr(kb, "parser_id", None) == ParserType.KG for kb in kbs)
+    tenant_ids = list(dict.fromkeys([kb.tenant_id for kb in kbs]))
+    embedding_list = list(dict.fromkeys([kb.embd_id for kb in kbs]))
+    embd_mdl = LLMBundle(tenant_ids[0], LLMType.EMBEDDING, embedding_list[0])
+    max_prompt_tokens = getattr(embd_mdl, "max_length", None) or 8192
+    if is_knowledge_graph:
+        chat_mdl_kg = LLMBundle(tenant_ids[0], LLMType.CHAT, llm_name=None)
+        ck = await settings.kg_retriever.retrieval(
+            question,
+            tenant_ids,
+            resolved_kb_ids,
+            embd_mdl,
+            chat_mdl_kg,
+        )
+        kbinfos = {"chunks": ([ck] if ck.get("content_with_weight") else [])}
+    else:
+        kbinfos = settings.retriever.retrieval(
+            question,
+            embd_mdl,
+            tenant_ids,
+            resolved_kb_ids,
+            1,
+            page_size,
+            similarity_threshold,
+            vector_similarity_weight,
+            top=retrieval_top,
+            doc_ids=doc_ids if doc_ids else None,
+            aggs=False,
+            rerank_mdl=None,
+            rank_feature=label_question(question, kbs),
+        )
+        kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
+    if not kbinfos.get("chunks"):
         return True, "", ""
-    merged_context = "\n\n".join(context_parts)
-    return True, "", merged_context[:12000]
+    merged_context = "\n".join(kb_prompt(kbinfos, max_prompt_tokens))
+    return True, "", merged_context
 
 
 @manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
@@ -2556,6 +2618,12 @@ async def ask_by_docs():
         "presence_penalty": _to_float_param(req, "presence_penalty", 0.0),
         "frequency_penalty": _to_float_param(req, "frequency_penalty", 0.0),
     }
+    _rn = req.get("retrieval_options")
+    _rn = _rn if isinstance(_rn, dict) else {}
+    top_k = max(1, _to_int_value(_coalesce_param(req, _rn, "top_k"), 12))
+    retrieval_top = max(top_k, _to_int_value(_coalesce_param(req, _rn, "retrieval_top"), 1024))
+    similarity_threshold = _to_float_value(_coalesce_param(req, _rn, "similarity_threshold"), 0.1)
+    vector_similarity_weight = _to_float_value(_coalesce_param(req, _rn, "vector_similarity_weight"), 0.3)
 
     env_chat_cfg = {
         "factory": os.getenv("DEFAULT_CHAT_FACTORY", "").strip(),
@@ -2618,7 +2686,15 @@ async def ask_by_docs():
 
     use_doc_grounding = bool(kb_ids or doc_ids)
     if use_doc_grounding:
-        ok, err_msg, doc_context = await _collect_prompt_context_by_ids("", kb_ids, doc_ids)
+        ok, err_msg, doc_context = await _collect_prompt_context_by_retrieval(
+            question,
+            kb_ids,
+            doc_ids,
+            top_k,
+            similarity_threshold,
+            vector_similarity_weight,
+            retrieval_top,
+        )
         if not ok:
             return get_json_result(data=False, message=err_msg, code=RetCode.OPERATING_ERROR)
         if not doc_context:
@@ -2649,5 +2725,9 @@ async def ask_by_docs():
             "used_doc_ids": doc_ids,
             "grounded_by_documents": use_doc_grounding,
             "llm_options": llm_options,
+            "top_k": top_k,
+            "retrieval_top": retrieval_top,
+            "similarity_threshold": similarity_threshold,
+            "vector_similarity_weight": vector_similarity_weight,
         }
     )
