@@ -98,7 +98,6 @@ FACTORY = {
     ParserType.RESUME.value: resume,
     ParserType.PICTURE.value: picture,
     ParserType.ONE.value: one,
-    ParserType.HICHUNK.value: hichunk,
     ParserType.AUDIO.value: audio,
     ParserType.EMAIL.value: email,
     ParserType.KG.value: naive,
