@@ -15,6 +15,7 @@
 #
 import json
 import copy
+import os
 import re
 import time
 
@@ -505,9 +506,34 @@ async def agents_completion_openai_compatibility(tenant_id, agent_id):
 
 
 @manager.route("/agents/<agent_id>/completions", methods=["POST"])  # noqa: F821
-@token_required
-async def agent_completions(tenant_id, agent_id):
+async def agent_completions(agent_id):
     req = await get_request_json()
+    if os.environ.get("DISABLE_SDK"):
+        return get_json_result(data=False, message="`Authorization` can't be empty")
+    tenant_id = None
+    authorization_str = request.headers.get("Authorization")
+    if (authorization_str or "").strip():
+        authorization_list = authorization_str.split()
+        if len(authorization_list) < 2:
+            return get_json_result(data=False, message="Please check your authorization format.")
+        token = authorization_list[1]
+        objs = APIToken.query(token=token)
+        if not objs:
+            return get_json_result(
+                data=False,
+                message="Authentication error: API key is invalid!",
+                code=RetCode.AUTHENTICATION_ERROR,
+            )
+        tenant_id = objs[0].tenant_id
+    else:
+        ok_cvs, cvs = UserCanvasService.get_by_id(agent_id)
+        if not ok_cvs or not cvs:
+            return get_json_result(
+                data=False,
+                message="Agent not found.",
+                code=RetCode.NOT_FOUND,
+            )
+        tenant_id = str(cvs.user_id)
     return_trace = bool(req.get("return_trace", False))
 
     if req.get("stream", True):

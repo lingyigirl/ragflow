@@ -906,7 +906,6 @@ async def run():
     try:
         requester_id = ""
         is_api_key_mode = False
-        no_auth_mode = False
         if current_user:
             requester_id = str(current_user.id).strip()
         else:
@@ -920,7 +919,16 @@ async def run():
                 requester_id = str(token_objs[0].tenant_id).strip()
                 is_api_key_mode = True
             else:
-                no_auth_mode = True
+                raw_uid = req.get("user_id")
+                if raw_uid is None or (isinstance(raw_uid, str) and not raw_uid.strip()):
+                    return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR)
+                req_user_id = str(raw_uid).strip()
+                ok_user, user = UserService.get_by_id(req_user_id)
+                if not ok_user or not user:
+                    return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR)
+                if str(getattr(user, "status", "")) != StatusEnum.VALID.value:
+                    return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR)
+                requester_id = req_user_id
         classify_switch = req.get("enable_voucher_type_classify", False)
         if not isinstance(classify_switch, bool):
             return get_json_result(
@@ -937,13 +945,12 @@ async def run():
             )
 
         def _run_sync():
-            if not no_auth_mode:
-                for doc_id in req["doc_ids"]:
-                    can_access = DocumentService.accessible(doc_id, requester_id)
-                    if not can_access and is_api_key_mode:
-                        can_access = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
-                    if not can_access:
-                        return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
+            for doc_id in req["doc_ids"]:
+                can_access = DocumentService.accessible(doc_id, requester_id)
+                if not can_access and is_api_key_mode:
+                    can_access = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
+                if not can_access:
+                    return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
             kb_table_num_map = {}
             for id in req["doc_ids"]:
