@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
 
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
-from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+from deepdoc.parser.mineru_parser import MinerUParser
 import logging
 
 load_dotenv()
