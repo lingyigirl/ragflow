@@ -196,6 +196,8 @@ export function ChunkMethodDialog({
     layoutRecognize?.toLowerCase?.()?.includes('mineru');
 
   const isPdf = documentExtension === 'pdf';
+  const isSpreadsheet =
+    documentExtension === 'xlsx' || documentExtension === 'xls';
 
   const showPages = useMemo(() => {
     return isPdf && hidePagesChunkMethods.every((x) => x !== selectedTag);
@@ -203,7 +205,7 @@ export function ChunkMethodDialog({
 
   const showOne = useMemo(() => {
     return (
-      isPdf &&
+      (isPdf || isSpreadsheet) &&
       hidePagesChunkMethods
         .filter(
           (x) =>
@@ -211,7 +213,7 @@ export function ChunkMethodDialog({
         )
         .every((x) => x !== selectedTag)
     );
-  }, [selectedTag, isPdf]);
+  }, [selectedTag, isPdf, isSpreadsheet]);
 
   const showMaxTokenNumber =
     selectedTag === DocumentParserType.Naive ||
