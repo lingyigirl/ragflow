@@ -140,9 +140,14 @@ class MinerUParseOptions:
 
 
 class MinerUParser(RAGFlowPdfParser):
-    def __init__(self, mineru_path: str = "mineru", mineru_api: str = "", mineru_server_url: str = ""):
-        self.mineru_api = mineru_api.rstrip("/")
-        self.mineru_server_url = mineru_server_url.rstrip("/")
+    def __init__(
+        self,
+        mineru_path: str = "mineru",
+        mineru_api: Optional[str] = None,
+        mineru_server_url: Optional[str] = None,
+    ):
+        self.mineru_api = (mineru_api or "").rstrip("/")
+        self.mineru_server_url = (mineru_server_url or "").rstrip("/")
         self.outlines = []
         self.logger = logging.getLogger(self.__class__.__name__)
 
