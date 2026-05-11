@@ -1569,6 +1569,27 @@ class MinerUParser(RAGFlowPdfParser):
             self._emit_callback(callback, -1, f"[MinerU] 上传解析产物到MinIO失败: {e}")
             return False
 
+    def parse_document(
+        self,
+        filepath: str | PathLike[str],
+        binary: Union[BytesIO, bytes, None] = None,
+        callback: Optional[Callable] = None,
+        *,
+        output_dir: Optional[str] = None,
+        backend: str = "pipeline",
+        delete_output: bool = True,
+        **kwargs,
+    ) -> tuple:
+        return self.parse_pdf(
+            filepath=filepath,
+            binary=binary,
+            callback=callback,
+            output_dir=output_dir,
+            backend=backend,
+            delete_output=delete_output,
+            **kwargs,
+        )
+
     def parse_pdf(
             self,
             filepath: str | PathLike[str],
@@ -1643,6 +1664,53 @@ class MinerUParser(RAGFlowPdfParser):
             return sections, tables
 
         file_path = Path(filepath)
+        suffix_lower = file_path.suffix.lower()
+        mineru_excel_suffixes = {".xlsx", ".xls", ".xlsm"}
+        if suffix_lower in mineru_excel_suffixes:
+            from deepdoc.utils.excel2pdf import convert_excel_bytes_to_pdf_bytes
+
+            raw = None
+            if binary is not None:
+                raw = binary.read() if hasattr(binary, "read") else binary
+            if raw is None:
+                raw = Path(filepath).read_bytes()
+            if not isinstance(raw, bytes):
+                raw = bytes(raw)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Incoming Excel bytes md5=%s size=%s suffix=%s",
+                    hashlib.md5(raw).hexdigest(),
+                    len(raw),
+                    suffix_lower,
+                )
+            except Exception:
+                pass
+            if callback:
+                callback(0.12, "[MinerU] Excel detected, converting to PDF...")
+            pdf_bytes = convert_excel_bytes_to_pdf_bytes(raw, excel_suffix=suffix_lower)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Excel->PDF bytes md5=%s size=%s",
+                    hashlib.md5(pdf_bytes).hexdigest(),
+                    len(pdf_bytes),
+                )
+            except Exception:
+                pass
+            pdf_virtual_path = str(file_path.with_suffix(".pdf"))
+            if callback:
+                callback(0.14, "[MinerU] Excel converted to PDF, continue parsing...")
+            return self.parse_pdf(
+                filepath=pdf_virtual_path,
+                binary=pdf_bytes,
+                callback=callback,
+                output_dir=output_dir,
+                backend=backend,
+                server_url=server_url,
+                delete_output=delete_output,
+                parse_method=parse_method,
+                **kwargs,
+            )
+
         pdf_file_name = file_path.stem.replace(" ", "") + ".pdf"
         pdf_file_path_valid = os.path.join(file_path.parent, pdf_file_name)
 

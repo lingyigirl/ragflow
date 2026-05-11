@@ -807,11 +807,16 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
         res = tokenize_table(tables, doc, is_english)
         callback(0.8, "Finish parsing.")
 
-    elif re.search(r"\.(csv|xlsx?)$", filename, re.IGNORECASE):
+    elif re.search(r"\.(csv|xlsx?|xlsm)$", filename, re.IGNORECASE):
         callback(0.1, "Start to parse.")
 
-        # Check if tcadp_parser is selected for spreadsheet files
-        layout_recognizer = parser_config.get("layout_recognize", "DeepDOC")
+        layout_recognizer, parser_model_name = normalize_layout_recognizer(
+            parser_config.get("layout_recognize", "DeepDOC")
+        )
+        if isinstance(layout_recognizer, bool):
+            layout_recognizer = "DeepDOC" if layout_recognizer else "Plain Text"
+        name = layout_recognizer.strip().lower()
+
         if layout_recognizer == "TCADP Parser":
             table_result_type = parser_config.get("table_result_type", "1")
             markdown_image_response_type = parser_config.get("markdown_image_response_type", "1")
@@ -824,7 +829,7 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
                 return res
 
             # Determine file type based on extension
-            file_type = "XLSX" if re.search(r"\.xlsx?$", filename, re.IGNORECASE) else "CSV"
+            file_type = "XLSX" if re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE) else "CSV"
 
             sections, tables = tcadp_parser.parse_pdf(
                 filepath=filename,
@@ -833,6 +838,26 @@ def chunk(filename, binary=None, from_page=0, to_page=100000, lang="Chinese", ca
                 output_dir=os.environ.get("TCADP_OUTPUT_DIR", ""),
                 file_type=file_type
             )
+            parser_config["chunk_token_num"] = 0
+            res = tokenize_table(tables, doc, is_english)
+            callback(0.8, "Finish parsing.")
+        elif name == "mineru" and re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE):
+            parser = PARSERS["mineru"]
+            sections, tables, pdf_parser = parser(
+                filename=filename,
+                binary=binary,
+                from_page=from_page,
+                to_page=to_page,
+                lang=lang,
+                callback=callback,
+                layout_recognizer=layout_recognizer,
+                mineru_llm_name=parser_model_name,
+                **kwargs,
+            )
+            if not sections and not tables:
+                return []
+            if table_context_size or image_context_size:
+                tables = append_context2table_image4pdf(sections, tables, image_context_size)
             parser_config["chunk_token_num"] = 0
             res = tokenize_table(tables, doc, is_english)
             callback(0.8, "Finish parsing.")
