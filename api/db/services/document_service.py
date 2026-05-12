@@ -486,8 +486,6 @@ class DocumentService(CommonService):
         target_field = type_to_field[req_type]
         col = getattr(MineruSection, target_field)
         update_kwargs = {col: text}
-        if target_field == "table_body":
-            update_kwargs[MineruSection.text] = text
         updated = MineruSection.update(update_kwargs).where(MineruSection.id == section.id).execute()
         if not updated:
             return False, "update failed", {}
