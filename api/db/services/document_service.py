@@ -474,6 +474,14 @@ class DocumentService(CommonService):
         }
         if req_type not in type_to_field:
             return False, "type must be one of text, table_caption, table_footnote, table_body", {}
+        if text is None:
+            return False, "text is required", {}
+        if isinstance(text, (dict, list, tuple)):
+            from deepdoc.parser.mineru_parser import MinerUParser
+
+            text = MinerUParser._mineru_longtext_for_db(text) or ""
+        elif not isinstance(text, str):
+            text = str(text)
         try:
             from api.db.db_models import MineruSection
         except Exception:
@@ -482,7 +490,10 @@ class DocumentService(CommonService):
         if not section:
             return False, "mineru_section not found by chunk_id", {}
         target_field = type_to_field[req_type]
-        updated = MineruSection.update(**{target_field: text}).where(MineruSection.id == section.id).execute()
+        update_kwargs = {target_field: text}
+        if target_field == "table_body":
+            update_kwargs["text"] = text
+        updated = MineruSection.update(**update_kwargs).where(MineruSection.id == section.id).execute()
         if not updated:
             return False, "update failed", {}
         return True, "", {

@@ -37,6 +37,20 @@ def get_value(d, k1, k2):
     return d.get(k1, d.get(k2))
 
 
+def kb_prompt_truncate_chunk_list(kbinfos, max_tokens):
+    knowledges = [get_value(ck, "content", "content_with_weight") for ck in kbinfos["chunks"]]
+    used_token_count = 0
+    chunks_num = 0
+    for i, c in enumerate(knowledges):
+        if not c:
+            continue
+        used_token_count += num_tokens_from_string(c)
+        chunks_num += 1
+        if max_tokens * 0.97 < used_token_count:
+            break
+    return kbinfos["chunks"][:chunks_num]
+
+
 def chunks_format(reference):
     return [
         {

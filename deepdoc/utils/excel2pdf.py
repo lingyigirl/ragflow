@@ -150,8 +150,8 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
         office_bin = "/usr/bin/libreoffice" if Path("/usr/bin/libreoffice").exists() else (shutil.which("libreoffice") or shutil.which("soffice"))
         if not office_bin:
             _logger.error(
-                "[excel2pdf] LibreOffice 不可用：未找到 libreoffice/soffice（已检查 /usr/bin/libreoffice 与 PATH）。"
-                "Excel 转 PDF 无法执行，请在运行解析任务的环境中安装 LibreOffice（Docker 镜像需包含对应包）。"
+                "使用下述指令安装libreoffice"
+                "apt update && apt install -y libreoffice libreoffice-calc xvfb fonts-noto-cjk locales-all"
             )
             raise RuntimeError("未找到 LibreOffice/soffice 可执行文件，请在容器内安装 libreoffice。")
 

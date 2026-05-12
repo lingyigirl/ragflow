@@ -41,6 +41,7 @@ from common.misc_utils import get_uuid
 from api.utils.api_utils import (
     get_data_error_result,
     get_json_result,
+    get_parser_config,
     server_error_response,
     validate_request, get_request_json, token_required,
 )
@@ -50,7 +51,7 @@ from common.constants import RetCode, VALID_TASK_STATUS, ParserType, TaskStatus,
 from api.utils.web_utils import CONTENT_TYPE_MAP, html2pdf, is_valid_url
 from deepdoc.parser.html_parser import RAGFlowHtmlParser
 from rag.nlp import search, rag_tokenizer
-from rag.prompts.generator import kb_prompt
+from rag.prompts.generator import kb_prompt, kb_prompt_truncate_chunk_list, get_value
 from rag.app.tag import label_question
 from rag.llm import ChatModel
 from rag.utils.voucher_classifier import (
@@ -2383,6 +2384,42 @@ async def batch_doc_progress():
         return server_error_response(e)
 
 
+_DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET = frozenset(
+    {
+        "naive",
+        "manual",
+        "qa",
+        "table",
+        "paper",
+        "book",
+        "laws",
+        "presentation",
+        "picture",
+        "one",
+        "hichunk",
+        "knowledge_graph",
+        "email",
+        "tag",
+    }
+)
+
+
+def _normalize_direct_upload_chunk_method(raw: str | None) -> tuple[str | None, str | None]:
+    text = (raw or "general").strip().lower()
+    if text == "general":
+        text = "naive"
+    if text not in _DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET:
+        return f"`chunk_method` {raw!r} doesn't exist", None
+    return None, text
+
+
+def _normalize_direct_upload_parse_method(raw: str | None) -> tuple[str | None, str | None]:
+    text = (raw or "mineru").strip().lower()
+    if text not in {"mineru", "deepdoc"}:
+        return f"`parse_method` must be 'mineru' or 'deepdoc', got {raw!r}", None
+    return None, text
+
+
 @manager.route("/direct_upload_parse", methods=["POST"])  # noqa: F821
 async def upload_parse_user_kb():
     try:
@@ -2391,6 +2428,12 @@ async def upload_parse_user_kb():
         req_user_id = (form.get("user_id") or "").strip() 
         if not req_user_id: 
             return get_json_result(data=False, message='Lack of "user_id"', code=RetCode.ARGUMENT_ERROR)
+        chunk_err, chunk_method_key = _normalize_direct_upload_chunk_method(form.get("chunk_method"))
+        if chunk_err or not chunk_method_key:
+            return get_json_result(data=False, message=chunk_err or "Invalid chunk_method.", code=RetCode.ARGUMENT_ERROR)
+        parse_err, parse_method_key = _normalize_direct_upload_parse_method(form.get("parse_method"))
+        if parse_err or not parse_method_key:
+            return get_json_result(data=False, message=parse_err or "Invalid parse_method.", code=RetCode.ARGUMENT_ERROR)
         user_tenants = UserTenantService.query(user_id=req_user_id, status=StatusEnum.VALID.value)
         if not user_tenants: 
             return get_data_error_result(message="User tenant relation not found.")
@@ -2446,7 +2489,7 @@ async def upload_parse_user_kb():
         run_info = {"run": TaskStatus.RUNNING.value, "progress": 0, "progress_msg": "", "chunk_num": 0, "token_num": 0}
         kb_table_num_map = {}
         doc_ids = []
-        parser_cfg_patch = {
+        mineru_parser_cfg_patch = {
             "layout_recognize": "MinerU",
             "mineru_backend": "hybrid-auto-engine",
             "mineru_parse_method": "auto",
@@ -2459,11 +2502,22 @@ async def upload_parse_user_kb():
             doc_id = doc_dict["id"]
             doc_ids.append(doc_id)
             current_parser_cfg = doc_dict.get("parser_config") if isinstance(doc_dict.get("parser_config"), dict) else {}
-            parser_cfg = dict(current_parser_cfg)
-            parser_cfg.update(parser_cfg_patch)
-            DocumentService.update_by_id(doc_id, {"parser_id": ParserType.NAIVE.value, **run_info})
+            parser_cfg = get_parser_config(chunk_method_key, current_parser_cfg)
+            if parse_method_key == "mineru":
+                parser_cfg.update(mineru_parser_cfg_patch)
+            else:
+                parser_cfg["layout_recognize"] = "DeepDOC"
+                for _mk in (
+                    "mineru_backend",
+                    "mineru_parse_method",
+                    "mineru_lang",
+                    "skip_mineru_section_persist",
+                    "use_submitted_content_list",
+                ):
+                    parser_cfg.pop(_mk, None)
+            DocumentService.update_by_id(doc_id, {"parser_id": chunk_method_key, **run_info})
             DocumentService.update_parser_config(doc_id, parser_cfg)
-            doc_dict["parser_id"] = ParserType.NAIVE.value
+            doc_dict["parser_id"] = chunk_method_key
             doc_dict["parser_config"] = parser_cfg
             DocumentService.run(tenant_id, doc_dict, kb_table_num_map)
 
@@ -2473,6 +2527,8 @@ async def upload_parse_user_kb():
                 "kb_name": kb.name,
                 "doc_ids": doc_ids,
                 "run_started": True,
+                "chunk_method": chunk_method_key,
+                "parse_method": parse_method_key,
             }
         )
     except Exception as e:
@@ -2542,6 +2598,74 @@ def _coalesce_param(req: dict, nested: dict, key: str):
     return None
 
 
+def _mineru_norm_for_match(text):
+    if not text:
+        return ""
+    return re.sub(r"\s+", " ", str(text).strip().lower())
+
+
+def _resolve_mineru_section_chunk_id_for_chunk(doc_id, kb_id, chunk_text):
+    if not doc_id or not kb_id or not chunk_text:
+        return ""
+    nchunk = _mineru_norm_for_match(chunk_text)
+    if len(nchunk) < 8:
+        return ""
+    offset = 0
+    batch = 500
+    cap = 8000
+    best_cid = ""
+    best_score = 0
+    while offset < cap:
+        rows = DocumentService.list_mineru_sections_page(kb_id, doc_id, offset, batch)
+        if not rows:
+            break
+        for r in rows:
+            cid = str(r.get("chunk_id") or "").strip()
+            if not cid:
+                continue
+            for key in ("text", "table_body", "table_caption", "table_footnote"):
+                raw = r.get(key)
+                if raw is None:
+                    continue
+                nt = _mineru_norm_for_match(raw)
+                if len(nt) < 8:
+                    continue
+                score = 0
+                if nt in nchunk:
+                    score = len(nt)
+                elif nchunk in nt:
+                    score = len(nchunk)
+                if score > best_score:
+                    best_score = score
+                    best_cid = cid
+        offset += len(rows)
+        if len(rows) < batch:
+            break
+    return best_cid
+
+
+def _build_mineru_chunk_citations(used_list, fallback_kb):
+    out = []
+    for ck in used_list:
+        doc_part = str(get_value(ck, "doc_id", "document_id") or "").strip()
+        kb_part = ck.get("kb_id")
+        if isinstance(kb_part, (list, tuple)) and kb_part:
+            kb_part = str(kb_part[0]).strip()
+        else:
+            kb_part = str(kb_part or "").strip() or fallback_kb
+        ctx = get_value(ck, "content", "content_with_weight") or ""
+        mineru_id = _resolve_mineru_section_chunk_id_for_chunk(doc_part, kb_part, ctx)
+        out.append(
+            {
+                "doc_id": doc_part,
+                "kb_id": kb_part,
+                "vector_chunk_id": str(get_value(ck, "id", "chunk_id") or "").strip(),
+                "mineru_section_chunk_id": mineru_id,
+            }
+        )
+    return out
+
+
 async def _collect_prompt_context_by_retrieval(
     question: str,
     kb_ids: list[str],
@@ -2550,22 +2674,23 @@ async def _collect_prompt_context_by_retrieval(
     similarity_threshold: float,
     vector_similarity_weight: float,
     retrieval_top: int,
+    include_mineru_chunk_citation: bool = True,
 ):
     resolved_kb_ids = list(dict.fromkeys(kb_ids))
     for doc_id in doc_ids:
         ok, doc = DocumentService.get_by_id(doc_id)
         if not ok or not doc:
-            return False, f"Document {doc_id} not found.", ""
+            return False, f"Document {doc_id} not found.", "", []
         kid = str(doc.kb_id).strip()
         if kid and kid not in resolved_kb_ids:
             resolved_kb_ids.append(kid)
     if not resolved_kb_ids:
-        return False, "No dataset scope for retrieval.", ""
+        return False, "No dataset scope for retrieval.", "", []
     kbs = list(KnowledgebaseService.get_by_ids(resolved_kb_ids))
     found_ids = {str(kb.id) for kb in kbs}
     for kid in resolved_kb_ids:
         if kid not in found_ids:
-            return False, f"Dataset {kid} not found.", ""
+            return False, f"Dataset {kid} not found.", "", []
     is_knowledge_graph = all(getattr(kb, "parser_id", None) == ParserType.KG for kb in kbs)
     tenant_ids = list(dict.fromkeys([kb.tenant_id for kb in kbs]))
     embedding_list = list(dict.fromkeys([kb.embd_id for kb in kbs]))
@@ -2599,9 +2724,14 @@ async def _collect_prompt_context_by_retrieval(
         )
         kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
     if not kbinfos.get("chunks"):
-        return True, "", ""
+        return True, "", "", []
     merged_context = "\n".join(kb_prompt(kbinfos, max_prompt_tokens))
-    return True, "", merged_context
+    if not include_mineru_chunk_citation:
+        return True, "", merged_context, []
+    used_list = kb_prompt_truncate_chunk_list(kbinfos, max_prompt_tokens)
+    fallback_kb = resolved_kb_ids[0] if resolved_kb_ids else ""
+    citations = await asyncio.to_thread(_build_mineru_chunk_citations, used_list, fallback_kb)
+    return True, "", merged_context, citations
 
 
 @manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
@@ -2631,6 +2761,7 @@ async def ask_by_docs():
     retrieval_top = max(top_k, _to_int_value(_coalesce_param(req, _rn, "retrieval_top"), 1024))
     similarity_threshold = _to_float_value(_coalesce_param(req, _rn, "similarity_threshold"), 0.1)
     vector_similarity_weight = _to_float_value(_coalesce_param(req, _rn, "vector_similarity_weight"), 0.3)
+    include_mineru_chunk_citation = bool(req.get("include_mineru_chunk_citation"))
 
     env_chat_cfg = {
         "factory": os.getenv("DEFAULT_CHAT_FACTORY", "").strip(),
@@ -2693,7 +2824,7 @@ async def ask_by_docs():
 
     use_doc_grounding = bool(kb_ids or doc_ids)
     if use_doc_grounding:
-        ok, err_msg, doc_context = await _collect_prompt_context_by_retrieval(
+        ok, err_msg, doc_context, mineru_citations = await _collect_prompt_context_by_retrieval(
             question,
             kb_ids,
             doc_ids,
@@ -2701,6 +2832,7 @@ async def ask_by_docs():
             similarity_threshold,
             vector_similarity_weight,
             retrieval_top,
+            include_mineru_chunk_citation=include_mineru_chunk_citation,
         )
         if not ok:
             return get_json_result(data=False, message=err_msg, code=RetCode.OPERATING_ERROR)
@@ -2725,16 +2857,17 @@ async def ask_by_docs():
     if isinstance(answer, tuple):
         answer = answer[0]
 
-    return get_json_result(
-        data={
-            "answer": answer,
-            "used_kb_ids": kb_ids,
-            "used_doc_ids": doc_ids,
-            "grounded_by_documents": use_doc_grounding,
-            "llm_options": llm_options,
-            "top_k": top_k,
-            "retrieval_top": retrieval_top,
-            "similarity_threshold": similarity_threshold,
-            "vector_similarity_weight": vector_similarity_weight,
-        }
-    )
+    data = {
+        "answer": answer,
+        "used_kb_ids": kb_ids,
+        "used_doc_ids": doc_ids,
+        "grounded_by_documents": use_doc_grounding,
+        "llm_options": llm_options,
+        "top_k": top_k,
+        "retrieval_top": retrieval_top,
+        "similarity_threshold": similarity_threshold,
+        "vector_similarity_weight": vector_similarity_weight,
+    }
+    if include_mineru_chunk_citation and use_doc_grounding:
+        data["mineru_chunk_citations"] = mineru_citations
+    return get_json_result(data=data)
