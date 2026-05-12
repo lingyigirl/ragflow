@@ -1935,8 +1935,8 @@ async def update_mineru_section():
 
     try:
         raw = await request.get_data(cache=False)
-        raw_text = raw.decode("utf-8", errors="replace") if raw else ""
-        logging.info("[MinerU][update][request_raw] %s", raw_text)
+        # raw_text = raw.decode("utf-8", errors="replace") if raw else ""
+        logging.info("[MinerU][update][request_raw] %s", raw)
         try:
             req = json.loads(raw.decode("utf-8")) if raw else {}
         except json.JSONDecodeError:
