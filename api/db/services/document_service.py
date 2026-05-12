@@ -484,10 +484,11 @@ class DocumentService(CommonService):
         if not section:
             return False, "mineru_section not found by chunk_id", {}
         target_field = type_to_field[req_type]
-        update_kwargs = {target_field: text}
+        col = getattr(MineruSection, target_field)
+        update_kwargs = {col: text}
         if target_field == "table_body":
-            update_kwargs["text"] = text
-        updated = MineruSection.update(**update_kwargs).where(MineruSection.id == section.id).execute()
+            update_kwargs[MineruSection.text] = text
+        updated = MineruSection.update(update_kwargs).where(MineruSection.id == section.id).execute()
         if not updated:
             return False, "update failed", {}
         return True, "", {

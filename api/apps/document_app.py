@@ -1912,10 +1912,30 @@ async def mineru_download(file_type):
 
 @manager.route("/mineru_section/update", methods=["POST"])  # noqa: F821
 @login_required
-@validate_request("chunk_id", "type", "text")
 async def update_mineru_section():
     try:
-        req = await get_request_json()
+        raw = await request.get_data(cache=False)
+        try:
+            req = json.loads(raw.decode("utf-8")) if raw else {}
+        except json.JSONDecodeError:
+            return get_json_result(
+                data=False,
+                message="请求体不是合法 JSON",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        if not isinstance(req, dict):
+            return get_json_result(
+                data=False,
+                message="请求体必须是 JSON 对象",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        for _k in ("chunk_id", "type", "text"):
+            if _k not in req:
+                return get_json_result(
+                    data=False,
+                    message=f"required argument are missing: {_k}; ",
+                    code=RetCode.ARGUMENT_ERROR,
+                )
         chunk_id = (req.get("chunk_id") or "").strip()
         req_type = (req.get("type") or "").strip().lower()
         text = req.get("text")
