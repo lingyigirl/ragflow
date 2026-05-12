@@ -1913,8 +1913,30 @@ async def mineru_download(file_type):
 @manager.route("/mineru_section/update", methods=["POST"])  # noqa: F821
 @login_required
 async def update_mineru_section():
+    def _mineru_section_debug_snapshot(row):
+        if not row:
+            return {}
+        return {
+            "id": getattr(row, "id", None),
+            "kb_id": getattr(row, "kb_id", None),
+            "doc_id": getattr(row, "doc_id", None),
+            "chunk_id": getattr(row, "chunk_id", None),
+            "type": getattr(row, "type", None),
+            "text": getattr(row, "text", None),
+            "table_caption": getattr(row, "table_caption", None),
+            "table_footnote": getattr(row, "table_footnote", None),
+            "table_body": getattr(row, "table_body", None),
+            "img_path": getattr(row, "img_path", None),
+            "page_idx": getattr(row, "page_idx", None),
+            "text_level": getattr(row, "text_level", None),
+            "sub_type": getattr(row, "sub_type", None),
+            "list_items": getattr(row, "list_items", None),
+        }
+
     try:
         raw = await request.get_data(cache=False)
+        raw_text = raw.decode("utf-8", errors="replace") if raw else ""
+        logging.info("[MinerU][update][request_raw] %s", raw_text)
         try:
             req = json.loads(raw.decode("utf-8")) if raw else {}
         except json.JSONDecodeError:
@@ -1929,6 +1951,14 @@ async def update_mineru_section():
                 message="请求体必须是 JSON 对象",
                 code=RetCode.ARGUMENT_ERROR,
             )
+        # LOGO：解析为对象后的请求体，便于后端对照查看
+        try:
+            logging.info(
+                "[MinerU][update][LOGO-请求体] %s",
+                json.dumps(req, ensure_ascii=False, default=str),
+            )
+        except Exception:
+            logging.info("[MinerU][update][LOGO-请求体] %r", req)
         for _k in ("chunk_id", "type", "text"):
             if _k not in req:
                 return get_json_result(
@@ -1988,17 +2018,57 @@ async def update_mineru_section():
             )
         check_kb_team_permission(kb, current_user.id)
 
+        # LOGO：写入表前，展示即将更新的字段与当前行快照
+        try:
+            logging.info(
+                "[MinerU][update][LOGO-入表前] %s",
+                json.dumps(
+                    {
+                        "chunk_id": chunk_id,
+                        "effective_type": effective_type,
+                        "text": text,
+                        "row_id": getattr(section, "id", None),
+                        "before_row": _mineru_section_debug_snapshot(section),
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                ),
+            )
+        except Exception:
+            logging.exception("[MinerU][update][LOGO-入表前] 序列化或打印失败")
+
         ok, msg, data = DocumentService.update_mineru_section_content_by_chunk_id(
             chunk_id,
             effective_type,
             text,
         )
+        # LOGO：写入表后，结合服务层返回与立刻回读的行数据
+        try:
+            _row_after = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
+            logging.info(
+                "[MinerU][update][LOGO-写入表后] ok=%s msg=%s service_data=%s after_row=%s",
+                ok,
+                msg,
+                json.dumps(data or {}, ensure_ascii=False, default=str),
+                json.dumps(_mineru_section_debug_snapshot(_row_after), ensure_ascii=False, default=str),
+            )
+        except Exception:
+            logging.exception("[MinerU][update][LOGO-写入表后] 序列化或打印失败")
         if not ok:
             return get_json_result(
                 data=False,
                 message=msg or "更新 mineru_section 失败",
                 code=RetCode.SERVER_ERROR,
             )
+        # LOGO：接口返回前再查库，核对最终落库内容
+        try:
+            _row_final = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
+            logging.info(
+                "[MinerU][update][LOGO-接口结束前DB] %s",
+                json.dumps(_mineru_section_debug_snapshot(_row_final), ensure_ascii=False, default=str),
+            )
+        except Exception:
+            logging.exception("[MinerU][update][LOGO-接口结束前DB] 序列化或打印失败")
         return get_json_result(data=data)
     except Exception as e:
         return server_error_response(e)
