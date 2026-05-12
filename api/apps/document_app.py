@@ -1916,16 +1916,44 @@ async def update_mineru_section():
     def _mineru_section_debug_snapshot(row):
         if not row:
             return {}
+
+            
+        # 取出正文与表格三字段，供 LOGO 日志与返回快照共用
+        text_val = getattr(row, "text", None)
+        table_caption_val = getattr(row, "table_caption", None)
+        table_footnote_val = getattr(row, "table_footnote", None)
+        table_body_val = getattr(row, "table_body", None)
+        # 单独打 LOGO，便于在日志里核对这四块内容是否一致、是否过长
+        try:
+            logging.info(
+                "[MinerU][update][LOGO-section文本表格字段] %s",
+                json.dumps(
+                    {
+                        "chunk_id": getattr(row, "chunk_id", None),
+                        "type": getattr(row, "type", None),
+                        "text": text_val,
+                        "table_caption": table_caption_val,
+                        "table_footnote": table_footnote_val,
+                        "table_body": table_body_val,
+                    },
+                    ensure_ascii=False,
+                    default=str,
+                ),
+            )
+        except Exception:
+            logging.exception("[MinerU][update][LOGO-section文本表格字段] 序列化或打印失败")
+        
+        
         return {
             "id": getattr(row, "id", None),
             "kb_id": getattr(row, "kb_id", None),
             "doc_id": getattr(row, "doc_id", None),
             "chunk_id": getattr(row, "chunk_id", None),
             "type": getattr(row, "type", None),
-            "text": getattr(row, "text", None),
-            "table_caption": getattr(row, "table_caption", None),
-            "table_footnote": getattr(row, "table_footnote", None),
-            "table_body": getattr(row, "table_body", None),
+            "text": text_val,
+            "table_caption": table_caption_val,
+            "table_footnote": table_footnote_val,
+            "table_body": table_body_val,
             "img_path": getattr(row, "img_path", None),
             "page_idx": getattr(row, "page_idx", None),
             "text_level": getattr(row, "text_level", None),
