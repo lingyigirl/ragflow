@@ -476,12 +476,6 @@ class DocumentService(CommonService):
             return False, "type must be one of text, table_caption, table_footnote, table_body", {}
         if text is None:
             return False, "text is required", {}
-        if isinstance(text, (dict, list, tuple)):
-            from deepdoc.parser.mineru_parser import MinerUParser
-
-            text = MinerUParser._mineru_longtext_for_db(text) or ""
-        elif not isinstance(text, str):
-            text = str(text)
         try:
             from api.db.db_models import MineruSection
         except Exception:

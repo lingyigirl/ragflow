@@ -1935,6 +1935,30 @@ async def update_mineru_section():
                 code=RetCode.NOT_FOUND,
             )
 
+        row_type = (getattr(section, "type", None) or "").strip().lower()
+        if row_type == "table":
+            if req_type not in ("table_body", "table_caption", "table_footnote"):
+                return get_json_result(
+                    data=False,
+                    message="合并表格切片仅支持更新 table_body、table_caption、table_footnote",
+                    code=RetCode.ARGUMENT_ERROR,
+                )
+            effective_type = req_type
+        elif row_type not in valid_types:
+            return get_json_result(
+                data=False,
+                message="当前 mineru_section 类型不支持更新",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        elif req_type != row_type:
+            return get_json_result(
+                data=False,
+                message="type 与数据切片类型不一致",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        else:
+            effective_type = row_type
+
         e, kb = KnowledgebaseService.get_by_id(section.kb_id)
         if not e:
             return get_json_result(
@@ -1946,7 +1970,7 @@ async def update_mineru_section():
 
         ok, msg, data = DocumentService.update_mineru_section_content_by_chunk_id(
             chunk_id,
-            req_type,
+            effective_type,
             text,
         )
         if not ok:
