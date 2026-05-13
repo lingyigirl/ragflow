@@ -397,6 +397,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
         }
 
     parse_task_array = []
+    pid = str(doc.get("parser_id") or "").strip().lower()
 
     if doc["type"] == FileType.PDF.value:
         file_bin = settings.STORAGE_IMPL.get(bucket, name)
@@ -405,9 +406,9 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
         if pages is None:
             pages = 0
         page_size = doc["parser_config"].get("task_page_size") or 12
-        if doc["parser_id"] == "paper":
+        if pid == "paper":
             page_size = doc["parser_config"].get("task_page_size") or 22
-        if doc["parser_id"] in ["one", "hichunk", "knowledge_graph"] or do_layout != "DeepDOC" or doc["parser_config"].get("toc_extraction", False):
+        if pid in ["one", "hichunk", "knowledge_graph"] or do_layout != "DeepDOC" or doc["parser_config"].get("toc_extraction", False):
             page_size = 10 ** 9
         page_ranges = doc["parser_config"].get("pages") or [(1, 10 ** 5)]
         for s, e in page_ranges:
@@ -419,7 +420,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
                 task["from_page"] = p
                 task["to_page"] = min(p + page_size, e)
                 parse_task_array.append(task)
-        if doc.get("parser_id") == "hichunk":
+        if pid == "hichunk":
             logging.info(
                 "%s doc_id=%s pages=%s page_size=%s pdf_tasks=%s layout_recognize=%s",
                 _HICHUNK_QUEUE_LOGO,
@@ -430,7 +431,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
                 do_layout,
             )
 
-    elif doc["parser_id"] == "table":
+    elif pid == "table":
         file_bin = settings.STORAGE_IMPL.get(bucket, name)
         rn = RAGFlowExcelParser.row_number(doc["name"], file_bin)
         for i in range(0, rn, 3000):
@@ -439,6 +440,9 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
             task["to_page"] = min(i + 3000, rn)
             parse_task_array.append(task)
     else:
+        parse_task_array.append(new_task())
+
+    if not parse_task_array:
         parse_task_array.append(new_task())
 
     chunking_config = DocumentService.get_chunking_config(doc["id"])
@@ -476,7 +480,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
     DocumentService.begin2parse(doc["id"])
 
     unfinished_task_array = [task for task in parse_task_array if task["progress"] < 1.0]
-    if doc.get("parser_id") == "hichunk":
+    if pid == "hichunk":
         logging.info(
             "%s doc_id=%s redis_queue=%s unfinished=%s total_tasks=%s priority=%s",
             _HICHUNK_QUEUE_LOGO,
