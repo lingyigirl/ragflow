@@ -430,7 +430,16 @@ async def build_chunks(task, progress_callback):
                                               (int(settings.DOC_MAXIMUM_SIZE / 1024 / 1024)))
         return []
 
-    chunker = FACTORY[task["parser_id"].lower()]
+    parser_id = str(task.get("parser_id") or "").strip().lower()
+    chunker = FACTORY.get(parser_id)
+    if chunker is None:
+        logging.warning(
+            "Unknown parser_id %r in task %s, fallback to naive parser.",
+            task.get("parser_id"),
+            task.get("id"),
+        )
+        chunker = naive
+
     try:
         st = timer()
         bucket, name = File2DocumentService.get_storage_address(doc_id=task["doc_id"])
