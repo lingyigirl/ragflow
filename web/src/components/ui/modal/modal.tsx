@@ -98,7 +98,6 @@ const Modal: ModalType = ({
       return;
     }
     onOpenChange?.(open);
-    console.log('open', open, onOpenChange);
     if (open && !disabled) {
       onOk?.();
     }
@@ -183,6 +182,7 @@ const Modal: ModalType = ({
             )}
             style={style}
             onClick={(e) => e.stopPropagation()}
+            aria-describedby={undefined}
           >
             {/* title */}
             {title && (
