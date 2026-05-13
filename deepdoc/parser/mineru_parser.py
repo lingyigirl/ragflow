@@ -139,6 +139,10 @@ class MinerUParseOptions:
     table_enable: bool = True
 
 
+def resolve_mineru_api_from_env() -> str:
+    return (os.environ.get("MINERU_APISERVER", "") or "").strip().rstrip("/")
+
+
 class MinerUParser(RAGFlowPdfParser):
     def __init__(
         self,

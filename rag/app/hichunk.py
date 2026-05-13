@@ -684,12 +684,16 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             callback(0.1, "Start MinerU parsing (PDF or image).")
 
         mineru_executable = os.environ.get("MINERU_EXECUTABLE", "mineru")
-        mineru_api = parser_config.get("mineru_api_base") or resolve_mineru_api_from_env()
+        _mineru_api_cfg = parser_config.get("mineru_api_base")
+        mineru_api = _mineru_api_cfg.strip().rstrip("/") if isinstance(_mineru_api_cfg, str) else ""
+        if not mineru_api:
+            mineru_api = resolve_mineru_api_from_env()
         mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api)
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
-        if not mineru_parser.check_installation():
+        mineru_ok, _mineru_install_reason = mineru_parser.check_installation(backend)
+        if not mineru_ok:
             if is_excel_mineru_path:
                 logging.error(
                     "[MinerU][Excel] MinerU 不可用，已禁用 naive 回退: file=%s backend=%s parser_config=%s",

@@ -726,7 +726,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
-        if not mineru_parser.check_installation():
+        mineru_ok, _mineru_install_reason = mineru_parser.check_installation(backend)
+        if not mineru_ok:
             if is_excel_mineru_path:
                 logging.error(
                     "[MinerU][Excel] MinerU 不可用，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
