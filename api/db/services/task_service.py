@@ -37,6 +37,7 @@ from rag.nlp import search
 
 CANVAS_DEBUG_DOC_ID = "dataflow_x"
 GRAPH_RAPTOR_FAKE_DOC_ID = "graph_raptor_x"
+_HICHUNK_QUEUE_LOGO = "[HiChunk|queue]"
 
 def trim_header_by_lines(text: str, max_length) -> str:
     # Trim header text to maximum length while preserving line breaks
@@ -418,6 +419,16 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
                 task["from_page"] = p
                 task["to_page"] = min(p + page_size, e)
                 parse_task_array.append(task)
+        if doc.get("parser_id") == "hichunk":
+            logging.info(
+                "%s doc_id=%s pages=%s page_size=%s pdf_tasks=%s layout_recognize=%s",
+                _HICHUNK_QUEUE_LOGO,
+                doc["id"],
+                pages,
+                page_size,
+                len(parse_task_array),
+                do_layout,
+            )
 
     elif doc["parser_id"] == "table":
         file_bin = settings.STORAGE_IMPL.get(bucket, name)
@@ -465,6 +476,16 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
     DocumentService.begin2parse(doc["id"])
 
     unfinished_task_array = [task for task in parse_task_array if task["progress"] < 1.0]
+    if doc.get("parser_id") == "hichunk":
+        logging.info(
+            "%s doc_id=%s redis_queue=%s unfinished=%s total_tasks=%s priority=%s",
+            _HICHUNK_QUEUE_LOGO,
+            doc["id"],
+            settings.get_svr_queue_name(priority),
+            len(unfinished_task_array),
+            len(parse_task_array),
+            priority,
+        )
     for unfinished_task in unfinished_task_array:
         assert REDIS_CONN.queue_product(
             settings.get_svr_queue_name(priority), message=unfinished_task
