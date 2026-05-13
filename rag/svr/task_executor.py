@@ -439,6 +439,13 @@ async def build_chunks(task, progress_callback):
             task.get("id"),
         )
         chunker = naive
+    else:
+        logging.info(
+            "Resolved parser_id %r to chunker %r for task %s",
+            task.get("parser_id"),
+            chunker.__name__ if hasattr(chunker, '__name__') else str(chunker),
+            task.get("id"),
+        )
 
     try:
         st = timer()

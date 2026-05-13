@@ -399,7 +399,11 @@ def get_parser_config(chunk_method, parser_config):
         "picture": None,
     }
 
-    default_config = key_mapping[chunk_method]
+    try:
+        default_config = key_mapping[chunk_method]
+    except KeyError:
+        logging.warning("get_parser_config: 未知 chunk_method %r，已回退到 naive。", chunk_method) 
+        default_config = key_mapping["naive"]
 
     # If no parser_config provided, return default merged with base defaults
     if not parser_config:

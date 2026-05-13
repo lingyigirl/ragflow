@@ -755,7 +755,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
             )
         except KeyError as exc:
-            if str(exc).strip("'\"") == "type":
+            _missing_key = exc.args[0] if exc.args else None  
+            if _missing_key == "type":
                 if is_excel_mineru_path:
                     logging.exception(
                         "[MinerU][Excel] 输出缺少 type，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
@@ -772,6 +773,31 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 logging.exception("MinerU parser output misses 'type'; file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
                 return _collapse_to_single_chunk(
                     _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU output missing 'type'."),
+                    doc,
+                    eng,
+                )
+            if _missing_key == "hichunk":
+                if is_excel_mineru_path:
+                    logging.exception(
+                        "[MinerU][Excel] 输出键异常 hichunk，已禁用 naive 回退: file=%s backend=%s parser_config=%s",
+                        filename,
+                        backend,
+                        parser_config,
+                    )
+                    if callback:
+                        callback(
+                            -1,
+                            f"Excel+MinerU：MinerU 输出键异常 hichunk，已禁用 naive 回退。file={filename} backend={backend}",
+                        )
+                    raise RuntimeError("Excel+MinerU: MinerU KeyError('hichunk'), naive fallback disabled.") from exc
+                logging.exception(
+                    "MinerU KeyError('hichunk'); file=%s, backend=%s, parser_config=%s",
+                    filename,
+                    backend,
+                    parser_config,
+                )
+                return _collapse_to_single_chunk(
+                    _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU KeyError('hichunk')."),
                     doc,
                     eng,
                 )
