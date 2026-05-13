@@ -113,6 +113,9 @@ TASK_TYPE_TO_PIPELINE_TASK_TYPE = {
     "memory": PipelineTaskType.MEMORY,
 }
 
+# 与 api/db/services/task_service._HICHUNK_QUEUE_LOGO 成对的消费端路径日志前缀，便于串联「入队」与「执行」
+_TASK_EXECUTOR_HICHUNK_PATH_LOGO = "[HiChunk|task_executor|路径]"  # 日志中 grep 此串即可过滤 HiChunk worker 路径
+
 UNACKED_ITERATOR = None
 
 CONSUMER_NO = "0" if len(sys.argv) < 2 else sys.argv[1]
@@ -416,6 +419,26 @@ async def collect():
         task["memory_id"] = msg["memory_id"]
         task["source_id"] = msg["source_id"]
         task["message_dict"] = msg["message_dict"]
+    # 在交给 handle_task 之前打印 HiChunk 消费路径（对应前端：知识库-文件-PDF-数据管道选内置 HiChunk 后 API 入队）
+    _parser_id_collect = str(task.get("parser_id") or "").strip().lower()  # 归一化解析器 id，用于判断是否 HiChunk
+    if _parser_id_collect == "hichunk":
+        _hichunk_mod = FACTORY.get("hichunk")  # 与 build_chunks 相同的分块模块解析
+        _hichunk_name = _hichunk_mod.__name__ if _hichunk_mod is not None and hasattr(_hichunk_mod, "__name__") else str(_hichunk_mod)  # 模块名便于对照日志
+        logging.info(
+            "%s collect 阶段: Redis 消费组=%s 消费者=%s stream_msg_id=%s | 消息体 id=%s doc_id=%s task_type=%s | "
+            "TaskService.get_task 已联表加载 parser_id=%s 文档 type=%s 文件名=%s | 下一步 handle_task -> do_handle_task -> build_chunks -> %s",
+            _TASK_EXECUTOR_HICHUNK_PATH_LOGO,
+            SVR_CONSUMER_GROUP_NAME,
+            CONSUMER_NAME,
+            redis_msg.get_msg_id(),
+            msg.get("id"),
+            task.get("doc_id"),
+            task_type,
+            task.get("parser_id"),
+            task.get("type"),
+            task.get("name"),
+            _hichunk_name,
+        )
     return redis_msg, task
 
 
@@ -1385,6 +1408,25 @@ async def handle_task():
                                                              PipelineTaskType.PARSE) or PipelineTaskType.PARSE
     task_id = task["id"]
     try:
+        # 在 handle_task begin 之前打印与前端选择 HiChunk 相关的执行路径（区分普通解析与画布数据流）
+        _parser_id_handle = str(task.get("parser_id") or "").strip().lower()  # 当前任务解析器
+        if _parser_id_handle == "hichunk":
+            if str(task_type).startswith("dataflow"):
+                _flow_note = "任务类型=dataflow：API 侧 queue_dataflow -> 本进程 do_handle_task 中 run_dataflow"  # 画布数据流分支
+            else:
+                _flow_note = "任务类型=默认解析：API 侧 DocumentService.run -> queue_tasks(PDF+HiChunk 整本任务) -> build_chunks -> rag.app.hichunk"  # 内置分块分支
+            logging.info(
+                "%s handle_task 入口(紧接 begin 日志): 前端知识库-文件-PDF-数据管道选内置 HiChunk 后常见路径 | %s | consumer=%s task_id=%s doc_id=%s kb_id=%s 页 from~to=%s~%s task_type=%r",
+                _TASK_EXECUTOR_HICHUNK_PATH_LOGO,
+                _flow_note,
+                CONSUMER_NAME,
+                task_id,
+                task.get("doc_id"),
+                task.get("kb_id"),
+                task.get("from_page"),
+                task.get("to_page"),
+                task_type,
+            )
         logging.info(f"handle_task begin for task {json.dumps(task)}")
         CURRENT_TASKS[task["id"]] = copy.deepcopy(task)
         await do_handle_task(task)
