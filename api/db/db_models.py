@@ -245,25 +245,33 @@ class RetryingPooledMySQLDatabase(PooledMySQLDatabase):
         self.retry_delay = kwargs.pop("retry_delay", 1)
         super().__init__(*args, **kwargs)
 
+    @staticmethod
+    def _mysql_should_retry_execute(exc):
+        if isinstance(exc, (OperationalError, InterfaceError)):
+            error_codes = [2013, 2006]
+            error_messages = ["", "Lost connection"]
+            return (
+                (hasattr(exc, "args") and exc.args and exc.args[0] in error_codes)
+                or (str(exc) in error_messages)
+                or (hasattr(exc, "__class__") and exc.__class__.__name__ == "InterfaceError")
+            )
+        if isinstance(exc, ValueError):
+            return "read of closed file" in str(exc).lower()
+        return False
+
     def execute_sql(self, sql, params=None, commit=True):
         for attempt in range(self.max_retries + 1):
             try:
                 return super().execute_sql(sql, params, commit)
-            except (OperationalError, InterfaceError) as e:
-                error_codes = [2013, 2006]
-                error_messages = ['', 'Lost connection']
-                should_retry = (
-                    (hasattr(e, 'args') and e.args and e.args[0] in error_codes) or
-                    (str(e) in error_messages) or
-                    (hasattr(e, '__class__') and e.__class__.__name__ == 'InterfaceError')
-                )
-
-                if should_retry and attempt < self.max_retries:
+            except (OperationalError, InterfaceError, ValueError) as e:
+                if not self._mysql_should_retry_execute(e):
+                    raise
+                if attempt < self.max_retries:
                     logging.warning(
-                        f"Database connection issue (attempt {attempt+1}/{self.max_retries}): {e}"
+                        f"Database connection issue (attempt {attempt + 1}/{self.max_retries}): {e}"
                     )
                     self._handle_connection_loss()
-                    time.sleep(self.retry_delay * (2 ** attempt))
+                    time.sleep(self.retry_delay * (2**attempt))
                 else:
                     logging.error(f"DB execution failure: {e}")
                     raise
@@ -287,22 +295,15 @@ class RetryingPooledMySQLDatabase(PooledMySQLDatabase):
         for attempt in range(self.max_retries + 1):
             try:
                 return super().begin()
-            except (OperationalError, InterfaceError) as e:
-                error_codes = [2013, 2006]
-                error_messages = ['', 'Lost connection']
-
-                should_retry = (
-                    (hasattr(e, 'args') and e.args and e.args[0] in error_codes) or
-                    (str(e) in error_messages) or
-                    (hasattr(e, '__class__') and e.__class__.__name__ == 'InterfaceError')
-                )
-
-                if should_retry and attempt < self.max_retries:
+            except (OperationalError, InterfaceError, ValueError) as e:
+                if not self._mysql_should_retry_execute(e):
+                    raise
+                if attempt < self.max_retries:
                     logging.warning(
-                        f"Lost connection during transaction (attempt {attempt+1}/{self.max_retries})"
+                        f"Lost connection during transaction (attempt {attempt + 1}/{self.max_retries})"
                     )
                     self._handle_connection_loss()
-                    time.sleep(self.retry_delay * (2 ** attempt))
+                    time.sleep(self.retry_delay * (2**attempt))
                 else:
                     raise
         return None
