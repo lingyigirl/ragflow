@@ -419,6 +419,15 @@ async def collect():
         task["memory_id"] = msg["memory_id"]
         task["source_id"] = msg["source_id"]
         task["message_dict"] = msg["message_dict"]
+    _chunk_flow_redis_parser = str(task.get("parser_id") or "").strip().lower()
+    logging.info(
+        "[ChunkFlow|redis|consumed|parser=%s|task_id=%s|doc_id=%s|consumer=%s|stream_msg_id=%s]",
+        _chunk_flow_redis_parser or "-",
+        task.get("id"),
+        task.get("doc_id"),
+        CONSUMER_NAME,
+        redis_msg.get_msg_id(),
+    )
     # 在交给 handle_task 之前打印 HiChunk 消费路径（对应前端：知识库-文件-PDF-数据管道选内置 HiChunk 后 API 入队）
     _parser_id_collect = str(task.get("parser_id") or "").strip().lower()  # 归一化解析器 id，用于判断是否 HiChunk
     if _parser_id_collect == "hichunk":
@@ -454,6 +463,12 @@ async def build_chunks(task, progress_callback):
         return []
 
     parser_id = str(task.get("parser_id") or "").strip().lower()
+    logging.info(
+        "[ChunkFlow|build_chunks|parser=%s|task_id=%s|doc_id=%s]",
+        parser_id or "-",
+        task.get("id"),
+        task.get("doc_id"),
+    )
     chunker = FACTORY.get(parser_id)
     if chunker is None:
         logging.warning(
@@ -1407,6 +1422,14 @@ async def handle_task():
     pipeline_task_type = TASK_TYPE_TO_PIPELINE_TASK_TYPE.get(task_type,
                                                              PipelineTaskType.PARSE) or PipelineTaskType.PARSE
     task_id = task["id"]
+    logging.info(
+        "[ChunkFlow|task_executor|parser=%s|task_id=%s|doc_id=%s|consumer=%s|task_type=%s]",
+        str(task.get("parser_id") or "").strip().lower() or "-",
+        task_id,
+        task.get("doc_id"),
+        CONSUMER_NAME,
+        task_type,
+    )
     try:
         # 在 handle_task begin 之前打印与前端选择 HiChunk 相关的执行路径（区分普通解析与画布数据流）
         _parser_id_handle = str(task.get("parser_id") or "").strip().lower()  # 当前任务解析器

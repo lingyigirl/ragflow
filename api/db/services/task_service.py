@@ -147,6 +147,13 @@ class TaskService(CommonService):
         if docs[0]["retry_count"] >= 3:
             return None
 
+        _chunk_flow_parser = str(docs[0].get("parser_id") or "").strip().lower()
+        logging.info(
+            "[ChunkFlow|TaskService.get_task|parser=%s|task_id=%s|doc_id=%s]",
+            _chunk_flow_parser or "-",
+            docs[0].get("id"),
+            docs[0].get("doc_id"),
+        )
         return docs[0]
 
     @classmethod
@@ -398,6 +405,12 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
 
     parse_task_array = []
     pid = str(doc.get("parser_id") or "").strip().lower()
+    logging.info(
+        "[ChunkFlow|queue_tasks|parser=%s|doc_id=%s|type=%s]",
+        pid,
+        doc.get("id"),
+        doc.get("type"),
+    )
 
     if doc["type"] == FileType.PDF.value:
         file_bin = settings.STORAGE_IMPL.get(bucket, name)
@@ -491,6 +504,13 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
             priority,
         )
     for unfinished_task in unfinished_task_array:
+        logging.info(
+            "[ChunkFlow|redis|publish|parser=%s|task_id=%s|doc_id=%s|queue=%s]",
+            pid,
+            unfinished_task.get("id"),
+            doc["id"],
+            settings.get_svr_queue_name(priority),
+        )
         assert REDIS_CONN.queue_product(
             settings.get_svr_queue_name(priority), message=unfinished_task
         ), "Can't access Redis. Please check the Redis' status."

@@ -1192,8 +1192,19 @@ class DocumentService(CommonService):
                 if kb_table_num_map[kb_id] <= 0:
                     KnowledgebaseService.delete_field_map(kb_id)
         if doc.get("pipeline_id", ""):
+            _chunk_flow_parser = str(doc_parser).strip().lower() if doc_parser is not None else "naive"
+            logging.info(
+                "[ChunkFlow|DocumentService.run|branch=dataflow|parser=%s|doc_id=%s]",
+                _chunk_flow_parser,
+                doc.get("id"),
+            )
             queue_dataflow(tenant_id, flow_id=doc["pipeline_id"], task_id=get_uuid(), doc_id=doc["id"])
         else:
+            logging.info(
+                "[ChunkFlow|DocumentService.run|branch=queue_tasks|parser=%s|doc_id=%s]",
+                str(doc_parser).strip().lower() if doc_parser is not None else "naive",
+                doc.get("id"),
+            )
             bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
             queue_tasks(doc, bucket, name, 0)
 
