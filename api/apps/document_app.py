@@ -465,12 +465,19 @@ async def create():
 
 
 @manager.route("/list", methods=["POST"])  # noqa: F821
-@login_required
 async def list_docs():
     kb_id = request.args.get("kb_id")
     if not kb_id:
         return get_json_result(data=False, message='Lack of "KB ID"', code=RetCode.ARGUMENT_ERROR)
-    tenants = UserTenantService.query(user_id=current_user.id)
+    if current_user:
+        auth_user_id = current_user.id
+    else:
+        auth_user_id = (request.args.get("user_id") or "").strip()
+        if not auth_user_id:
+            return get_json_result(data=False, message="Unauthorized.", code=RetCode.AUTHENTICATION_ERROR)
+        if not UserService.query(id=auth_user_id, status=StatusEnum.VALID.value):
+            return get_json_result(data=False, message="Unauthorized.", code=RetCode.AUTHENTICATION_ERROR)
+    tenants = UserTenantService.query(user_id=auth_user_id)
     for tenant in tenants:
         if KnowledgebaseService.query(tenant_id=tenant.tenant_id, id=kb_id):
             break
