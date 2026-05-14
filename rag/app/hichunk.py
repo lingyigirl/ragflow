@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
 
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
-from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+from deepdoc.parser.mineru_parser import MinerUParser  # 仅导入解析器类，避免依赖 resolve_mineru_api_from_env（旧包或循环导入时该名可能不存在）
 import logging
 
 load_dotenv()
@@ -683,7 +683,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             callback(0.1, "Start MinerU parsing (PDF or image).")
 
         mineru_executable = os.environ.get("MINERU_EXECUTABLE", "mineru")
-        mineru_api = parser_config.get("mineru_api_base") or resolve_mineru_api_from_env()
+        mineru_api = parser_config.get("mineru_api_base") or (os.environ.get("MINERU_APISERVER", "") or "").strip().rstrip("/") 
         mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api)
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
