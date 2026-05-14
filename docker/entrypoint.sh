@@ -37,7 +37,7 @@ ENABLE_ADMIN_SERVER=0 # Default close admin server
 INIT_SUPERUSER_ARGS="" # Default to not initialize superuser
 CONSUMER_NO_BEG=0
 CONSUMER_NO_END=0
-WORKERS=1
+WORKERS=2
 
 MCP_HOST="127.0.0.1"
 MCP_PORT=9382

@@ -35,7 +35,7 @@ PY=python3
 
 # Set default number of workers if WS is not set or less than 1
 if [[ -z "$WS" || $WS -lt 1 ]]; then
-  WS=1
+  WS=2
 fi
 
 # Maximum number of retries for each task executor and server
