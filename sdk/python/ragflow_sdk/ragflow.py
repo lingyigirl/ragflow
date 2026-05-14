@@ -54,7 +54,7 @@ class RAGFlow:
         avatar: Optional[str] = None,
         description: Optional[str] = None,
         embedding_model: Optional[str] = None,
-        permission: str = "me",
+        permission: str = "team",
         chunk_method: str = "naive",
         parser_config: Optional[DataSet.ParserConfig] = None,
     ) -> DataSet:

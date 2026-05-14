@@ -61,7 +61,7 @@ export default function DatasetSettings() {
     defaultValues: {
       name: '',
       parser_id: DocumentParserType.Naive,
-      permission: PermissionRole.Me,
+      permission: PermissionRole.Team,
       language: 'Chinese',
       parser_config: {
         layout_recognize: DocumentType.DeepDOC,

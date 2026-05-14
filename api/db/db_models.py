@@ -739,7 +739,7 @@ class Knowledgebase(DataBaseModel):
     language = CharField(max_length=32, null=True, default="Chinese" if "zh_CN" in os.getenv("LANG", "") else "English", help_text="English|Chinese", index=True)
     description = TextField(null=True, help_text="KB description")
     embd_id = CharField(max_length=128, null=False, help_text="default embedding model ID", index=True)
-    permission = CharField(max_length=16, null=False, help_text="me|team", default="me", index=True)
+    permission = CharField(max_length=16, null=False, help_text="me|team", default="team", index=True)
     created_by = CharField(max_length=32, null=False, index=True)
     doc_num = IntegerField(default=0, index=True)
     token_num = IntegerField(default=0, index=True)

@@ -281,7 +281,7 @@ class TestDatasetCreate:
     def test_permission_unset(self, client):
         payload = {"name": "permission_unset"}
         dataset = client.create_dataset(**payload)
-        assert dataset.permission == "me", str(dataset)
+        assert dataset.permission == "team", str(dataset)
 
     @pytest.mark.p3
     def test_permission_none(self, client):

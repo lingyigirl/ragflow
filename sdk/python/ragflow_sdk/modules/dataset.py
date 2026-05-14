@@ -30,7 +30,7 @@ class DataSet(Base):
         self.tenant_id = None
         self.description = ""
         self.embedding_model = ""
-        self.permission = "me"
+        self.permission = "team"
         self.document_count = 0
         self.chunk_count = 0
         self.chunk_method = "naive"

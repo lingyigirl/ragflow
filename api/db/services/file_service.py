@@ -541,7 +541,6 @@ class FileService(CommonService):
         if pdf_parser_config:
             if pdf_parser_config.get("parse_method"):
                 parser_config["layout_recognize"] = pdf_parser_config["parse_method"]
-
             if pdf_parser_config.get("mineru_parse_method"):
                 parser_config["mineru_parse_method"] = pdf_parser_config["mineru_parse_method"]
             if pdf_parser_config.get("mineru_formula_enable") is not None:
