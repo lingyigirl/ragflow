@@ -139,18 +139,29 @@ class MinerUParseOptions:
     table_enable: bool = True
 
 
-def resolve_mineru_api_from_env() -> str:
-    return (os.environ.get("MINERU_APISERVER", "") or "").strip().rstrip("/")
+def resolve_mineru_api_from_env(fallback: str = "http://host.docker.internal:9987") -> str:
+    base = os.environ.get("MINERU_APISERVER")
+    if base:
+        return base.rstrip("/")
 
+    scheme = os.environ.get("MINERU_API_SCHEME", "http").strip() or "http"
+    host = os.environ.get("MINERU_API_HOST", "host.docker.internal").strip()
+    port = os.environ.get("MINERU_API_PORT", "").strip()
 
+    if host:
+        if port:
+            return f"{scheme}://{host}:{port}"
+        return f"{scheme}://{host}"
+
+    return fallback.rstrip("/")
 class MinerUParser(RAGFlowPdfParser):
     def __init__(
         self,
         mineru_path: str = "mineru",
-        mineru_api: Optional[str] = None,
+        mineru_api: str = "",
         mineru_server_url: Optional[str] = None,
     ):
-        self.mineru_api = (mineru_api or "").rstrip("/")
+        self.mineru_api = mineru_api.rstrip("/") if mineru_api else ""
         self.mineru_server_url = (mineru_server_url or "").rstrip("/")
         self.outlines = []
         self.logger = logging.getLogger(self.__class__.__name__)
@@ -1706,19 +1717,6 @@ class MinerUParser(RAGFlowPdfParser):
             except Exception:
                 pass
             pdf_virtual_path = str(file_path.with_suffix(".pdf"))
-            if kb_id and doc_id and pdf_bytes:
-                try:
-                    pdf_name = Path(pdf_virtual_path).name
-                    pdf_location = f"{doc_id}/{pdf_name}"
-                    settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_bytes)
-                    self.logger.info(
-                        "[MinerU][Excel] Uploaded converted PDF to MinIO: bucket=%s, location=%s",
-                        kb_id, pdf_location
-                    )
-                except Exception as e:
-                    self.logger.warning(
-                        "[MinerU][Excel] Failed to upload converted PDF: %s", e
-                    )
             if callback:
                 callback(0.14, "[MinerU] Excel converted to PDF, continue parsing...")
             return self.parse_pdf(
