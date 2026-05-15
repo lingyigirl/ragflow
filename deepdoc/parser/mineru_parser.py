@@ -1706,6 +1706,19 @@ class MinerUParser(RAGFlowPdfParser):
             except Exception:
                 pass
             pdf_virtual_path = str(file_path.with_suffix(".pdf"))
+            if kb_id and doc_id and pdf_bytes:
+                try:
+                    pdf_name = Path(pdf_virtual_path).name
+                    pdf_location = f"{doc_id}/{pdf_name}"
+                    settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_bytes)
+                    self.logger.info(
+                        "[MinerU][Excel] Uploaded converted PDF to MinIO: bucket=%s, location=%s",
+                        kb_id, pdf_location
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        "[MinerU][Excel] Failed to upload converted PDF: %s", e
+                    )
             if callback:
                 callback(0.14, "[MinerU] Excel converted to PDF, continue parsing...")
             return self.parse_pdf(

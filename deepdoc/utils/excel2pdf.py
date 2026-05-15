@@ -17,7 +17,7 @@ _logger = logging.getLogger(__name__)
 
 
 def _should_save_pdf_snapshot() -> bool:
-    return str(os.environ.get("EXCEL2PDF_SAVE_LOCAL_PDF", "1")).strip() == "1"
+    return str(os.environ.get("EXCEL2PDF_SAVE_LOCAL_PDF", "1")).strip() == "0"
 
 
 def _save_pdf_snapshot_if_needed(pdf_bytes: bytes, utils_dir: Path):

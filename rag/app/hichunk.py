@@ -710,6 +710,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 output_dir=os.environ.get("MINERU_OUTPUT_DIR", ""),
                 backend=backend,
                 delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
+                kb_id=kwargs.get("kb_id"),
+                doc_id=kwargs.get("doc_id"),
+                parser_config=kwargs.get("parser_config", {}),
             )
         except KeyError as exc:
             _missing_key = exc.args[0] if exc.args else None
