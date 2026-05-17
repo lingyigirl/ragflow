@@ -1817,7 +1817,6 @@ async def mineru_parse():
 
 
 @manager.route("/mineru_download/<file_type>", methods=["GET"])  # noqa: F821
-@login_required
 async def mineru_download(file_type):
     try:
         kb_id_raw = request.args.get("kb_id")
@@ -1854,7 +1853,6 @@ async def mineru_download(file_type):
         e, kb = KnowledgebaseService.get_by_id(kb_id)
         if not e:
             return get_json_result(data=False, message="知识库不存在", code=RetCode.NOT_FOUND)
-        check_kb_team_permission(kb, current_user.id)
 
         e, doc = DocumentService.get_by_id(doc_id)
         if not e or not doc:
@@ -1958,7 +1956,6 @@ async def update_mineru_section():
                 message="请求体必须是 JSON 对象",
                 code=RetCode.ARGUMENT_ERROR,
             )
-        # LOGO：解析为对象后的请求体，便于后端对照查看
         try:
             logging.info(
                 "[MinerU][update][LOGO-请求体] %s",
@@ -2025,7 +2022,6 @@ async def update_mineru_section():
             )
         check_kb_team_permission(kb, current_user.id)
 
-        # LOGO：写入表前，展示即将更新的字段与当前行快照
         try:
             logging.info(
                 "[MinerU][update][LOGO-入表前] %s",
@@ -2049,7 +2045,6 @@ async def update_mineru_section():
             effective_type,
             text,
         )
-        # LOGO：写入表后，结合服务层返回与立刻回读的行数据
         try:
             _row_after = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
             logging.info(
@@ -2067,7 +2062,6 @@ async def update_mineru_section():
                 message=msg or "更新 mineru_section 失败",
                 code=RetCode.SERVER_ERROR,
             )
-        # LOGO：接口返回前再查库，核对最终落库内容
         try:
             _row_final = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
             logging.info(
