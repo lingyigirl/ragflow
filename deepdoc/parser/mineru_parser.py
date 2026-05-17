@@ -1374,7 +1374,6 @@ class MinerUParser(RAGFlowPdfParser):
         doc_id: str,
         content_list: list[dict[str, Any]],
         callback: Optional[Callable] = None,
-        pdf_path: Optional[Path] = None,
     ) -> bool:
         try:
             if not output_dir or not output_dir.exists():
@@ -1578,21 +1577,9 @@ class MinerUParser(RAGFlowPdfParser):
             else:
                 self.logger.info(f"[MinerU] 未找到图片文件，跳过上传")
 
-            pdf_uploaded = False
-            if pdf_path and pdf_path.exists() and pdf_path.is_file():
-                try:
-                    pdf_location = f"{base_prefix}/{pdf_path.name}"
-                    settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_path.read_bytes())
-                    self.logger.info(f"[MinerU] 已上传PDF文件: bucket={kb_id}, location={pdf_location}")
-                    pdf_uploaded = True
-                    self._emit_callback(callback, 0.87, f"[MinerU] 已上传PDF文件")
-                except Exception as e:
-                    self.logger.warning(f"[MinerU] 上传PDF文件失败: {e}")
-
             self.logger.info(
                 f"[MinerU] 解析产物上传完成: bucket={kb_id}, prefix={base_prefix}, "
-                f"json={'已上传' if json_uploaded else '失败'}, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张, "
-                f"pdf={'已上传' if pdf_uploaded else '未上传'}"
+                f"json={'已上传' if json_uploaded else '失败'}, markdown={'已上传' if markdown_uploaded else '未找到'}, 图片={uploaded_image_count}张"
             )
             self._emit_callback(callback, 0.90, f"[MinerU] 解析产物上传完成")
             return True
@@ -1732,6 +1719,14 @@ class MinerUParser(RAGFlowPdfParser):
             pdf_virtual_path = str(file_path.with_suffix(".pdf"))
             if callback:
                 callback(0.14, "[MinerU] Excel converted to PDF, continue parsing...")
+            if kb_id and doc_id and not bool(parser_cfg.get("skip_mineru_output_upload", False)):
+                try:
+                    pdf_filename = Path(pdf_virtual_path).name
+                    pdf_location = f"{doc_id}/{pdf_filename}"
+                    settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_bytes)
+                    self.logger.info(f"[MinerU] 已上传Excel转化PDF文件: bucket={kb_id}, location={pdf_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传Excel转化PDF文件失败: {e}")
             return self.parse_pdf(
                 filepath=pdf_virtual_path,
                 binary=pdf_bytes,
@@ -1847,7 +1842,6 @@ class MinerUParser(RAGFlowPdfParser):
                             doc_id=doc_id,
                             content_list=content_list_for_minio,
                             callback=callback,
-                            pdf_path=pdf,
                         )
                         if not ok:
                             self.logger.warning(
