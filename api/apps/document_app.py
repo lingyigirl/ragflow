@@ -2795,17 +2795,17 @@ async def _collect_prompt_context_by_retrieval(
     for doc_id in doc_ids:
         ok, doc = DocumentService.get_by_id(doc_id)
         if not ok or not doc:
-            return False, f"Document {doc_id} not found.", "", [], []
+            return False, f"Document {doc_id} not found.", "", [], [], {}
         kid = str(doc.kb_id).strip()
         if kid and kid not in resolved_kb_ids:
             resolved_kb_ids.append(kid)
     if not resolved_kb_ids:
-        return False, "No dataset scope for retrieval.", "", [], []
+        return False, "No dataset scope for retrieval.", "", [], [], {}
     kbs = list(KnowledgebaseService.get_by_ids(resolved_kb_ids))
     found_ids = {str(kb.id) for kb in kbs}
     for kid in resolved_kb_ids:
         if kid not in found_ids:
-            return False, f"Dataset {kid} not found.", "", [], []
+            return False, f"Dataset {kid} not found.", "", [], [], {}
     is_knowledge_graph = all(getattr(kb, "parser_id", None) == ParserType.KG for kb in kbs)
     tenant_ids = list(dict.fromkeys([kb.tenant_id for kb in kbs]))
     embedding_list = list(dict.fromkeys([kb.embd_id for kb in kbs]))
@@ -2839,15 +2839,21 @@ async def _collect_prompt_context_by_retrieval(
         )
         kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
     if not kbinfos.get("chunks"):
-        return True, "", "", [], []
+        return True, "", "", [], [], {}
     used_chunks = kb_prompt_truncate_chunk_list(kbinfos, max_prompt_tokens)
     chunk_ids = [get_value(ck, "chunk_id", "id") for ck in used_chunks if get_value(ck, "chunk_id", "id")]
+    chunk_bbox = {}
+    if chunk_ids:
+        from api.db.db_models import MineruSection
+        if MineruSection.table_exists():
+            rows = MineruSection.select(MineruSection.chunk_id, MineruSection.bbox).where(MineruSection.chunk_id.in_(chunk_ids))
+            chunk_bbox = {row.chunk_id: row.bbox for row in rows}
     merged_context = "\n".join(kb_prompt(kbinfos, max_prompt_tokens))
     if not include_mineru_chunk_citation:
-        return True, "", merged_context, [], chunk_ids
+        return True, "", merged_context, [], chunk_bbox
     fallback_kb = resolved_kb_ids[0] if resolved_kb_ids else ""
     citations = await asyncio.to_thread(_build_mineru_chunk_citations, used_chunks, fallback_kb)
-    return True, "", merged_context, citations, chunk_ids
+    return True, "", merged_context, citations, chunk_bbox
 
 
 @manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
@@ -2939,10 +2945,10 @@ async def ask_by_docs():
     chat_mdl = ChatModel[llm_factory](llm_api_key, llm_model, base_url=llm_base_url)
 
     use_doc_grounding = bool(kb_ids or doc_ids)
-    chunk_ids = []
+    chunk_bbox = {}
     mineru_citations = []
     if use_doc_grounding:
-        ok, err_msg, doc_context, mineru_citations, chunk_ids = await _collect_prompt_context_by_retrieval(
+        ok, err_msg, doc_context, mineru_citations, chunk_bbox = await _collect_prompt_context_by_retrieval(
             question,
             kb_ids,
             doc_ids,
@@ -2980,8 +2986,8 @@ async def ask_by_docs():
         "used_kb_ids": kb_ids,
         "used_doc_ids": doc_ids,
         "grounded_by_documents": use_doc_grounding,
-        "chunk_ids": chunk_ids,
-        "trace_chunk": bool(chunk_ids),
+        "trace_chunk": bool(chunk_bbox),
+        "chunk_bbox": chunk_bbox,
         "llm_options": llm_options,
         "top_k": top_k,
         "retrieval_top": retrieval_top,
