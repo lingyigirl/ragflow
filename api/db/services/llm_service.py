@@ -141,6 +141,10 @@ class LLMBundle(LLM4Tenant):
         if self.langfuse:
             generation = self.langfuse.start_generation(trace_context=self.trace_context, name="encode_queries", model=self.llm_name, input={"query": query})
 
+        token_size = num_tokens_from_string(query)
+        if token_size > self.max_length:
+            target_len = int(self.max_length * 0.95)
+            query = query[:target_len]
         emd, used_tokens = self.mdl.encode_queries(query)
         llm_name = getattr(self, "llm_name", None)
         if not TenantLLMService.increase_usage(self.tenant_id, self.llm_type, used_tokens, llm_name):
