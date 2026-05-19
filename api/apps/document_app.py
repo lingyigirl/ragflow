@@ -2795,17 +2795,17 @@ async def _collect_prompt_context_by_retrieval(
     for doc_id in doc_ids:
         ok, doc = DocumentService.get_by_id(doc_id)
         if not ok or not doc:
-            return False, f"Document {doc_id} not found.", "", [], [], {}
+            return False, f"Document {doc_id} not found.", "", [], {}
         kid = str(doc.kb_id).strip()
         if kid and kid not in resolved_kb_ids:
             resolved_kb_ids.append(kid)
     if not resolved_kb_ids:
-        return False, "No dataset scope for retrieval.", "", [], [], {}
+        return False, "No dataset scope for retrieval.", "", [], {}
     kbs = list(KnowledgebaseService.get_by_ids(resolved_kb_ids))
     found_ids = {str(kb.id) for kb in kbs}
     for kid in resolved_kb_ids:
         if kid not in found_ids:
-            return False, f"Dataset {kid} not found.", "", [], [], {}
+            return False, f"Dataset {kid} not found.", "", [], {}
     is_knowledge_graph = all(getattr(kb, "parser_id", None) == ParserType.KG for kb in kbs)
     tenant_ids = list(dict.fromkeys([kb.tenant_id for kb in kbs]))
     embedding_list = list(dict.fromkeys([kb.embd_id for kb in kbs]))
@@ -2839,15 +2839,31 @@ async def _collect_prompt_context_by_retrieval(
         )
         kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
     if not kbinfos.get("chunks"):
-        return True, "", "", [], [], {}
+        return True, "", "", [], {}
     used_chunks = kb_prompt_truncate_chunk_list(kbinfos, max_prompt_tokens)
-    chunk_ids = [get_value(ck, "chunk_id", "id") for ck in used_chunks if get_value(ck, "chunk_id", "id")]
     chunk_bbox = {}
-    if chunk_ids:
+    doc_ids = list(dict.fromkeys([get_value(ck, "doc_id", "document_id") for ck in used_chunks if get_value(ck, "doc_id", "document_id")]))
+    if doc_ids:
         from api.db.db_models import MineruSection
         if MineruSection.table_exists():
-            rows = MineruSection.select(MineruSection.chunk_id, MineruSection.bbox).where(MineruSection.chunk_id.in_(chunk_ids))
-            chunk_bbox = {row.chunk_id: row.bbox for row in rows}
+            rows = MineruSection.select(MineruSection.doc_id, MineruSection.chunk_id, MineruSection.text, MineruSection.bbox).where(MineruSection.doc_id.in_(doc_ids))
+            sections_by_doc = {}
+            for row in rows:
+                if row.doc_id not in sections_by_doc:
+                    sections_by_doc[row.doc_id] = []
+                sections_by_doc[row.doc_id].append(row)
+            for ck in used_chunks:
+                ck_doc_id = get_value(ck, "doc_id", "document_id")
+                ck_text = get_value(ck, "content_with_weight", "content")
+                if not ck_doc_id or not ck_text:
+                    continue
+                if isinstance(ck_text, dict):
+                    ck_text = ck_text.get("text", "")
+                ck_text = str(ck_text)
+                for section in sections_by_doc.get(ck_doc_id, []):
+                    section_text = (section.text or "").strip()
+                    if section_text and section_text in ck_text:
+                        chunk_bbox[section.chunk_id] = section.bbox
     merged_context = "\n".join(kb_prompt(kbinfos, max_prompt_tokens))
     if not include_mineru_chunk_citation:
         return True, "", merged_context, [], chunk_bbox
