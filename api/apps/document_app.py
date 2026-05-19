@@ -514,6 +514,7 @@ async def list_docs():
             return get_data_error_result(message=f"Invalid filter conditions: {', '.join(invalid_types)} type{'s' if len(invalid_types) > 1 else ''}")
 
     suffix = req.get("suffix", [])
+    doc_ids = req.get("doc_ids", [])
     metadata_condition = req.get("metadata_condition", {}) or {}
     metadata = req.get("metadata", {}) or {}
     if isinstance(metadata, dict) and metadata.get("empty_metadata"):
@@ -529,14 +530,22 @@ async def list_docs():
             return get_data_error_result(message="metadata must be an object.")
 
     doc_ids_filter = None
+    if doc_ids:
+        doc_ids_filter = set(doc_ids)
     metas = None
     if metadata_condition or metadata:
         metas = DocumentService.get_flatted_meta_by_kbs([kb_id])
 
     if metadata_condition:
-        doc_ids_filter = set(meta_filter(metas, convert_conditions(metadata_condition), metadata_condition.get("logic", "and")))
-        if metadata_condition.get("conditions") and not doc_ids_filter:
+        condition_ids = set(meta_filter(metas, convert_conditions(metadata_condition), metadata_condition.get("logic", "and")))
+        if metadata_condition.get("conditions") and not condition_ids:
             return get_json_result(data={"total": 0, "docs": []})
+        if doc_ids_filter is None:
+            doc_ids_filter = condition_ids
+        else:
+            doc_ids_filter &= condition_ids
+            if not doc_ids_filter:
+                return get_json_result(data={"total": 0, "docs": []})
 
     if metadata:
         metadata_doc_ids = None
