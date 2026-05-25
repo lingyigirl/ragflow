@@ -92,7 +92,7 @@ export default function SearchingView({
             setIsSearching?.(false);
           }}
         >
-          RAGFlow
+          KINS
         </h1>
         <div
           className={cn(
