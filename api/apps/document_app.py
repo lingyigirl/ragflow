@@ -2835,7 +2835,13 @@ async def _collect_prompt_context_by_retrieval(
     if doc_ids:
         from api.db.db_models import MineruSection
         if MineruSection.table_exists():
-            rows = MineruSection.select(MineruSection.doc_id, MineruSection.chunk_id, MineruSection.text, MineruSection.bbox).where(MineruSection.doc_id.in_(doc_ids))
+            rows = MineruSection.select(
+                MineruSection.doc_id,
+                MineruSection.chunk_id,
+                MineruSection.text,
+                MineruSection.bbox,
+                MineruSection.page_idx,
+            ).where(MineruSection.doc_id.in_(doc_ids))
             sections_by_doc = {}
             for row in rows:
                 if row.doc_id not in sections_by_doc:
@@ -2852,7 +2858,10 @@ async def _collect_prompt_context_by_retrieval(
                 for section in sections_by_doc.get(ck_doc_id, []):
                     section_text = (section.text or "").strip()
                     if section_text and section_text in ck_text:
-                        chunk_bbox[section.chunk_id] = section.bbox
+                        chunk_bbox[section.chunk_id] = {
+                            "bbox": section.bbox,
+                            "page_idx": section.page_idx,
+                        }
     merged_context = "\n".join(kb_prompt(kbinfos, max_prompt_tokens))
     if not include_mineru_chunk_citation:
         return True, "", merged_context, [], chunk_bbox
