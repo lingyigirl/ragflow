@@ -306,9 +306,9 @@ def login_or_token_required(func):
 
 
 @manager.route("/upload", methods=["POST"])  # noqa: F821
-@login_required
+@login_or_token_required
 @validate_request("kb_id")
-async def upload():
+async def upload(tenant_id=None):
     form = await request.form
     kb_id = form.get("kb_id")
     if not kb_id:
@@ -327,10 +327,13 @@ async def upload():
     e, kb = KnowledgebaseService.get_by_id(kb_id)
     if not e:
         raise LookupError("Can't find this dataset!")
-    if not check_kb_team_permission(kb, current_user.id):
+    actor_id = current_user.id if current_user else tenant_id
+    if not actor_id:
+        raise Unauthorized()
+    if not check_kb_team_permission(kb, actor_id):
         return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
-    err, files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, current_user.id)
+    err, files = await asyncio.to_thread(FileService.upload_document, kb, file_objs, actor_id)
     if err:
         return get_json_result(data=files, message="\n".join(err), code=RetCode.SERVER_ERROR)
 
@@ -890,23 +893,27 @@ async def rm():
     if isinstance(doc_ids, str): 
         doc_ids = [doc_ids] 
 
-    if current_user: 
-        requester_id = str(current_user.id).strip() 
-    else: 
-        raw_uid = req.get("user_id") 
-        if raw_uid is None or (isinstance(raw_uid, str) and not raw_uid.strip()): 
-            return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR) 
-        req_user_id = str(raw_uid).strip() 
-        ok_user, user = UserService.get_by_id(req_user_id) 
-        if not ok_user or not user: 
-            return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR) 
-        if str(getattr(user, "status", "")) != StatusEnum.VALID.value: 
-            return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR) 
-        requester_id = req_user_id 
+    if current_user:
+        requester_id = str(current_user.id).strip()
+        is_api_key_mode = False
+    else:
+        authorization_str = request.headers.get("Authorization")
+        if not authorization_str:
+            return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR)
+        authorization_list = authorization_str.split()
+        token = authorization_list[1].strip() if len(authorization_list) >= 2 else authorization_str.strip()
+        token_objs = APIToken.query(token=token) if token else []
+        if not token_objs:
+            return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
+        requester_id = str(token_objs[0].tenant_id).strip()
+        is_api_key_mode = True
 
     for doc_id in doc_ids:
-        if not DocumentService.accessible4deletion(doc_id, requester_id): 
-            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR) 
+        can_delete = DocumentService.accessible4deletion(doc_id, requester_id)
+        if not can_delete and is_api_key_mode:
+            can_delete = str(DocumentService.get_tenant_id(doc_id) or "") == requester_id
+        if not can_delete:
+            return get_json_result(data=False, message="No authorization.", code=RetCode.AUTHENTICATION_ERROR)
 
     errors = await asyncio.to_thread(FileService.delete_docs, doc_ids, requester_id) 
 
@@ -927,25 +934,15 @@ async def run():
             requester_id = str(current_user.id).strip()
         else:
             authorization_str = request.headers.get("Authorization")
-            if authorization_str:
-                authorization_list = authorization_str.split()
-                token = authorization_list[1].strip() if len(authorization_list) >= 2 else authorization_str.strip()
-                token_objs = APIToken.query(token=token) if token else []
-                if not token_objs:
-                    return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
-                requester_id = str(token_objs[0].tenant_id).strip()
-                is_api_key_mode = True
-            else:
-                raw_uid = req.get("user_id")
-                if raw_uid is None or (isinstance(raw_uid, str) and not raw_uid.strip()):
-                    return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR)
-                req_user_id = str(raw_uid).strip()
-                ok_user, user = UserService.get_by_id(req_user_id)
-                if not ok_user or not user:
-                    return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR)
-                if str(getattr(user, "status", "")) != StatusEnum.VALID.value:
-                    return get_json_result(data=False, message="Invalid user_id.", code=RetCode.AUTHENTICATION_ERROR)
-                requester_id = req_user_id
+            if not authorization_str:
+                return get_json_result(data=False, message="Authentication required.", code=RetCode.AUTHENTICATION_ERROR)
+            authorization_list = authorization_str.split()
+            token = authorization_list[1].strip() if len(authorization_list) >= 2 else authorization_str.strip()
+            token_objs = APIToken.query(token=token) if token else []
+            if not token_objs:
+                return get_json_result(data=False, message="Authentication error: API key is invalid!", code=RetCode.AUTHENTICATION_ERROR)
+            requester_id = str(token_objs[0].tenant_id).strip()
+            is_api_key_mode = True
         classify_switch = req.get("enable_voucher_type_classify", False)
         if not isinstance(classify_switch, bool):
             return get_json_result(
@@ -2475,7 +2472,8 @@ async def identity_list_docs():
         return server_error_response(e)
 
 @manager.route("/batch_file_progress", methods=["POST"])
-async def batch_doc_progress():
+@token_required
+async def batch_doc_progress(tenant_id):
     req = await get_request_json()
     doc_ids = req.get("doc_ids", []) if isinstance(req, dict) else []
     if isinstance(doc_ids, str):
@@ -2545,36 +2543,18 @@ def _normalize_direct_upload_parse_method(raw: str | None) -> tuple[str | None, 
 
 
 @manager.route("/direct_upload_parse", methods=["POST"])  # noqa: F821
-async def upload_parse_user_kb():
+@token_required
+async def upload_parse_user_kb(tenant_id):
     try:
         from api.db.db_models import MineruSection
-        form = await request.form 
-        req_user_id = (form.get("user_id") or "").strip() 
-        if not req_user_id: 
-            return get_json_result(data=False, message='Lack of "user_id"', code=RetCode.ARGUMENT_ERROR)
+        form = await request.form
         chunk_err, chunk_method_key = _normalize_direct_upload_chunk_method(form.get("chunk_method"))
         if chunk_err or not chunk_method_key:
             return get_json_result(data=False, message=chunk_err or "Invalid chunk_method.", code=RetCode.ARGUMENT_ERROR)
         parse_err, parse_method_key = _normalize_direct_upload_parse_method(form.get("parse_method"))
         if parse_err or not parse_method_key:
             return get_json_result(data=False, message=parse_err or "Invalid parse_method.", code=RetCode.ARGUMENT_ERROR)
-        user_tenants = UserTenantService.query(user_id=req_user_id, status=StatusEnum.VALID.value)
-        if not user_tenants: 
-            return get_data_error_result(message="User tenant relation not found.")
-        ok_user, user = UserService.get_by_id(req_user_id)
-        if not ok_user or not user: 
-            return get_data_error_result(message="User not found.")
-        for ut in user_tenants:
-            if str(ut.user_id) != str(user.id):
-                return get_data_error_result(message="User tenant mismatch.")
-        tenant_id = None
-        for ut in user_tenants:
-            if str(ut.tenant_id) == str(user.id):
-                tenant_id = str(ut.tenant_id)
-                break
-        if not tenant_id:
-            return get_data_error_result(message="Personal workspace not found.")
-        kb_name = req_user_id
+        kb_name = tenant_id
 
         files = await request.files
         if "file" not in files:
