@@ -2871,7 +2871,8 @@ async def _collect_prompt_context_by_retrieval(
 
 
 @manager.route("/ask_by_docs", methods=["POST"])  # noqa: F821
-async def ask_by_docs():
+@token_required
+async def ask_by_docs(tenant_id):
     req = await get_request_json()
     if not isinstance(req, dict):
         return get_json_result(data=False, message="Invalid JSON body.", code=RetCode.ARGUMENT_ERROR)
