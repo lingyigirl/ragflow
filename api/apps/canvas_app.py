@@ -74,6 +74,10 @@ async def save():
         req["dsl"] = json.dumps(req["dsl"], ensure_ascii=False)
     req["dsl"] = json.loads(req["dsl"])
     cate = req.get("canvas_category", CanvasCategory.Agent)
+    if cate != CanvasCategory.DataFlow and not req.get("agent_type"):
+        party_type = (req.get("dsl") or {}).get("globals", {}).get("agent.party_type")
+        if party_type:
+            req["agent_type"] = party_type
     if "id" not in req:
         req["user_id"] = current_user.id
         if UserCanvasService.query(user_id=current_user.id, title=req["title"].strip(), canvas_category=cate):

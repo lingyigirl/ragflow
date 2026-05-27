@@ -12,7 +12,7 @@ import { useNavigatePage } from '@/hooks/logic-hooks/navigate-hooks';
 import { useFetchAgentTemplates, useSetAgent } from '@/hooks/use-agent-request';
 
 import { CardContainer } from '@/components/card-container';
-import { AgentCategory } from '@/constants/agent';
+import { AgentCategory, AgentGlobals } from '@/constants/agent';
 import { IFlowTemplate } from '@/interfaces/database/agent';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,17 +54,23 @@ export default function AgentTemplates() {
 
   const handleOk = useCallback(
     async (payload: any) => {
-      let dsl = template?.dsl;
-      const canvasCategory = template?.canvas_category;
+      const canvasCategory =
+        template?.canvas_category ?? AgentCategory.AgentCanvas;
+      const isDataflowCanvas = canvasCategory === AgentCategory.DataflowCanvas;
+      const dsl = {
+        ...(template?.dsl ?? {}),
+        globals: {
+          ...((template?.dsl?.globals as Record<string, unknown>) ?? {}),
+          [AgentGlobals.AgentPartyType]: payload.partyType,
+        },
+      };
 
       const ret = await setAgent({
         title: payload.name,
         dsl,
         avatar: template?.avatar,
         canvas_category: canvasCategory,
-        ...(canvasCategory === AgentCategory.AgentCanvas
-          ? { agent_type: payload.partyType }
-          : {}),
+        ...(!isDataflowCanvas ? { agent_type: payload.partyType } : {}),
       });
 
       if (ret?.code === 0) {

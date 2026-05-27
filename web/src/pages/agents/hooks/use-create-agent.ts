@@ -84,9 +84,12 @@ export function useCreateAgentOrPipeline() {
 
   const handleCreateAgentOrPipeline = useCallback(
     async (data: FormSchemaType) => {
-      const isAgent = data.type === FlowType.Agent;
+      const isDataflow = data.type === FlowType.Flow;
+      const canvasCategory = isDataflow
+        ? AgentCategory.DataflowCanvas
+        : AgentCategory.AgentCanvas;
       const nextDsl = cloneDeep(
-        isAgent ? EmptyDsl : DataflowEmptyDsl,
+        isDataflow ? DataflowEmptyDsl : EmptyDsl,
       ) as DSL;
       nextDsl.globals = {
         ...(nextDsl.globals ?? {}),
@@ -95,10 +98,8 @@ export function useCreateAgentOrPipeline() {
       const ret = await setAgent({
         title: data.name,
         dsl: nextDsl,
-        canvas_category: isAgent
-          ? AgentCategory.AgentCanvas
-          : AgentCategory.DataflowCanvas,
-        ...(isAgent ? { agent_type: data.partyType } : {}),
+        canvas_category: canvasCategory,
+        ...(!isDataflow ? { agent_type: data.partyType } : {}),
       });
 
       if (ret.code === 0) {
