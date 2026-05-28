@@ -111,6 +111,9 @@ class UserCanvasService(CommonService):
                 cls.model.create_date,
                 cls.model.update_date,
                 cls.model.canvas_category,
+                cls.model.agent_type,
+                cls.model.agent_type_cn,
+                cls.model.agent_type_en,
                 User.nickname,
                 User.avatar.alias('tenant_avatar'),
             ]
@@ -156,6 +159,8 @@ class UserCanvasService(CommonService):
             cls.model.update_time,
             cls.model.canvas_category,
             cls.model.agent_type,
+            cls.model.agent_type_cn,
+            cls.model.agent_type_en,
         ]
         if keywords:
             agents = cls.model.select(*fields).join(User, on=(cls.model.user_id == User.id)).where(

@@ -105,7 +105,13 @@ export function useCreateAgentOrPipeline() {
         title: data.name,
         dsl: nextDsl,
         canvas_category: canvasCategory,
-        ...(!isDataflow ? { agent_type: data.partyType } : {}),
+        ...(!isDataflow
+          ? {
+              agent_type: data.partyType,
+              agent_type_cn: data.agentTypeNameZh?.trim() || undefined,
+              agent_type_en: data.agentTypeNameEn?.trim() || undefined,
+            }
+          : {}),
       });
 
       if (ret.code === 0) {

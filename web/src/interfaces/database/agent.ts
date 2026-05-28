@@ -78,6 +78,8 @@ export declare interface IFlow {
   operator_permission: number;
   canvas_category: string;
   agent_type?: string | null;
+  agent_type_cn?: string | null;
+  agent_type_en?: string | null;
 }
 
 export interface IFlowTemplate {

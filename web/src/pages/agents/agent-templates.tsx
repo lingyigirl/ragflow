@@ -76,7 +76,13 @@ export default function AgentTemplates() {
         dsl,
         avatar: template?.avatar,
         canvas_category: canvasCategory,
-        ...(!isDataflowCanvas ? { agent_type: payload.partyType } : {}),
+        ...(!isDataflowCanvas
+          ? {
+              agent_type: payload.partyType,
+              agent_type_cn: payload.agentTypeNameZh?.trim() || undefined,
+              agent_type_en: payload.agentTypeNameEn?.trim() || undefined,
+            }
+          : {}),
       });
 
       if (ret?.code === 0) {

@@ -313,6 +313,8 @@ export const useSetAgent = (showMessage: boolean = true) => {
       avatar?: string;
       canvas_category?: string;
       agent_type?: string;
+      agent_type_cn?: string;
+      agent_type_en?: string;
     }) => {
       const { data = {} } = await agentService.setCanvas(params);
       if (data.code === 0) {

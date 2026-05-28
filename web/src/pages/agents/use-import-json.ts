@@ -1,6 +1,10 @@
 import { useToast } from '@/components/hooks/use-toast';
 import message from '@/components/ui/message';
-import { AgentCategory, DataflowOperator } from '@/constants/agent';
+import {
+  AgentCategory,
+  AgentGlobals,
+  DataflowOperator,
+} from '@/constants/agent';
 import { FileMimeType } from '@/constants/common';
 import { useSetModalState } from '@/hooks/common-hooks';
 import { EmptyDsl, useSetAgent } from '@/hooks/use-agent-request';
@@ -50,9 +54,32 @@ export const useHandleImportJsonFile = () => {
               isAgent = false;
             }
 
+            const graphPayload = {
+              nodes: graph.nodes,
+              edges: graph.edges ?? [],
+            };
             const dsl = isAgent
-              ? { ...EmptyDsl, graph }
-              : { ...DataflowEmptyDsl, graph };
+              ? { ...EmptyDsl, graph: graphPayload }
+              : { ...DataflowEmptyDsl, graph: graphPayload };
+
+            if (isAgent) {
+              dsl.globals = {
+                ...(dsl.globals ?? {}),
+                ...(graph.agent_type
+                  ? { [AgentGlobals.AgentPartyType]: graph.agent_type }
+                  : {}),
+                ...(graph.agent_type_cn
+                  ? {
+                      [AgentGlobals.AgentPartyTypeNameZh]: graph.agent_type_cn,
+                    }
+                  : {}),
+                ...(graph.agent_type_en
+                  ? {
+                      [AgentGlobals.AgentPartyTypeNameEn]: graph.agent_type_en,
+                    }
+                  : {}),
+              };
+            }
 
             setAgent({
               title: name,
@@ -60,6 +87,17 @@ export const useHandleImportJsonFile = () => {
               canvas_category: isAgent
                 ? AgentCategory.AgentCanvas
                 : AgentCategory.DataflowCanvas,
+              ...(isAgent
+                ? {
+                    agent_type: graph.agent_type,
+                    agent_type_cn: graph.agent_type_cn?.trim?.()
+                      ? graph.agent_type_cn.trim()
+                      : graph.agent_type_cn,
+                    agent_type_en: graph.agent_type_en?.trim?.()
+                      ? graph.agent_type_en.trim()
+                      : graph.agent_type_en,
+                  }
+                : {}),
             });
             hideFileUploadModal();
           } else {

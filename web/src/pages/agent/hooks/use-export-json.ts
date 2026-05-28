@@ -1,3 +1,4 @@
+import { AgentGlobals } from '@/constants/agent';
 import { useFetchAgent } from '@/hooks/use-agent-request';
 import { downloadJsonFile } from '@/utils/file-util';
 import { useCallback } from 'react';
@@ -8,8 +9,20 @@ export const useHandleExportJsonFile = () => {
   const { data } = useFetchAgent();
 
   const handleExportJson = useCallback(() => {
-    downloadJsonFile(buildDslData().graph, `${data.title}.json`);
-  }, [buildDslData, data.title]);
+    const dsl = buildDslData();
+    const globals = (dsl.globals ?? {}) as Record<string, string>;
+    downloadJsonFile(
+      {
+        ...dsl.graph,
+        agent_type: data.agent_type ?? globals[AgentGlobals.AgentPartyType],
+        agent_type_cn:
+          data.agent_type_cn ?? globals[AgentGlobals.AgentPartyTypeNameZh],
+        agent_type_en:
+          data.agent_type_en ?? globals[AgentGlobals.AgentPartyTypeNameEn],
+      },
+      `${data.title}.json`,
+    );
+  }, [buildDslData, data]);
 
   return {
     handleExportJson,
