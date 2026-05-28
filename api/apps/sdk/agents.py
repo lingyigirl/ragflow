@@ -929,14 +929,10 @@ async def webhook_trace(agent_id: str):
 @manager.route("/agents/user_agents", methods=["POST"])
 @token_required
 async def list_user_agent_id_and_title(tenant_id: str):
-    req = cast(dict[str, Any], await get_request_json() or {})
-    usr_id = req.get("usr_id")
-    if not usr_id:
-        return get_json_result(data=False, message="usr_id is required.", code=RetCode.ARGUMENT_ERROR)
     q = (
         UserCanvasService.model.select(UserCanvasService.model.id, UserCanvasService.model.title)
         .where(
-            UserCanvasService.model.user_id == usr_id,
+            UserCanvasService.model.user_id == tenant_id,
             UserCanvasService.model.canvas_category == CanvasCategory.Agent,
         )
         .order_by(UserCanvasService.model.update_time.desc())
