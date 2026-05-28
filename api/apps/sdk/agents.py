@@ -929,12 +929,34 @@ async def webhook_trace(agent_id: str):
 @manager.route("/agents/user_agents", methods=["POST"])
 @token_required
 async def list_user_agent_id_and_title(tenant_id: str):
-    q = (
-        UserCanvasService.model.select(UserCanvasService.model.id, UserCanvasService.model.title)
-        .where(
-            UserCanvasService.model.user_id == tenant_id,
-            UserCanvasService.model.canvas_category == CanvasCategory.Agent,
-        )
-        .order_by(UserCanvasService.model.update_time.desc())
+    req = cast(dict[str, Any], await get_request_json() or {})
+    q = UserCanvasService.model.select(
+        UserCanvasService.model.id,
+        UserCanvasService.model.title,
+    ).where(
+        UserCanvasService.model.user_id == tenant_id,
+        UserCanvasService.model.canvas_category == CanvasCategory.Agent,
     )
+    agent_type = req.get("type")
+    if agent_type is not None and str(agent_type).strip() != "":
+        at = str(agent_type).strip().lower()
+        if at == "none":
+            q = q.where(
+                UserCanvasService.model.agent_type.is_null(True)
+                | (UserCanvasService.model.agent_type == "none")
+                | (UserCanvasService.model.agent_type == "")
+            )
+        else:
+            q = q.where(UserCanvasService.model.agent_type == at)
+    agent_type_cn = req.get("agent_type_cn")
+    if agent_type_cn is not None and str(agent_type_cn).strip() != "":
+        q = q.where(
+            UserCanvasService.model.agent_type_cn == str(agent_type_cn).strip()
+        )
+    agent_type_en = req.get("agent_type_en")
+    if agent_type_en is not None and str(agent_type_en).strip() != "":
+        q = q.where(
+            UserCanvasService.model.agent_type_en == str(agent_type_en).strip()
+        )
+    q = q.order_by(UserCanvasService.model.update_time.desc())
     return get_result(data=list(q.dicts()))
