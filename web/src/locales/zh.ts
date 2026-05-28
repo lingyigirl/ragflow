@@ -1839,6 +1839,8 @@ General：实体和关系提取提示来自 GitHub - microsoft/graphrag：基于
       agentPartyTypeNone: '无',
       agentPartyTypePersonal: '个人',
       agentPartyTypeEnterprise: '企业',
+      agentPartyTypeNameZh: '智能体类型(中文)',
+      agentPartyTypeNameEn: '智能体类型(英文)',
       parser: '解析器',
       parserDescription: '从文件中提取原始文本和结构以供下游处理。',
       tokenizer: '分词器',

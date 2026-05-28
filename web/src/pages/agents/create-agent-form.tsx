@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { RAGFlowFormItem } from '@/components/ragflow-form';
 import { Card, CardContent } from '@/components/ui/card';
 import { Form } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -89,6 +90,8 @@ export const FormSchema = z.object({
   description: z.string().trim().optional(),
   type: z.nativeEnum(FlowType).optional(),
   partyType: z.nativeEnum(AgentPartyType),
+  agentTypeNameZh: z.string().trim().optional(),
+  agentTypeNameEn: z.string().trim().optional(),
 });
 
 export type FormSchemaType = z.infer<typeof FormSchema>;
@@ -106,6 +109,8 @@ export function CreateAgentForm({
       name: '',
       type: FlowType.Agent,
       partyType: AgentPartyType.None,
+      agentTypeNameZh: '',
+      agentTypeNameEn: '',
     },
   });
 
@@ -136,10 +141,7 @@ export function CreateAgentForm({
         {}
         <RAGFlowFormItem name="partyType" label={t('flow.agentPartyTypeLabel')}>
           {(field) => (
-            <Select
-              value={field.value}
-              onValueChange={field.onChange}
-            >
+            <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
@@ -158,6 +160,18 @@ export function CreateAgentForm({
               </SelectContent>
             </Select>
           )}
+        </RAGFlowFormItem>
+        <RAGFlowFormItem
+          name="agentTypeNameZh"
+          label={t('flow.agentPartyTypeNameZh')}
+        >
+          <Input autoComplete="off" />
+        </RAGFlowFormItem>
+        <RAGFlowFormItem
+          name="agentTypeNameEn"
+          label={t('flow.agentPartyTypeNameEn')}
+        >
+          <Input autoComplete="off" />
         </RAGFlowFormItem>
       </form>
     </Form>

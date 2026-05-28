@@ -94,6 +94,12 @@ export function useCreateAgentOrPipeline() {
       nextDsl.globals = {
         ...(nextDsl.globals ?? {}),
         [AgentGlobals.AgentPartyType]: data.partyType,
+        ...(data.agentTypeNameZh
+          ? { [AgentGlobals.AgentPartyTypeNameZh]: data.agentTypeNameZh }
+          : {}),
+        ...(data.agentTypeNameEn
+          ? { [AgentGlobals.AgentPartyTypeNameEn]: data.agentTypeNameEn }
+          : {}),
       };
       const ret = await setAgent({
         title: data.name,

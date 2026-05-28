@@ -62,6 +62,12 @@ export default function AgentTemplates() {
         globals: {
           ...((template?.dsl?.globals as Record<string, unknown>) ?? {}),
           [AgentGlobals.AgentPartyType]: payload.partyType,
+          ...(payload.agentTypeNameZh
+            ? { [AgentGlobals.AgentPartyTypeNameZh]: payload.agentTypeNameZh }
+            : {}),
+          ...(payload.agentTypeNameEn
+            ? { [AgentGlobals.AgentPartyTypeNameEn]: payload.agentTypeNameEn }
+            : {}),
         },
       };
 

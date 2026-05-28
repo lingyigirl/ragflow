@@ -28,6 +28,8 @@ export enum AgentGlobals {
   SysConversationTurns = 'sys.conversation_turns',
   SysFiles = 'sys.files',
   AgentPartyType = 'agent.party_type',
+  AgentPartyTypeNameZh = 'agent.party_type_name_zh',
+  AgentPartyTypeNameEn = 'agent.party_type_name_en',
 }
 
 export const AgentGlobalsSysQueryWithBrace = `{${AgentGlobals.SysQuery}}`;
