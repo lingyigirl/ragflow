@@ -957,6 +957,16 @@ async def run():
                 message='"enable_auto_standard_filename" must be a boolean value.',
                 code=RetCode.ARGUMENT_ERROR,
             )
+        chunk_method_key = None
+        parse_method_key = None
+        if "chunk_method" in req:
+            chunk_err, chunk_method_key = _normalize_optional_run_chunk_method(req.get("chunk_method"))
+            if chunk_err:
+                return get_json_result(data=False, message=chunk_err, code=RetCode.ARGUMENT_ERROR)
+        if "parse_method" in req:
+            parse_err, parse_method_key = _normalize_optional_run_parse_method(req.get("parse_method"))
+            if parse_err:
+                return get_json_result(data=False, message=parse_err, code=RetCode.ARGUMENT_ERROR)
 
         def _run_sync():
             for doc_id in req["doc_ids"]:
@@ -996,6 +1006,10 @@ async def run():
                         settings.docStoreConn.delete({"doc_id": id}, search.index_name(tenant_id), doc.kb_id)
 
                 if str(req["run"]) == TaskStatus.RUNNING.value:
+                    if chunk_method_key or parse_method_key:
+                        method_err = _apply_run_chunk_and_parse_method(doc, chunk_method_key, parse_method_key)
+                        if method_err:
+                            return get_data_error_result(message=method_err)
                     if req.get("apply_kb"):
                         e, kb = KnowledgebaseService.get_by_id(doc.kb_id)
                         if not e:
@@ -2540,6 +2554,81 @@ def _normalize_direct_upload_parse_method(raw: str | None) -> tuple[str | None, 
     if text not in {"mineru", "deepdoc"}:
         return f"`parse_method` must be 'mineru' or 'deepdoc', got {raw!r}", None
     return None, text
+
+
+_RUN_MINERU_PARSER_CFG_PATCH = {
+    "layout_recognize": "MinerU",
+    "mineru_backend": "hybrid-auto-engine",
+    "mineru_parse_method": "auto",
+    "mineru_lang": "Chinese",
+    "skip_mineru_section_persist": False,
+    "use_submitted_content_list": False,
+}
+
+_RUN_MINERU_CFG_KEYS = (
+    "mineru_backend",
+    "mineru_parse_method",
+    "mineru_lang",
+    "skip_mineru_section_persist",
+    "use_submitted_content_list",
+)
+
+
+def _normalize_optional_run_chunk_method(raw) -> tuple[str | None, str | None]:
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str):
+        return "`chunk_method` must be a string", None
+    text = raw.strip().lower()
+    if not text:
+        return "`chunk_method`  doesn't exist", None
+    if text == "general":
+        text = "naive"
+    if text not in _DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET:
+        return f"`chunk_method` {raw!r} doesn't exist", None
+    return None, text
+
+
+def _normalize_optional_run_parse_method(raw) -> tuple[str | None, str | None]:
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str):
+        return "`parse_method` must be a string", None
+    text = raw.strip().lower()
+    if text not in {"mineru", "deepdoc"}:
+        return f"`parse_method` must be 'mineru' or 'deepdoc', got {raw!r}", None
+    return None, text
+
+
+def _patch_parser_config_for_parse_method(parser_cfg: dict, parse_method_key: str) -> dict:
+    if parse_method_key == "mineru":
+        parser_cfg.update(_RUN_MINERU_PARSER_CFG_PATCH)
+    elif parse_method_key == "deepdoc":
+        parser_cfg["layout_recognize"] = "DeepDOC"
+        for key in _RUN_MINERU_CFG_KEYS:
+            parser_cfg.pop(key, None)
+    return parser_cfg
+
+
+def _apply_run_chunk_and_parse_method(doc, chunk_method_key: str | None, parse_method_key: str | None):
+    if not chunk_method_key and not parse_method_key:
+        return None
+    if chunk_method_key:
+        if (doc.type == FileType.VISUAL and chunk_method_key != "picture") or (
+            re.search(r"\.(ppt|pptx|pages)$", doc.name) and chunk_method_key != "presentation"
+        ):
+            return "Not supported yet!"
+    current_parser_cfg = doc.parser_config if isinstance(doc.parser_config, dict) else {}
+    parser_cfg = dict(current_parser_cfg)
+    if chunk_method_key:
+        parser_cfg = get_parser_config(chunk_method_key, current_parser_cfg)
+        DocumentService.update_by_id(doc.id, {"parser_id": chunk_method_key})
+        doc.parser_id = chunk_method_key
+    if parse_method_key:
+        parser_cfg = _patch_parser_config_for_parse_method(parser_cfg, parse_method_key)
+    DocumentService.update_parser_config(doc.id, parser_cfg)
+    doc.parser_config = parser_cfg
+    return None
 
 
 @manager.route("/direct_upload_parse", methods=["POST"])  # noqa: F821

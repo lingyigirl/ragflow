@@ -254,3 +254,22 @@ class TestDocumentsParseStop:
         assert res["message"] == "No authorization.", res
 
         validate_document_parse_cancel(WebApiAuth, kb_id, document_ids)
+
+
+class TestDocumentsParseMethodParams:
+    @pytest.mark.parametrize(
+        "extra, expected_code, expected_message",
+        [
+            pytest.param({"chunk_method": "invalid_method"}, 101, "`chunk_method` 'invalid_method' doesn't exist", marks=pytest.mark.p3),
+            pytest.param({"parse_method": "ocr"}, 101, "`parse_method` must be 'mineru' or 'deepdoc', got 'ocr'", marks=pytest.mark.p3),
+            pytest.param({"chunk_method": "qa"}, 0, "", marks=pytest.mark.p3),
+            pytest.param({"parse_method": "mineru"}, 0, "", marks=pytest.mark.p3),
+        ],
+    )
+    def test_run_method_params(self, WebApiAuth, add_documents_func, extra, expected_code, expected_message):
+        _, document_ids = add_documents_func
+        payload = {"doc_ids": document_ids[:1], "run": "1", **extra}
+        res = parse_documents(WebApiAuth, payload)
+        assert res["code"] == expected_code, res
+        if expected_message:
+            assert expected_message in res["message"], res
