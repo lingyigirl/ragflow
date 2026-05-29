@@ -963,3 +963,92 @@ async def list_user_agent_id_and_title(tenant_id: str):
         )
     q = q.order_by(UserCanvasService.model.update_time.desc())
     return get_result(data=list(q.dicts()))
+
+
+@manager.route("/agents/agent_type", methods=["POST"])
+@token_required
+async def update_agent_type_info(tenant_id: str):
+    req = cast(dict[str, Any], await get_request_json() or {})
+    agent_id = req.get("agent_id")
+    if agent_id is None or str(agent_id).strip() == "":
+        return get_json_result(
+            data=False, message="No agent_id in request.", code=RetCode.ARGUMENT_ERROR
+        )
+    agent_id = str(agent_id).strip()
+
+    canvas_rows = UserCanvasService.query(user_id=tenant_id, id=agent_id)
+    if not canvas_rows:
+        return get_json_result(
+            data=False,
+            message="Only owner of canvas authorized for this operation.",
+            code=RetCode.OPERATING_ERROR,
+        )
+
+    canvas = canvas_rows[0]
+    if canvas.canvas_category != CanvasCategory.Agent:
+        return get_json_result(
+            data=False, message="The agent doesn't exist.", code=RetCode.DATA_ERROR
+        )
+
+    update_fields: dict[str, Any] = {}
+    if "agent_type" in req:
+        at = req["agent_type"]
+        if at is not None and str(at).strip() != "":
+            update_fields["agent_type"] = str(at).strip().lower()
+        else:
+            update_fields["agent_type"] = None
+    if "agent_type_cn" in req:
+        cn = req["agent_type_cn"]
+        update_fields["agent_type_cn"] = (
+            str(cn).strip() if cn is not None and str(cn).strip() else None
+        )
+    if "agent_type_en" in req:
+        en = req["agent_type_en"]
+        update_fields["agent_type_en"] = (
+            str(en).strip() if en is not None and str(en).strip() else None
+        )
+
+    if not update_fields:
+        return get_json_result(
+            data=False,
+            message="No agent type fields in request.",
+            code=RetCode.ARGUMENT_ERROR,
+        )
+
+    dsl = canvas.dsl or {}
+    if isinstance(dsl, str):
+        dsl = json.loads(dsl)
+    globals_ = dsl.setdefault("globals", {})
+    if "agent_type" in update_fields:
+        if update_fields["agent_type"]:
+            globals_["agent.party_type"] = update_fields["agent_type"]
+        else:
+            globals_.pop("agent.party_type", None)
+    if "agent_type_cn" in update_fields:
+        if update_fields["agent_type_cn"]:
+            globals_["agent.party_type_name_zh"] = update_fields["agent_type_cn"]
+        else:
+            globals_.pop("agent.party_type_name_zh", None)
+    if "agent_type_en" in update_fields:
+        if update_fields["agent_type_en"]:
+            globals_["agent.party_type_name_en"] = update_fields["agent_type_en"]
+        else:
+            globals_.pop("agent.party_type_name_en", None)
+    update_fields["dsl"] = dsl
+
+    UserCanvasService.update_by_id(agent_id, update_fields)
+
+    return get_result(
+        data={
+            "agent_id": agent_id,
+            "type": update_fields["agent_type"]
+            if "agent_type" in update_fields
+            else canvas.agent_type,
+            "agent_type_cn": update_fields["agent_type_cn"]
+            if "agent_type_cn" in update_fields
+            else canvas.agent_type_cn,
+            "agent_type_en": update_fields["agent_type_en"]
+            if "agent_type_en" in update_fields
+            else canvas.agent_type_en,
+        }
+    )
