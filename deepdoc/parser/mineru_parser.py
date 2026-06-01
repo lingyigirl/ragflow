@@ -1754,6 +1754,118 @@ class MinerUParser(RAGFlowPdfParser):
                 **kwargs,
             )
 
+        mineru_word_suffixes = {".doc", ".docx", ".docm", ".dot", ".dotx", ".dotm"}
+        if suffix_lower in mineru_word_suffixes:
+            from deepdoc.utils.word2pdf import convert_word_bytes_to_pdf_bytes
+
+            raw = None
+            if binary is not None:
+                raw = binary.read() if hasattr(binary, "read") else binary
+            if raw is None:
+                raw = Path(filepath).read_bytes()
+            if not isinstance(raw, bytes):
+                raw = bytes(raw)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Incoming Word bytes md5=%s size=%s suffix=%s",
+                    hashlib.md5(raw).hexdigest(),
+                    len(raw),
+                    suffix_lower,
+                )
+            except Exception:
+                pass
+            if callback:
+                callback(0.12, "[MinerU] Word detected, converting to PDF...")
+            pdf_bytes = convert_word_bytes_to_pdf_bytes(raw, word_suffix=suffix_lower)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Word->PDF bytes md5=%s size=%s",
+                    hashlib.md5(pdf_bytes).hexdigest(),
+                    len(pdf_bytes),
+                )
+            except Exception:
+                pass
+            pdf_virtual_path = str(file_path.with_suffix(".pdf"))
+            if callback:
+                callback(0.14, "[MinerU] Word converted to PDF, continue parsing...")
+            if kb_id and doc_id and not bool(parser_cfg.get("skip_mineru_output_upload", False)):
+                try:
+                    pdf_filename = Path(pdf_virtual_path).name
+                    pdf_location = f"{doc_id}/{pdf_filename}"
+                    result = settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_bytes)
+                    if result is None:
+                        raise RuntimeError("MinIO put returned None")
+                    self.logger.info(f"[MinerU] 已上传Word转化PDF文件: bucket={kb_id}, location={pdf_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传Word转化PDF文件失败: {e}")
+            return self.parse_pdf(
+                filepath=pdf_virtual_path,
+                binary=pdf_bytes,
+                callback=callback,
+                output_dir=output_dir,
+                backend=backend,
+                server_url=server_url,
+                delete_output=delete_output,
+                parse_method=parse_method,
+                **kwargs,
+            )
+
+        mineru_image_suffixes = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
+        if suffix_lower in mineru_image_suffixes:
+            from deepdoc.utils.pic2pdf import convert_image_bytes_to_pdf_bytes
+
+            raw = None
+            if binary is not None:
+                raw = binary.read() if hasattr(binary, "read") else binary
+            if raw is None:
+                raw = Path(filepath).read_bytes()
+            if not isinstance(raw, bytes):
+                raw = bytes(raw)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Incoming Image bytes md5=%s size=%s suffix=%s",
+                    hashlib.md5(raw).hexdigest(),
+                    len(raw),
+                    suffix_lower,
+                )
+            except Exception:
+                pass
+            if callback:
+                callback(0.12, "[MinerU] Image detected, converting to PDF...")
+            pdf_bytes = convert_image_bytes_to_pdf_bytes(raw, image_suffix=suffix_lower)
+            try:
+                self.logger.info(
+                    "[MinerU][Diag] Image->PDF bytes md5=%s size=%s",
+                    hashlib.md5(pdf_bytes).hexdigest(),
+                    len(pdf_bytes),
+                )
+            except Exception:
+                pass
+            pdf_virtual_path = str(file_path.with_suffix(".pdf"))
+            if callback:
+                callback(0.14, "[MinerU] Image converted to PDF, continue parsing...")
+            if kb_id and doc_id and not bool(parser_cfg.get("skip_mineru_output_upload", False)):
+                try:
+                    pdf_filename = Path(pdf_virtual_path).name
+                    pdf_location = f"{doc_id}/{pdf_filename}"
+                    result = settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_bytes)
+                    if result is None:
+                        raise RuntimeError("MinIO put returned None")
+                    self.logger.info(f"[MinerU] 已上传图片转化PDF文件: bucket={kb_id}, location={pdf_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传图片转化PDF文件失败: {e}")
+            return self.parse_pdf(
+                filepath=pdf_virtual_path,
+                binary=pdf_bytes,
+                callback=callback,
+                output_dir=output_dir,
+                backend=backend,
+                server_url=server_url,
+                delete_output=delete_output,
+                parse_method=parse_method,
+                **kwargs,
+            )
+
         pdf_file_name = file_path.stem.replace(" ", "") + ".pdf"
         pdf_file_path_valid = os.path.join(file_path.parent, pdf_file_name)
 

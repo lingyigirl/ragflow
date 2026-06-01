@@ -1242,7 +1242,7 @@ async def change_parser():
             else:
                 return get_json_result(data=True)
 
-        if (doc.type == FileType.VISUAL and req["parser_id"] != "picture") or (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req["parser_id"] != "presentation"):
+        if (doc.type == FileType.VISUAL and req["parser_id"] not in ("picture", "one", "hichunk")) or (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req["parser_id"] != "presentation"):
             return get_data_error_result(message="Not supported yet!")
         if "parser_config" in req:
             DocumentService.update_parser_config(doc.id, req["parser_config"])
@@ -2614,7 +2614,7 @@ def _apply_run_chunk_and_parse_method(doc, chunk_method_key: str | None, parse_m
     if not chunk_method_key and not parse_method_key:
         return None
     if chunk_method_key:
-        if (doc.type == FileType.VISUAL and chunk_method_key != "picture") or (
+        if (doc.type == FileType.VISUAL and chunk_method_key not in ("picture", "one", "hichunk")) or (
             re.search(r"\.(ppt|pptx|pages)$", doc.name) and chunk_method_key != "presentation"
         ):
             return "Not supported yet!"

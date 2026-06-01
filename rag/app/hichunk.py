@@ -675,8 +675,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     sections, tbls = [], []
     table_indices_in_mineru = []  
 
-    is_mineru_doc = re.search(r"\.(pdf|xlsx?|xlsm)$", filename, re.IGNORECASE)
-    is_mineru_img = re.search(r"\.(jpe?g|png)$", filename, re.IGNORECASE)
+    is_mineru_doc = re.search(r"\.(pdf|xlsx?|xlsm|docx?|docm|dotx?|dotm)$", filename, re.IGNORECASE)
+    is_mineru_img = re.search(r"\.(jpe?g|png|gif|bmp|webp|tiff?)$", filename, re.IGNORECASE)
     if is_mineru_doc or is_mineru_img:
         is_excel_mineru_path = bool(re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE))
         if callback:
