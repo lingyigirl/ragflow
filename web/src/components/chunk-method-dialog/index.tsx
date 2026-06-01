@@ -198,6 +198,19 @@ export function ChunkMethodDialog({
   const isPdf = documentExtension === 'pdf';
   const isSpreadsheet =
     documentExtension === 'xlsx' || documentExtension === 'xls';
+  const isImage = [
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'bmp',
+    'webp',
+    'tif',
+    'tiff',
+  ].includes(documentExtension);
+  const isWord = ['doc', 'docx', 'docm', 'dot', 'dotx', 'dotm'].includes(
+    documentExtension,
+  );
 
   const showPages = useMemo(() => {
     return isPdf && hidePagesChunkMethods.every((x) => x !== selectedTag);
@@ -205,7 +218,7 @@ export function ChunkMethodDialog({
 
   const showOne = useMemo(() => {
     return (
-      (isPdf || isSpreadsheet) &&
+      (isPdf || isSpreadsheet || isImage || isWord) &&
       hidePagesChunkMethods
         .filter(
           (x) =>
@@ -213,7 +226,7 @@ export function ChunkMethodDialog({
         )
         .every((x) => x !== selectedTag)
     );
-  }, [selectedTag, isPdf, isSpreadsheet]);
+  }, [selectedTag, isPdf, isSpreadsheet, isImage, isWord]);
 
   const showMaxTokenNumber =
     selectedTag === DocumentParserType.Naive ||
