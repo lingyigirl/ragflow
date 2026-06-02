@@ -23,7 +23,7 @@ from functools import wraps
 from pathlib import Path
 from quart import request, make_response, current_app
 from quart_auth import Unauthorized
-from api.apps import current_user, login_required
+from api.apps import current_user, login_required, api_key_required
 from api.common.check_team_permission import check_kb_team_permission
 from api.constants import FILE_NAME_LEN_LIMIT, IMG_BASE64_PREFIX
 from api.db import VALID_FILE_TYPES, FileType
@@ -616,7 +616,7 @@ async def list_docs():
 
 
 @manager.route("/classify_voucher_type", methods=["POST"])  # noqa: F821
-@login_required
+@api_key_required
 @validate_request("doc_id")
 async def classify_voucher_type():
     req = await get_request_json()
@@ -1031,7 +1031,7 @@ async def run():
 
 
 @manager.route("/rename", methods=["POST"])  # noqa: F821
-@login_required
+@api_key_required
 @validate_request("doc_id", "name")
 async def rename():
     req = await get_request_json()

@@ -171,6 +171,28 @@ def login_required(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]
     return wrapper
 
 
+def api_key_required(func: Callable[P, Awaitable[T]]) -> Callable[P, Awaitable[T]]:
+    @wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        authorization = request.headers.get("Authorization")
+        if not authorization:
+            raise Unauthorized()
+        parts = authorization.split()
+        if len(parts) != 2:
+            raise Unauthorized()
+        token = parts[1]
+        objs = APIToken.query(token=token)
+        if not objs:
+            raise Unauthorized()
+        user = UserService.query(id=objs[0].tenant_id, status=StatusEnum.VALID.value)
+        if not user:
+            raise Unauthorized()
+        g.user = user[0]
+        return await current_app.ensure_async(func)(*args, **kwargs)
+
+    return wrapper
+
+
 def login_user(user, remember=False, duration=None, force=False, fresh=True):
     """
     Logs a user in. You should pass the actual user object to this. If the
