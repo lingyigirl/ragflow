@@ -104,6 +104,8 @@ P = ParamSpec("P")
 
 
 def _load_user():
+    if getattr(g, "user", None):
+        return g.user
     jwt = Serializer(secret_key=settings.SECRET_KEY)
     authorization = request.headers.get("Authorization")
     g.user = None
