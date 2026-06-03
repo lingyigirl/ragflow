@@ -636,9 +636,9 @@ async def classify_voucher_type():
     return get_json_result(data=payload, message=err or "")
 
 
-@manager.route("/auto_standard_filename", methods=["POST"]) 
-@login_required  
-@validate_request("doc_id") 
+@manager.route("/auto_standard_filename", methods=["POST"])
+@api_key_required
+@validate_request("doc_id")
 async def auto_standard_filename(): 
     req = await get_request_json() 
     doc_id = str(req.get("doc_id") or "").strip() 
@@ -1936,7 +1936,7 @@ async def mineru_download(file_type):
 
 
 @manager.route("/mineru_section/update", methods=["POST"])  # noqa: F821
-@login_required
+@api_key_required
 async def update_mineru_section():
     def _mineru_section_debug_snapshot(row):
         if not row:
@@ -2211,7 +2211,7 @@ def _convert_mineru_row_to_content_item(row):
 
 
 @manager.route("/mineru_section/submit", methods=["POST"])  # noqa: F821
-@login_required
+@api_key_required
 @validate_request("kb_id", "doc_id")
 async def submit_mineru_section():
     temp_file_path = None
