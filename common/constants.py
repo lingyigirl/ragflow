@@ -103,6 +103,7 @@ class ParserType(StrEnum):
     PICTURE = "picture"
     ONE = "one"
     HICHUNK = "hichunk"
+    FINANCIAL = "financial"
     AUDIO = "audio"
     EMAIL = "email"
     KG = "knowledge_graph"

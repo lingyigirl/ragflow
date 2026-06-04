@@ -498,6 +498,167 @@ class DocumentService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def re_vectorize_mineru_section_by_chunk_id(cls, mineru_section_chunk_id):
+        if not mineru_section_chunk_id:
+            return False, "mineru_section_chunk_id is required", {}
+
+        section = cls.get_mineru_section_by_chunk_id(mineru_section_chunk_id)
+        if not section:
+            return False, "mineru_section not found by chunk_id", {}
+
+        kb_id = getattr(section, "kb_id", None)
+        doc_id = getattr(section, "doc_id", None)
+        if not kb_id or not doc_id:
+            return False, "kb_id or doc_id is missing", {}
+
+        def _unescape_db_text(val):
+            if val is None:
+                return ""
+            if isinstance(val, str):
+                try:
+                    parsed = json.loads(val)
+                    if isinstance(parsed, list):
+                        return "\n".join(str(v) for v in parsed)
+                    return str(parsed)
+                except (json.JSONDecodeError, TypeError):
+                    return val
+            if isinstance(val, (list, tuple)):
+                return "\n".join(str(v) for v in val)
+            return str(val)
+
+        def _build_section_text(msec):
+            if not msec:
+                return ""
+            mtype = (getattr(msec, "type", None) or "").strip().lower()
+            if mtype == "table":
+                t = (
+                    str(getattr(msec, "table_body", None) or "")
+                    + "\n"
+                    + _unescape_db_text(getattr(msec, "table_caption", None))
+                    + "\n"
+                    + _unescape_db_text(getattr(msec, "table_footnote", None))
+                ).strip()
+            elif mtype == "table_caption":
+                t = _unescape_db_text(getattr(msec, "table_caption", None))
+            elif mtype == "table_footnote":
+                t = _unescape_db_text(getattr(msec, "table_footnote", None))
+            elif mtype == "table_body":
+                t = str(getattr(msec, "table_body", None) or "")
+            else:
+                t = str(getattr(msec, "text", None) or "")
+            return t if t else ""
+
+        tenant_id = cls.get_tenant_id(doc_id)
+        if not tenant_id:
+            return False, "tenant not found", {}
+        embd_id = cls.get_embd_id(doc_id)
+
+        from api.db.services.llm_service import LLMBundle
+
+        embd_mdl = LLMBundle(tenant_id, LLMType.EMBEDDING, embd_id)
+
+        idxnm = search.index_name(tenant_id)
+        if not settings.docStoreConn.index_exist(idxnm, kb_id):
+            return False, "index does not exist", {}
+
+        found_chunks = settings.docStoreConn.search(
+            [],
+            [],
+            {"doc_id": str(doc_id)},
+            [],
+            OrderByExpr(),
+            0, 10000,
+            idxnm,
+            [kb_id],
+        )
+
+        updated_count = 0
+        if not found_chunks:
+            return False, "no vector chunks found for this document", {}
+
+        chunk_docs = settings.docStoreConn.get_doc_ids(found_chunks)
+        for vchunk_id in chunk_docs:
+            vchunk = settings.docStoreConn.get(vchunk_id, idxnm, [kb_id])
+            if not vchunk:
+                continue
+            mineru_ids = vchunk.get("mineru_section_chunk_ids")
+            if not mineru_ids or mineru_section_chunk_id not in mineru_ids:
+                continue
+
+            all_section_texts = []
+            for mid in mineru_ids:
+                if not mid:
+                    continue
+                msec = cls.get_mineru_section_by_chunk_id(mid)
+                all_section_texts.append(_build_section_text(msec))
+
+            new_full_content = "\n".join(t for t in all_section_texts if t)
+            if not new_full_content:
+                continue
+
+            content_ltks = rag_tokenizer.tokenize(
+                re.sub(r"</?(table|td|caption|tr|th)( [^<>]{0,12})?>", " ", new_full_content)
+            )
+            update_d = {
+                "content_with_weight": new_full_content,
+                "content_ltks": content_ltks,
+                "content_sm_ltks": rag_tokenizer.fine_grained_tokenize(content_ltks),
+            }
+
+            vts, _ = embd_mdl.encode([new_full_content])
+            v = vts[0]
+            update_d["q_%d_vec" % len(v)] = v.tolist()
+
+            settings.docStoreConn.update(
+                {"id": vchunk_id},
+                update_d,
+                idxnm,
+                kb_id,
+            )
+            updated_count += 1
+
+        if updated_count == 0:
+            return False, "no matching vector chunks found (mineru_section_chunk_ids not matched)", {}
+
+        return True, "", {
+            "updated_chunks": updated_count,
+            "kb_id": kb_id,
+            "doc_id": doc_id,
+            "mineru_section_chunk_id": mineru_section_chunk_id,
+        }
+
+    @classmethod
+    @DB.connection_context()
+    def get_chunk_ids_by_doc_id(cls, doc_id):
+        if not doc_id:
+            return []
+        try:
+            from api.db.db_models import MineruSection
+
+            if not MineruSection.table_exists():
+                return []
+            rows = (
+                MineruSection
+                .select(
+                    MineruSection.chunk_id,
+                    MineruSection.type,
+                    MineruSection.text,
+                    MineruSection.table_caption,
+                    MineruSection.table_footnote,
+                    MineruSection.table_body,
+                    MineruSection.bbox,
+                    MineruSection.page_idx,
+                    MineruSection.img_path,
+                )
+                .where(MineruSection.doc_id == str(doc_id).strip())
+                .order_by(MineruSection.page_idx.asc(), MineruSection.id.asc())
+            )
+            return list(rows.dicts())
+        except Exception:
+            return []
+
+    @classmethod
+    @DB.connection_context()
     def delete_chunk_images(cls, doc, tenant_id):
         page = 0
         page_size = 1000

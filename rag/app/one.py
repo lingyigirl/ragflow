@@ -855,21 +855,26 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         mineru_sections_with_level = []
         for item in mineru_sections:
+            chunk_id = ""
+            if len(item) >= 3:
+                _raw = str(item[-1] or "").strip()
+                if len(_raw) <= 64:
+                    chunk_id = _raw
             if len(item) == 2:
                 text, pos_tag = item
                 text = " ".join((text or "").strip().split())
                 title_level = 0 if is_html_table(text) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, pos_tag, title_level))
+                mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
             elif len(item) == 3:
                 text = " ".join((item[0] or "").strip().split())
                 title_level = 0 if is_html_table(text) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, item[1], title_level))
+                mineru_sections_with_level.append((text, item[1], title_level, chunk_id))
             else:
                 text = item[0] if len(item) > 0 else ""
                 pos_tag = item[1] if len(item) > 1 else None
                 text = " ".join((text or "").strip().split())
                 title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, pos_tag, title_level))
+                mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
 
         mineru_sections = mineru_sections_with_level
         levels_display = []
@@ -910,18 +915,20 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             if len(section_item) >= 2:
                 text, pos_tag = section_item[0], section_item[1]
                 title_level = section_item[2] if len(section_item) >= 3 else 0
+                sec_chunk_id = section_item[3] if len(section_item) >= 4 else ""
             else:
                 text = section_item[0] if len(section_item) > 0 else ""
                 pos_tag = None
                 title_level = 0
-            
+                sec_chunk_id = ""
+
             poss = _normalize_pos_list(mineru_parser.extract_positions(pos_tag)) if pos_tag else []
             if is_html_table(text):
                 tbls.append(((None, text), poss if poss else []))
                 table_indices_in_mineru.append(idx)
-                sections.append((text, idx, poss, 0))
+                sections.append((text, idx, poss, 0, sec_chunk_id))
             else:
-                sections.append((text, idx, poss, title_level))
+                sections.append((text, idx, poss, title_level, sec_chunk_id))
         
                         
         if mineru_tables:
@@ -1029,6 +1036,11 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     chunk_docs = tokenize_chunks(chunks, doc, eng)
 
+    all_chunk_ids = []
+    for section_item in sections:
+        if len(section_item) > 4 and section_item[4]:
+            all_chunk_ids.append(section_item[4])
+
     for i, chunk_doc in enumerate(chunk_docs):
         if i < len(chunk_positions):
             if chunk_positions[i]:
@@ -1048,6 +1060,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 for pos in chunk_doc["position_int"]
             ]
     
+    if all_chunk_ids:
+        for chunk_doc in chunk_docs:
+            chunk_doc["mineru_section_chunk_ids"] = all_chunk_ids
+
     res = chunk_docs
 
     if callback:

@@ -788,6 +788,7 @@ class Document(DataBaseModel):
     process_begin_at = DateTimeField(null=True, index=True)
     process_duration = FloatField(default=0)
     meta_fields = JSONField(null=True, default={})
+    tree = JSONField(null=True, default=None)
     suffix = CharField(max_length=32, null=False, help_text="The real file extension suffix", index=True)
     voucher_type = CharField(max_length=64, null=True, help_text="voucher type classified by llm", index=True)
     llm_classify_success = BooleanField(null=False, default=False, help_text="llm classify call success and valid label")
@@ -1416,6 +1417,10 @@ def migrate_db():
         pass
     try:
         migrate(migrator.add_column("document", "pipeline_id", CharField(max_length=32, null=True, help_text="Pipeline ID", index=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("document", "tree", JSONField(null=True, default=None)))
     except Exception:
         pass
     try:

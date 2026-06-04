@@ -699,3 +699,63 @@ class Dealer:
             chunks.append(d)
 
         return sorted(chunks, key=lambda x: x["similarity"] * -1)
+
+    def retrieval_by_financial_cross_ref(self, chunks: list[dict], tenant_ids: list[str]):
+        if not chunks:
+            return chunks
+
+        idx_nms = [index_name(tid) for tid in tenant_ids]
+        doc_ids = list(set(ck["doc_id"] for ck in chunks))
+
+        for doc_id in doc_ids:
+            doc_chunks = [ck for ck in chunks if ck["doc_id"] == doc_id]
+            has_note = False
+            for ck in doc_chunks:
+                content = ck.get("content_with_weight", "")
+                if any(kw in content for kw in ["合并财务报表项目注释", "财务报表项目注释", "财务报表附注"]):
+                    has_note = True
+                    break
+            if not has_note:
+                continue
+
+            kb_id = doc_chunks[0]["kb_id"]
+            field_list = ["content_with_weight", "doc_type_kwd", "docnm_kwd", "important_kwd", "img_id", "position_int"]
+            es_res = self.dataStore.search(
+                field_list, [],
+                {"doc_id": doc_id}, [],
+                OrderByExpr(), 0, 128, idx_nms, [kb_id]
+            )
+            all_doc_chunks = self.dataStore.get_fields(es_res, field_list)
+
+            table_titles = ["合并资产负债表", "合并利润表", "合并现金流量表",
+                          "资产负债表", "利润表", "现金流量表",
+                          "合并所有者权益变动表", "所有者权益变动表"]
+
+            existing_ids = set(ck["chunk_id"] for ck in chunks)
+            vector_size = 1024
+            for cid, fields in all_doc_chunks.items():
+                if cid in existing_ids:
+                    continue
+                content = fields.get("content_with_weight", "")
+                if not any(title in content for title in table_titles):
+                    continue
+
+                d = {
+                    "chunk_id": cid,
+                    "content_ltks": content,
+                    "content_with_weight": content,
+                    "doc_id": doc_id,
+                    "docnm_kwd": fields.get("docnm_kwd", ""),
+                    "kb_id": kb_id,
+                    "important_kwd": fields.get("important_kwd", []),
+                    "image_id": fields.get("img_id", ""),
+                    "similarity": min([ck["similarity"] for ck in doc_chunks]) * 0.5,
+                    "vector_similarity": 0.0,
+                    "term_similarity": 0.0,
+                    "vector": [0.0] * vector_size,
+                    "positions": fields.get("position_int", []),
+                    "doc_type_kwd": fields.get("doc_type_kwd", "")
+                }
+                chunks.append(d)
+
+        return chunks

@@ -1068,7 +1068,9 @@ def naive_merge(sections: str | list, chunk_token_num=128, delimiter="\n。；�
     if has_custom:
         custom_pattern = "|".join(re.escape(t) for t in sorted(set(custom_delimiters), key=len, reverse=True))
         cks, tk_nums = [], []
-        for sec, pos in sections:
+        for item in sections:
+            sec = item[0] if isinstance(item, (list, tuple)) else str(item)
+            pos = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ""
             split_sec = re.split(r"(%s)" % custom_pattern, sec, flags=re.DOTALL)
             for sub_sec in split_sec:
                 if re.fullmatch(custom_pattern, sub_sec or ""):
@@ -1083,7 +1085,9 @@ def naive_merge(sections: str | list, chunk_token_num=128, delimiter="\n。；�
                 tk_nums.append(num_tokens_from_string(text))
         return cks
 
-    for sec, pos in sections:
+    for item in sections:
+        sec = item[0] if isinstance(item, (list, tuple)) else str(item)
+        pos = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ""
         add_chunk("\n" + sec, pos)
 
     return cks

@@ -282,11 +282,11 @@ async def update_doc(tenant_id, dataset_id, document_id):
     if "parser_config" in req:
         DocumentService.update_parser_config(doc.id, req["parser_config"])
     if "chunk_method" in req:
-        valid_chunk_method = {"naive", "manual", "qa", "table", "paper", "book", "laws", "presentation", "picture", "one", "hichunk", "knowledge_graph", "email", "tag"}
+        valid_chunk_method = {"naive", "manual", "qa", "table", "paper", "book", "laws", "presentation", "picture", "one", "hichunk", "financial", "knowledge_graph", "email", "tag"}
         if req.get("chunk_method") not in valid_chunk_method:
             return get_error_data_result(f"`chunk_method` {req['chunk_method']} doesn't exist")
 
-        if (doc.type == FileType.VISUAL and req.get("chunk_method") not in ("picture", "one", "hichunk")) or \
+        if (doc.type == FileType.VISUAL and req.get("chunk_method") not in ("picture", "one", "hichunk", "financial")) or \
            (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req.get("chunk_method") != "presentation"):
             return get_error_data_result(message="Not supported yet!")
 

@@ -552,6 +552,8 @@
       </p>`,
       hichunk: `<p>适用于通过 <b>MinerU</b> 解析的 <b>PDF、Excel（转 PDF 路径）、图片</b> 等；解析后结合标题层级与规则完成智能分块，可选接入兼容 OpenAI 的推理服务。</p>
       <p>请在数据集侧配置嵌入模型与 PageRank；PDF 场景下可在单文档解析对话框中选择布局识别与 MinerU 相关选项。</p>`,
+      financial: `<p>专为<b>财报文档</b>设计，通过 <b>MinerU</b> 解析后提取目录构建文档结构树，按目录树驱动分块：表格永不切分，每个分块携带完整祖先标题链，实现精准检索。</p>
+      <p>请在数据集侧配置嵌入模型与 PageRank。支持 PDF、DOCX、图片等格式。</p>`,
       knowledgeGraph: `<p>支持的文件格式为<b>DOCX、EXCEL、PPT、IMAGE、PDF、TXT、MD、JSON、EML</b>
 
 <p>文件分块后，使用分块提取整个文档的知识图谱和思维导图。此方法将简单的方法应用于分块文件：

@@ -711,12 +711,14 @@ class MinerUParser(RAGFlowPdfParser):
                             list(output.keys())[:20] if isinstance(output, dict) else None,
                         )  
 
-                if section and parse_method == "manual":  
-                    sections.append((section, output["type"], self._line_tag(output)))  
-                elif section and parse_method == "paper":  
-                    sections.append((section + self._line_tag(output), output["type"]))  
-                else:  
-                    sections.append((section, self._line_tag(output)))  
+                _cid = output.get("chunk_id") or output.get("chuck_id") or output.get("id") or output.get("block_id") or ""
+                _cid = str(_cid).strip()[:64] if _cid else ""
+                if section and parse_method == "manual":
+                    sections.append((section, output["type"], self._line_tag(output), _cid))
+                elif section and parse_method == "paper":
+                    sections.append((section + self._line_tag(output), output["type"], _cid))
+                else:
+                    sections.append((section, self._line_tag(output), _cid))
             except Exception as _e_block:  
                 self.logger.error(  
                     "[MinerU] _transfer_to_sections 单块失败 idx=%s type=%r page_idx=%r bbox=%r keys=%s err=%s",

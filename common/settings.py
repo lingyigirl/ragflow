@@ -196,7 +196,7 @@ def init_settings():
 
     global PARSERS
     PARSERS = llm_settings.get(
-        "parsers", "naive:General,qa:Q&A,resume:Resume,manual:Manual,table:Table,paper:Paper,book:Book,laws:Laws,presentation:Presentation,picture:Picture,one:One,hichunk:Hichunk,audio:Audio,email:Email,tag:Tag"
+        "parsers", "naive:General,qa:Q&A,resume:Resume,manual:Manual,table:Table,paper:Paper,book:Book,laws:Laws,presentation:Presentation,picture:Picture,one:One,hichunk:Hichunk,financial:Financial,audio:Audio,email:Email,tag:Tag"
     )
 
     global CHAT_MDL, EMBEDDING_MDL, RERANK_MDL, ASR_MDL, IMAGE2TEXT_MDL

@@ -1,0 +1,929 @@
+import copy
+import re
+import os
+import json
+import logging
+from dotenv import load_dotenv
+from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
+
+from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
+from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+
+load_dotenv()
+
+TITLE_NUM_RE = re.compile(r'^(\d+(?:\.\d+)*)')
+
+
+def is_html_table(txt) -> bool:
+    if not isinstance(txt, str):
+        return False
+    lower = txt.lower()
+    return ("<table" in lower) and ("<tr" in lower or "<td" in lower)
+
+
+def normalize_text_for_title(text: str) -> str:
+    if not isinstance(text, str):
+        return ""
+    s = text.strip()
+    return re.sub(r"\s+", "", s)
+
+
+def get_section_title_level(text: str) -> int:
+    if not isinstance(text, str) or not text.strip():
+        return 0
+    text_stripped = normalize_text_for_title(text)
+    if not text_stripped:
+        return 0
+
+    level2_patterns = [
+        r'^\d+[\.、](?!\d)',
+        r'^[（(][一二三四五六七八九十]+[）)](?!\d)',
+        r'^第[一二三四五六七八九十百千\d]+条',
+    ]
+
+    level3_patterns = [
+        r'^\d+\.\d(?!\d)',
+        r'^（\d+）',
+        r'^\d+）',
+    ]
+
+    level4_patterns = [
+        r'^\d+\.\d+\.\d+',
+    ]
+
+    level1_patterns = [
+        r'^[一二三四五六七八九十]',
+    ]
+
+    for pattern in level4_patterns:
+        if re.match(pattern, text_stripped):
+            return 4
+
+    for pattern in level3_patterns:
+        if re.match(pattern, text_stripped):
+            return 3
+
+    for pattern in level2_patterns:
+        if re.match(pattern, text_stripped):
+            return 2
+
+    for pattern in level1_patterns:
+        if re.match(pattern, text_stripped):
+            return 1
+
+    m = TITLE_NUM_RE.match(text_stripped)
+    if m:
+        dot_count = m.group(1).count('.')
+        if dot_count >= 3:
+            return dot_count + 1
+
+    return 0
+
+
+def strip_position_stamp(text):
+    return re.sub(r'@@\d+(?:\s+[+-]?\d+(?:\.\d+)?){4}##', '', text)
+
+
+def _docs_have_content(docs):
+    for item in docs or []:
+        text = item.get("content_with_weight") if isinstance(item, dict) else None
+        if isinstance(text, str) and text.strip():
+            return True
+    return False
+
+
+def _fallback_general_docs(filename, binary, lang, callback, kwargs, reason):
+    from rag.app import naive as naive_app
+    from rag.app import picture as picture_app
+
+    parser_config = copy.deepcopy(kwargs.get("parser_config") or {})
+    last_exc = None
+
+    if callback:
+        callback(0.2, f"{reason} Falling back to stable parser.")
+
+    if re.search(r"\.pdf$", filename, re.IGNORECASE):
+        layouts = []
+        preferred = str(parser_config.get("layout_recognize", "")).strip()
+        for layout in [preferred, "DeepDOC", "Plain Text"]:
+            if layout and layout != "MinerU" and layout not in layouts:
+                layouts.append(layout)
+
+        for layout in layouts:
+            fallback_kwargs = dict(kwargs)
+            fallback_conf = copy.deepcopy(parser_config)
+            fallback_conf["layout_recognize"] = layout
+            fallback_kwargs["parser_config"] = fallback_conf
+            try:
+                docs = naive_app.chunk(
+                    filename,
+                    binary=binary,
+                    lang=lang,
+                    callback=callback,
+                    **fallback_kwargs,
+                ) or []
+                if _docs_have_content(docs):
+                    logging.info("Fallback parser succeeded for %s with layout_recognize=%s", filename, layout)
+                    return docs
+            except Exception as exc:
+                last_exc = exc
+                logging.exception("Fallback parser failed for %s with layout_recognize=%s", filename, layout)
+
+    elif re.search(r"\.(jpe?g|png)$", filename, re.IGNORECASE):
+        tenant_id = kwargs.get("tenant_id")
+        if tenant_id is not None:
+            fallback_kwargs = dict(kwargs)
+            fallback_conf = copy.deepcopy(parser_config)
+            fallback_conf["layout_recognize"] = "OCR"
+            fallback_kwargs["parser_config"] = fallback_conf
+            try:
+                docs = picture_app.chunk(
+                    filename,
+                    binary=binary,
+                    tenant_id=tenant_id,
+                    lang=lang,
+                    callback=callback,
+                    **fallback_kwargs,
+                ) or []
+                if _docs_have_content(docs):
+                    logging.info("Fallback picture parser succeeded for %s", filename)
+                    return docs
+            except Exception as exc:
+                last_exc = exc
+                logging.exception("Fallback picture parser failed for %s", filename)
+    else:
+        fallback_kwargs = dict(kwargs)
+        fallback_conf = copy.deepcopy(parser_config)
+        fallback_conf["layout_recognize"] = "DeepDOC"
+        fallback_kwargs["parser_config"] = fallback_conf
+        try:
+            docs = naive_app.chunk(
+                filename,
+                binary=binary,
+                lang=lang,
+                callback=callback,
+                **fallback_kwargs,
+            ) or []
+            if _docs_have_content(docs):
+                logging.info("Fallback generic parser succeeded for %s", filename)
+                return docs
+        except Exception as exc:
+            last_exc = exc
+            logging.exception("Fallback generic parser failed for %s", filename)
+
+    if last_exc:
+        logging.warning("Fallback parser produced no content for %s after error: %s", filename, last_exc)
+    return []
+
+
+def _collect_positions_from_docs(docs):
+    poss = []
+    for item in docs or []:
+        if not isinstance(item, dict):
+            continue
+        for pos in item.get("position_int") or []:
+            if isinstance(pos, (list, tuple)) and len(pos) >= 5:
+                poss.append(tuple(pos[:5]))
+    return poss
+
+
+def _collapse_to_single_chunk(docs, doc, eng):
+    merged = []
+    for item in docs or []:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("content_with_weight")
+        if isinstance(text, str) and text.strip():
+            merged.append(text.strip())
+
+    if not merged:
+        return []
+
+    chunk_docs = tokenize_chunks(["\n".join(merged)], doc, eng)
+    poss = _collect_positions_from_docs(docs)
+    if poss:
+        add_positions(chunk_docs[0], poss)
+    else:
+        chunk_docs[0]["position_int"] = []
+        chunk_docs[0]["page_num_int"] = []
+        chunk_docs[0]["top_int"] = []
+    return chunk_docs
+
+
+def label_to_depth(label, prev_depth):
+    if label is None:
+        return prev_depth + 1
+    if re.match(r'^第[一二三四五六七八九十百千\d]+节', label):
+        return 1
+    if re.match(r'^[一二三四五六七八九十]+$', label):
+        return 2
+    if re.match(r'^[（(][一二三四五六七八九十]+[）)]$', label):
+        return 3
+    if re.match(r'^\d+\.$', label):
+        return 4
+    if re.match(r'^[（(]\d+[）)]$', label):
+        return 5
+    return prev_depth + 1
+
+
+def estimate_tokens(text):
+    from common.token_utils import num_tokens_from_string
+    return num_tokens_from_string(text)
+
+
+class TocNode:
+    def __init__(self, title, label=None, depth=0, page_start=0, contains_table=False):
+        self.title = title
+        self.label = label
+        self.depth = depth
+        self.page_start = page_start
+        self.page_end = 0
+        self.children = []
+        self.parent = None
+        self.mineru_index_start = -1
+        self.mineru_index_end = -1
+        self.contains_table = contains_table
+
+
+def build_tree_from_triples(items):
+    root = TocNode(title="root", depth=0)
+    stack = [root]
+
+    for item in items:
+        depth = label_to_depth(item.get("label"), stack[-1].depth)
+        node = TocNode(
+            title=item.get("title", ""),
+            label=item.get("label"),
+            depth=depth,
+            page_start=item.get("page", 0),
+            contains_table=item.get("contains_table", False)
+        )
+        while stack and stack[-1].depth >= node.depth:
+            stack.pop()
+        stack[-1].children.append(node)
+        node.parent = stack[-1]
+        stack.append(node)
+
+    return root
+
+
+def _fuzzy_match_title(toc_title, text):
+    if not toc_title or not text:
+        return False
+    def _normalize(s):
+        s = re.sub(r'[\.、．\s]', '', s)
+        s = re.sub(r'[（(]', '(', s)
+        s = re.sub(r'[）)]', ')', s)
+        return s
+    return _normalize(toc_title) == _normalize(text)
+
+
+def _find_title_in_sections(title, sections, start_idx=0):
+    for i in range(start_idx, len(sections)):
+        item = sections[i]
+        text = (item[0] if len(item) >= 1 else "").strip()
+        if _fuzzy_match_title(title, text):
+            return i
+    return -1
+
+
+def _fix_toc_with_inline_titles(toc_root, mineru_sections, page_offset=0):
+    def _walk_start(node, start_search_idx):
+        if node.title != "root":
+            idx = _find_title_in_sections(node.title, mineru_sections, start_search_idx)
+            if idx >= 0:
+                node.mineru_index_start = idx
+            else:
+                estimated_page = node.page_start + page_offset
+                for i in range(start_search_idx, len(mineru_sections)):
+                    item = mineru_sections[i]
+                    pos = item[1] if len(item) > 1 else None
+                    if pos and isinstance(pos, (list, tuple)) and len(pos) >= 5:
+                        if pos[0] >= estimated_page:
+                            node.mineru_index_start = i
+                            break
+            if node.mineru_index_start < 0:
+                node.mineru_index_start = start_search_idx
+
+        next_start = node.mineru_index_start if node.mineru_index_start >= 0 else start_search_idx
+        for child in node.children:
+            _walk_start(child, next_start)
+            if child.mineru_index_start >= 0:
+                next_start = child.mineru_index_start
+
+    _walk_start(toc_root, 0)
+
+    def _walk_end(node):
+        for i, child in enumerate(node.children):
+            if i + 1 < len(node.children):
+                child.mineru_index_end = node.children[i + 1].mineru_index_start
+            else:
+                child.mineru_index_end = node.mineru_index_end if node.mineru_index_end > 0 else len(mineru_sections)
+            _walk_end(child)
+
+    toc_root.mineru_index_start = 0
+    toc_root.mineru_index_end = len(mineru_sections)
+    _walk_end(toc_root)
+
+    def _finalize_node_ends(node, fallback_end):
+        for child in node.children:
+            _finalize_node_ends(child, fallback_end)
+        if node.children:
+            last_end = node.children[-1].mineru_index_end
+            node.mineru_index_end = last_end if last_end >= 0 else fallback_end
+        elif node.mineru_index_end < 0:
+            node.mineru_index_end = fallback_end
+
+    _finalize_node_ends(toc_root, len(mineru_sections))
+    return toc_root
+
+
+def _parse_toc_text_with_llm(toc_text, llm_bundle):
+    prompt = f"""Extract the table of contents as a flat JSON array of triples (label, title, page).
+Each item: {{"label": "section_number_or_null", "title": "section_title", "page": page_number}}
+label is the numbering prefix like "第一节", "一", "（一）", "1.", or null for unnumbered items like table names.
+Mark financial statement tables with "contains_table": true.
+
+TOC text:
+{toc_text}
+
+Output ONLY the JSON array, no other text:"""
+
+    answer, _ = llm_bundle.chat(prompt, [{"role": "user", "content": prompt}], {"temperature": 0.0})
+    try:
+        answer = answer.strip()
+        if answer.startswith("```"):
+            answer = re.sub(r'^```\w*\n?', '', answer)
+            answer = re.sub(r'\n?```$', '', answer)
+        items = json.loads(answer)
+        return items
+    except Exception:
+        logging.warning("Failed to parse TOC LLM response as JSON, attempting to extract...")
+        match = re.search(r'\[.*\]', answer, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group())
+            except Exception:
+                pass
+        return None
+
+
+def _generate_cross_ref_with_llm(toc_items, llm_bundle):
+    prompt = f"""Analyze this financial report table of contents. Identify:
+1. main_tables: nodes that are the three main financial statements (balance sheet, income statement, cash flow statement)
+2. note_to_table_mapping: for each notes parent node, which main tables does it correspond to
+
+TOC items:
+{json.dumps(toc_items, ensure_ascii=False)}
+
+Output ONLY valid JSON:
+{{
+  "main_tables": [{{"title": "...", "index": N}}],
+  "note_to_table_mapping": {{"notes_node_title": ["table_title_1", "table_title_2"]}}
+}}"""
+
+    answer, _ = llm_bundle.chat(prompt, [{"role": "user", "content": prompt}], {"temperature": 0.0})
+    try:
+        answer = answer.strip()
+        if answer.startswith("```"):
+            answer = re.sub(r'^```\w*\n?', '', answer)
+            answer = re.sub(r'\n?```$', '', answer)
+        return json.loads(answer)
+    except Exception:
+        logging.warning("Failed to parse cross_ref LLM response as JSON")
+        return {"main_tables": [], "note_to_table_mapping": {}}
+
+
+def _merge_table_with_adjacent(content_sections):
+    merged = []
+    for item in content_sections:
+        text = item[0] if len(item) >= 1 else str(item)
+        merged.append(text)
+    return '\n'.join(merged)
+
+
+def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
+    chain = list(chain)
+
+    if node.mineru_index_start < 0:
+        return []
+
+    span_end = node.mineru_index_end
+    if span_end < 0:
+        if node.children:
+            for child in reversed(node.children):
+                if child.mineru_index_end >= 0:
+                    span_end = child.mineru_index_end
+                    break
+        if span_end < 0:
+            span_end = len(mineru_sections)
+
+    if span_end <= node.mineru_index_start:
+        if node.children:
+            child_chain = chain + ([node.title] if node.title else [])
+            results = []
+            for child in node.children:
+                results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
+            return results
+        return []
+
+    sections = mineru_sections[node.mineru_index_start:span_end]
+    if not sections:
+        if node.children:
+            child_chain = chain + ([node.title] if node.title else [])
+            results = []
+            for child in node.children:
+                results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
+            return results
+        return []
+
+    content = '\n'.join([
+        item[0] if len(item) >= 1 else str(item)
+        for item in sections
+    ])
+
+    has_table = node.contains_table or any(
+        is_html_table(item[0] if len(item) >= 1 else str(item))
+        for item in sections
+    )
+    span = (node.mineru_index_start, span_end)
+
+    if has_table:
+        merged = _merge_table_with_adjacent(sections)
+        return [{"content": merged, "parent_chain": chain, "mineru_range": span}]
+
+    if not content.strip():
+        if node.children:
+            child_chain = chain + ([node.title] if node.title else [])
+            results = []
+            for child in node.children:
+                results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
+            return results
+        return []
+
+    if estimate_tokens(content) < threshold:
+        return [{"content": content, "parent_chain": chain, "mineru_range": span}]
+
+    if node.children:
+        child_chain = chain + [node.title]
+        results = []
+        for child in node.children:
+            results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
+        return results
+
+    return [{"content": content, "parent_chain": chain, "mineru_range": span}]
+
+
+def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
+    parser_config = kwargs.get("parser_config", {"chunk_token_num": 512, "delimiter": "\n!?。！？；，、"})
+    parser_config = copy.deepcopy(parser_config)
+
+    normalized_doc_name = re.sub(r"\.(xlsx?|xlsm)$", ".pdf", filename, flags=re.IGNORECASE)
+    doc = {"docnm_kwd": normalized_doc_name}
+    doc["title_tks"] = rag_tokenizer.tokenize(re.sub(r"\.[a-zA-Z]+$", "", doc["docnm_kwd"]))
+    doc["title_sm_tks"] = rag_tokenizer.fine_grained_tokenize(doc["title_tks"])
+    eng = lang.lower() == "english"
+
+    tenant_id = kwargs.get("tenant_id")
+    kb_id = kwargs.get("kb_id")
+    doc_id = kwargs.get("doc_id")
+
+    token_threshold = 8192
+    if tenant_id:
+        try:
+            from api.db.services.llm_service import LLMBundle
+            from common.constants import LLMType
+            embd_bundle = LLMBundle(tenant_id, LLMType.EMBEDDING)
+            token_threshold = embd_bundle.max_length
+        except Exception:
+            pass
+
+    sections, tbls = [], []
+    table_indices_in_mineru = []
+
+    is_mineru_doc = re.search(r"\.(pdf|xlsx?|xlsm|docx?|docm|dotx?|dotm)$", filename, re.IGNORECASE)
+    is_mineru_img = re.search(r"\.(jpe?g|png|gif|bmp|webp|tiff?)$", filename, re.IGNORECASE)
+
+    if not (is_mineru_doc or is_mineru_img):
+        return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial parser requires PDF/image/docx.") or []
+
+    is_excel_mineru_path = bool(re.search(r"\.(xlsx?|xlsm)$", filename, re.IGNORECASE))
+
+    if callback:
+        callback(0.05, "Start MinerU parsing (Financial).")
+
+    mineru_executable = os.environ.get("MINERU_EXECUTABLE", "mineru")
+    mineru_api = parser_config.get("mineru_api_base") or resolve_mineru_api_from_env()
+    mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api)
+
+    backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
+
+    mineru_ok, _mineru_install_reason = mineru_parser.check_installation(backend)
+    if not mineru_ok:
+        if is_excel_mineru_path:
+            if callback:
+                callback(-1, "Excel+Financial：MinerU 不可用。")
+            raise RuntimeError("Excel+Financial: MinerU unavailable.")
+        return _collapse_to_single_chunk(
+            _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU is unavailable."),
+            doc, eng,
+        )
+
+    try:
+        mineru_sections, mineru_tables = mineru_parser.parse_document(
+            filepath=filename,
+            binary=binary,
+            callback=callback,
+            output_dir=os.environ.get("MINERU_OUTPUT_DIR", ""),
+            backend=backend,
+            delete_output=bool(int(os.environ.get("MINERU_DELETE_OUTPUT", 1))),
+            kb_id=kb_id,
+            doc_id=doc_id,
+            parser_config=kwargs.get("parser_config", {}),
+        )
+    except KeyError as exc:
+        _missing_key = exc.args[0] if exc.args else None
+        if _missing_key == "type":
+            if is_excel_mineru_path:
+                raise RuntimeError("Excel+Financial: MinerU output missing 'type'.") from exc
+            return _collapse_to_single_chunk(
+                _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU output missing 'type'."),
+                doc, eng,
+            )
+        if _missing_key == "hichunk":
+            if is_excel_mineru_path:
+                raise RuntimeError("Excel+Financial: MinerU KeyError('hichunk').") from exc
+            return _collapse_to_single_chunk(
+                _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU KeyError('hichunk')."),
+                doc, eng,
+            )
+        raise
+    except Exception as exc:
+        if is_excel_mineru_path:
+            raise RuntimeError(f"Excel+Financial parse failed: {exc!s}") from exc
+        return _collapse_to_single_chunk(
+            _fallback_general_docs(filename, binary, lang, callback, kwargs, f"MinerU parse failed: {exc}"),
+            doc, eng,
+        )
+
+    if callback:
+        callback(0.15, "MinerU parsing done (Financial).")
+
+    unique_sections = []
+    seen_key = set()
+    for item in mineru_sections:
+        text = (item[0] if len(item) >= 1 else "").strip()
+        pos = item[1] if len(item) > 1 else None
+        if not text:
+            unique_sections.append(item)
+            continue
+        if is_html_table(text):
+            key = ("tab", hash(text))
+        else:
+            pos_hash = hash(str(pos)) if pos is not None else None
+            key = ("sec", hash(text), pos_hash)
+        if key not in seen_key:
+            unique_sections.append(item)
+            seen_key.add(key)
+    mineru_sections = unique_sections
+
+    mineru_sections_with_level = []
+    for item in mineru_sections:
+        chunk_id = ""
+        if len(item) >= 4:
+            _raw = str(item[-1] or "").strip()
+            if len(_raw) <= 64:
+                chunk_id = _raw
+        if len(item) == 2:
+            text, pos_tag = item
+            text = " ".join((text or "").strip().split())
+            title_level = 0 if is_html_table(text) else get_section_title_level(text)
+            mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
+        elif len(item) == 3:
+            text = " ".join((item[0] or "").strip().split())
+            title_level = 0 if is_html_table(text) else get_section_title_level(text)
+            mineru_sections_with_level.append((text, item[1], title_level, chunk_id))
+        else:
+            text = item[0] if len(item) > 0 else ""
+            pos_tag = item[1] if len(item) > 1 else None
+            text = " ".join((text or "").strip().split())
+            title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
+            mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
+    mineru_sections = mineru_sections_with_level
+
+    def _normalize_pos_list(poss):
+        norm = []
+        if not poss:
+            return norm
+        for p in poss:
+            try:
+                if not isinstance(p, (list, tuple)) or len(p) < 5:
+                    continue
+                pn = p[0][0] if isinstance(p[0], list) else p[0]
+                norm.append((pn, p[1], p[2], p[3], p[4]))
+            except Exception:
+                continue
+        return norm
+
+    for idx, section_item in enumerate(mineru_sections):
+        if len(section_item) >= 2:
+            text, pos_tag = section_item[0], section_item[1]
+            title_level = section_item[2] if len(section_item) >= 3 else 0
+            sec_chunk_id = section_item[3] if len(section_item) >= 4 else ""
+        else:
+            text = section_item[0] if len(section_item) > 0 else ""
+            pos_tag = None
+            title_level = 0
+            sec_chunk_id = ""
+
+        poss = _normalize_pos_list(mineru_parser.extract_positions(pos_tag)) if pos_tag else []
+        if is_html_table(text):
+            tbls.append(((None, text), poss if poss else []))
+            table_indices_in_mineru.append(idx)
+            sections.append((text, idx, poss, 0, sec_chunk_id))
+        else:
+            sections.append((text, idx, poss, title_level, sec_chunk_id))
+
+    if mineru_tables:
+        for table_item in mineru_tables:
+            if isinstance(table_item, tuple) and len(table_item) == 2:
+                table_text, table_pos = table_item
+                if table_text is None:
+                    continue
+                table_text = str(table_text).strip()
+                if not table_text:
+                    continue
+                poss = _normalize_pos_list(mineru_parser.extract_positions(table_pos)) if table_pos else []
+                tbls.append(((None, table_text), poss))
+            else:
+                if table_item is None:
+                    continue
+                fallback_text = str(table_item).strip()
+                if not fallback_text:
+                    continue
+                tbls.append(((None, fallback_text), []))
+
+    if callback:
+        callback(0.2, "Extracting TOC (Financial)...")
+
+    toc_text = ""
+    toc_start_idx = -1
+    for i, section_item in enumerate(mineru_sections):
+        text = section_item[0] if len(section_item) >= 1 else ""
+        if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
+            toc_start_idx = i
+            break
+    if toc_start_idx < 0:
+        for i, section_item in enumerate(mineru_sections):
+            text = section_item[0] if len(section_item) >= 1 else ""
+            if re.search(r'第[一二三四五六七八九十百千\d]+节', text.strip()):
+                toc_start_idx = i - 1
+                break
+    if toc_start_idx >= 0:
+        toc_lines = []
+        for i in range(toc_start_idx, min(toc_start_idx + 40, len(mineru_sections))):
+            text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
+            stripped = text.strip()
+            if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped) and i > toc_start_idx + 2:
+                break
+            toc_lines.append(stripped)
+        toc_text = '\n'.join(toc_lines)
+
+    toc_items = None
+    if toc_text:
+        try:
+            from api.db.services.llm_service import LLMBundle
+            from common.constants import LLMType
+            if tenant_id:
+                chat_bundle = LLMBundle(tenant_id, LLMType.CHAT)
+                toc_items = _parse_toc_text_with_llm(toc_text, chat_bundle)
+        except Exception:
+            logging.exception("Failed to parse TOC with LLM (Financial).")
+
+    if toc_items is None:
+        toc_items = []
+        for i, section_item in enumerate(mineru_sections):
+            text = section_item[0] if len(section_item) >= 1 else ""
+            stripped = text.strip()
+            if not stripped:
+                continue
+            level = section_item[2] if len(section_item) >= 3 else get_section_title_level(stripped)
+            if level > 0:
+                pos_tag = section_item[1] if len(section_item) > 1 else None
+                page = 0
+                if pos_tag and isinstance(pos_tag, (list, tuple)) and len(pos_tag) >= 5:
+                    page = pos_tag[0]
+                toc_items.append({"label": stripped.split()[0] if stripped.split() else "", "title": stripped, "page": page})
+
+    toc_root = build_tree_from_triples(toc_items)
+    toc_root.mineru_index_start = toc_start_idx if toc_start_idx >= 0 else 0
+
+    body_start_idx = 0
+    first_section_heading = None
+    for i, section_item in enumerate(mineru_sections):
+        text = section_item[0] if len(section_item) >= 1 else ""
+        if re.search(r'第[一二三四五六七八九十百千\d]+节', text.strip()):
+            first_section_heading = i
+            break
+    if first_section_heading is not None:
+        body_start_idx = first_section_heading
+
+    _fix_toc_with_inline_titles(toc_root, mineru_sections)
+    if toc_start_idx < 0:
+        toc_start_idx = body_start_idx
+
+    cross_ref = None
+    if toc_items and tenant_id:
+        try:
+            from api.db.services.llm_service import LLMBundle
+            from common.constants import LLMType
+            chat_bundle = LLMBundle(tenant_id, LLMType.CHAT)
+            cross_ref = _generate_cross_ref_with_llm(toc_items, chat_bundle)
+        except Exception:
+            logging.exception("Failed to generate cross_ref (Financial).")
+
+    tree_data = {
+        "source": "toc_with_inline_fix" if toc_text else "inline_only",
+        "items": toc_items,
+    }
+    if cross_ref:
+        tree_data["cross_ref"] = cross_ref
+    if doc_id and tenant_id:
+        try:
+            from api.db.services.document_service import DocumentService
+            DocumentService.update_by_id(doc_id, {"tree": tree_data})
+        except Exception:
+            logging.exception("Failed to save tree to document (Financial).")
+
+    if callback:
+        callback(0.3, "Building chunk tree (Financial)...")
+
+    chunks_raw = []
+
+    if toc_start_idx > 0:
+        pre_toc_text = '\n'.join([
+            item[0] if len(item) >= 1 else str(item)
+            for item in mineru_sections[:toc_start_idx]
+        ])
+        if pre_toc_text.strip():
+            chunks_raw.append({"content": pre_toc_text, "parent_chain": [], "mineru_range": (0, toc_start_idx)})
+
+    if toc_start_idx < body_start_idx:
+        toc_content = '\n'.join([
+            item[0] if len(item) >= 1 else str(item)
+            for item in mineru_sections[toc_start_idx:body_start_idx]
+        ])
+        if toc_content.strip():
+            chunks_raw.append({"content": toc_content, "parent_chain": [], "mineru_range": (toc_start_idx, body_start_idx)})
+
+    body_root_children = []
+    for child in toc_root.children:
+        if child.mineru_index_start >= body_start_idx or child.mineru_index_start < 0:
+            body_root_children.append(child)
+
+    body_root = TocNode(title="body", depth=0)
+    body_root.children = body_root_children
+    body_root.mineru_index_start = body_start_idx
+    body_root.mineru_index_end = len(mineru_sections)
+
+    for child in body_root.children:
+        chunks_raw.extend(_walk_node_for_chunk(child, mineru_sections, [], token_threshold))
+
+    chunks_raw = [cr for cr in chunks_raw if str(cr.get("content", "")).strip()]
+    has_body_chunk = any(cr.get("mineru_range", (0, 0))[0] >= body_start_idx for cr in chunks_raw)
+    if not has_body_chunk:
+        chunks_raw = [{
+            "content": '\n'.join([
+                item[0] if len(item) >= 1 else str(item)
+                for item in mineru_sections[body_start_idx:]
+            ]),
+            "parent_chain": [],
+            "mineru_range": (body_start_idx, len(mineru_sections))
+        }]
+
+    if callback:
+        callback(0.5, "Building chunks (Financial)...")
+
+    chunks = []
+    chunk_positions = []
+
+    for chunk_raw in chunks_raw:
+        ck_content = chunk_raw["content"]
+        ck_chain = chunk_raw.get("parent_chain", [])
+        mineru_start, mineru_end = chunk_raw.get("mineru_range", (0, 0))
+
+        prefix = " > ".join(ck_chain) + "\n" if ck_chain else ""
+        chunk_text = prefix + ck_content
+
+        poss_list = []
+        for line_idx in range(mineru_start, mineru_end):
+            if 0 <= line_idx < len(sections):
+                section_item = sections[line_idx]
+                if len(section_item) > 2 and section_item[2]:
+                    poss_list.extend(section_item[2])
+
+        chunks.append(chunk_text)
+        chunk_positions.append(poss_list)
+
+    if not chunks:
+        all_lines = []
+        all_poss = []
+        for line_idx in range(body_start_idx, len(sections)):
+            section_item = sections[line_idx]
+            if len(section_item) >= 1:
+                all_lines.append(str(section_item[0]))
+            if len(section_item) > 2 and section_item[2]:
+                all_poss.extend(section_item[2])
+        prefix = " > ".join(toc_root.title) + "\n" if toc_root.title != "root" else ""
+        chunks = [prefix + '\n'.join(all_lines)]
+        chunk_positions = [all_poss]
+
+    html_table_count = len(table_indices_in_mineru)
+    mineru_only_tbls = tbls[html_table_count:] if html_table_count < len(tbls) else []
+
+    try:
+        tbls = vision_figure_parser_pdf_wrapper(tbls=mineru_only_tbls, callback=callback, **kwargs)
+    except KeyError as exc:
+        if str(exc).strip("'\"") == "type":
+            logging.exception("Skip vision figure enhancement due to missing 'type' field in parser output.")
+            tbls = mineru_only_tbls
+        else:
+            raise
+
+    sanitized_tbls = []
+    table_doc_orders = []
+    for table_item in tbls:
+        if not isinstance(table_item, (list, tuple)) or len(table_item) < 1:
+            continue
+        table_payload = table_item[0]
+        table_pos = table_item[1] if len(table_item) > 1 else []
+        table_text = None
+        if isinstance(table_payload, (list, tuple)) and len(table_payload) >= 2:
+            table_text = table_payload[1]
+        elif isinstance(table_payload, str):
+            table_text = table_payload
+        if table_text is None:
+            continue
+        table_text = str(table_text).strip()
+        if not table_text:
+            continue
+        table_sort_idx = 999999
+        if table_pos:
+            try:
+                p0 = table_pos[0]
+                table_sort_idx = p0[0][0] if isinstance(p0[0], list) else p0[0]
+            except Exception:
+                pass
+        sanitized_tbls.append(((None, table_text), table_pos if table_pos else []))
+        table_doc_orders.append(table_sort_idx)
+
+    table_docs = tokenize_table(sanitized_tbls, doc, eng)
+    chunk_docs = tokenize_chunks(chunks, doc, eng)
+
+    for i, chunk_doc in enumerate(chunk_docs):
+        if i < len(chunk_positions):
+            if chunk_positions[i]:
+                add_positions(chunk_doc, chunk_positions[i])
+            else:
+                chunk_doc["position_int"] = []
+                chunk_doc["page_num_int"] = []
+                chunk_doc["top_int"] = []
+        else:
+            chunk_doc["position_int"] = []
+            chunk_doc["page_num_int"] = []
+            chunk_doc["top_int"] = []
+
+        if "position_int" in chunk_doc and chunk_doc["position_int"]:
+            chunk_doc["position_int"] = [
+                list(pos) if isinstance(pos, tuple) else pos
+                for pos in chunk_doc["position_int"]
+            ]
+
+    all_elements = []
+    for i, chunk_doc in enumerate(chunk_docs):
+        sort_idx = i
+        if i < len(chunks_raw):
+            sort_idx = chunks_raw[i].get("mineru_range", (i, i))[0]
+        all_elements.append({
+            'type': 'chunk',
+            'doc': chunk_doc,
+            'mineru_index': sort_idx,
+            'mineru_range': {'min': sort_idx, 'max': sort_idx}
+        })
+
+    for ti, table_doc in enumerate(table_docs):
+        table_sort_idx = table_doc_orders[ti] if ti < len(table_doc_orders) else 999999
+        all_elements.append({
+            'type': 'table',
+            'doc': table_doc,
+            'mineru_index': table_sort_idx,
+            'mineru_range': {'min': table_sort_idx, 'max': table_sort_idx}
+        })
+
+    all_elements.sort(key=lambda x: x['mineru_index'])
+    res = [elem['doc'] for elem in all_elements]
+
+    if callback:
+        callback(1.0, "Financial chunking done.")
+
+    return res

@@ -76,6 +76,7 @@ const hidePagesChunkMethods = [
   DocumentParserType.Resume,
   DocumentParserType.One,
   DocumentParserType.Hichunk,
+  DocumentParserType.Financial,
   DocumentParserType.KnowledgeGraph,
 ];
 
@@ -222,7 +223,9 @@ export function ChunkMethodDialog({
       hidePagesChunkMethods
         .filter(
           (x) =>
-            x !== DocumentParserType.One && x !== DocumentParserType.Hichunk,
+            x !== DocumentParserType.One &&
+            x !== DocumentParserType.Hichunk &&
+            x !== DocumentParserType.Financial,
         )
         .every((x) => x !== selectedTag)
     );

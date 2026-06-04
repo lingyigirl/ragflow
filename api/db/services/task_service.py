@@ -421,7 +421,7 @@ def queue_tasks(doc: dict, bucket: str, name: str, priority: int):
         page_size = doc["parser_config"].get("task_page_size") or 12
         if pid == "paper":
             page_size = doc["parser_config"].get("task_page_size") or 22
-        if pid in ["one", "hichunk", "knowledge_graph"] or do_layout != "DeepDOC" or doc["parser_config"].get("toc_extraction", False):
+        if pid in ["one", "hichunk", "financial", "knowledge_graph"] or do_layout != "DeepDOC" or doc["parser_config"].get("toc_extraction", False):
             page_size = 10 ** 9
         page_ranges = doc["parser_config"].get("pages") or [(1, 10 ** 5)]
         for s, e in page_ranges:

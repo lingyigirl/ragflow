@@ -1242,7 +1242,7 @@ async def change_parser():
             else:
                 return get_json_result(data=True)
 
-        if (doc.type == FileType.VISUAL and req["parser_id"] not in ("picture", "one", "hichunk")) or (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req["parser_id"] != "presentation"):
+        if (doc.type == FileType.VISUAL and req["parser_id"] not in ("picture", "one", "hichunk", "financial")) or (re.search(r"\.(ppt|pptx|pages)$", doc.name) and req["parser_id"] != "presentation"):
             return get_data_error_result(message="Not supported yet!")
         if "parser_config" in req:
             DocumentService.update_parser_config(doc.id, req["parser_config"])
@@ -2095,6 +2095,59 @@ async def update_mineru_section():
         return server_error_response(e)
 
 
+@manager.route("/mineru_section/re_vectorize", methods=["POST"])
+@api_key_required
+async def re_vectorize_mineru_section():
+    try:
+        raw = await request.get_data(cache=False)
+        try:
+            req = json.loads(raw.decode("utf-8")) if raw else {}
+        except json.JSONDecodeError:
+            return get_json_result(
+                data=False,
+                message="请求体不是合法 JSON",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        if not isinstance(req, dict):
+            return get_json_result(
+                data=False,
+                message="请求体必须是 JSON 对象",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        chunk_id = (req.get("chunk_id") or "").strip()
+        if not chunk_id:
+            return get_json_result(
+                data=False,
+                message="chunk_id 不能为空",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+        section = DocumentService.get_mineru_section_by_chunk_id(chunk_id)
+        if not section:
+            return get_json_result(
+                data=False,
+                message="未找到对应 chunk_id 的 mineru_section 记录",
+                code=RetCode.NOT_FOUND,
+            )
+        e, kb = KnowledgebaseService.get_by_id(section.kb_id)
+        if not e:
+            return get_json_result(
+                data=False,
+                message="知识库不存在",
+                code=RetCode.NOT_FOUND,
+            )
+        check_kb_team_permission(kb, current_user.id)
+        ok, msg, data = DocumentService.re_vectorize_mineru_section_by_chunk_id(chunk_id)
+        if not ok:
+            return get_json_result(
+                data=False,
+                message=msg or "重向量化失败",
+                code=RetCode.SERVER_ERROR,
+            )
+        return get_json_result(data=data)
+    except Exception as e:
+        return server_error_response(e)
+
+
 def _mineru_json_list_or_empty(value):
     if value is None:
         return []
@@ -2354,8 +2407,47 @@ async def submit_mineru_section():
                 logging.warning("[MinerU] 清理临时 content_list 文件失败: %s", temp_file_path)
 
 
+@manager.route("/mineru_section/doc_chunk_datas", methods=["POST"])
+@api_key_required
+async def mineru_section_chunk_ids():
+    try:
+        req = await get_request_json()
+        doc_id = (req.get("doc_id") or "").strip()
+        if not doc_id:
+            return get_json_result(data=False, message="doc_id 不能为空", code=RetCode.ARGUMENT_ERROR)
+
+        rows = DocumentService.get_chunk_ids_by_doc_id(doc_id)
+        result = []
+        for row in rows:
+            row_type = str(row.get("type") or "").strip().lower()
+            if row_type == "table":
+                data = row.get("table_body")
+            elif row_type == "table_caption":
+                data = row.get("table_caption") or row.get("text")
+            elif row_type == "table_footnote":
+                data = row.get("table_footnote") or row.get("text")
+            elif row_type == "table_body":
+                data = row.get("table_body") or row.get("text")
+            else:
+                data = row.get("text")
+            item = {
+                "chunk_id": row.get("chunk_id"),
+                "type": row.get("type"),
+                "data": data,
+                "bbox": row.get("bbox"),
+                "page_idx": row.get("page_idx"),
+            }
+            img_path = row.get("img_path")
+            if img_path:
+                item["img_path"] = img_path
+            result.append(item)
+        return get_json_result(data={"doc_id": doc_id, "sections": result, "count": len(result)})
+    except Exception as e:
+        return server_error_response(e)
+
+
 # 新增凭证列表
-@manager.route("/identity_list", methods=["POST"]) 
+@manager.route("/identity_list", methods=["POST"])
 @login_required
 async def identity_list_docs():
     kb_id = request.args.get("kb_id")
@@ -2533,6 +2625,7 @@ _DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET = frozenset(
         "picture",
         "one",
         "hichunk",
+        "financial",
         "knowledge_graph",
         "email",
         "tag",
@@ -2614,7 +2707,7 @@ def _apply_run_chunk_and_parse_method(doc, chunk_method_key: str | None, parse_m
     if not chunk_method_key and not parse_method_key:
         return None
     if chunk_method_key:
-        if (doc.type == FileType.VISUAL and chunk_method_key not in ("picture", "one", "hichunk")) or (
+        if (doc.type == FileType.VISUAL and chunk_method_key not in ("picture", "one", "hichunk", "financial")) or (
             re.search(r"\.(ppt|pptx|pages)$", doc.name) and chunk_method_key != "presentation"
         ):
             return "Not supported yet!"
@@ -2916,6 +3009,7 @@ async def _collect_prompt_context_by_retrieval(
             rank_feature=label_question(question, kbs),
         )
         kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
+        kbinfos["chunks"] = settings.retriever.retrieval_by_financial_cross_ref(kbinfos["chunks"], tenant_ids)
     if not kbinfos.get("chunks"):
         return True, "", "", [], {}
     used_chunks = kb_prompt_truncate_chunk_list(kbinfos, max_prompt_tokens)

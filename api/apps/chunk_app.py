@@ -388,6 +388,7 @@ async def retrieval_test():
             if ck["content_with_weight"]:
                 ranks["chunks"].insert(0, ck)
         ranks["chunks"] = settings.retriever.retrieval_by_children(ranks["chunks"], tenant_ids)
+        ranks["chunks"] = settings.retriever.retrieval_by_financial_cross_ref(ranks["chunks"], tenant_ids)
 
         for c in ranks["chunks"]:
             c.pop("vector", None)

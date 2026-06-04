@@ -811,21 +811,26 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         mineru_sections_with_level = []
         for item in mineru_sections:
+            chunk_id = ""
+            if len(item) >= 3:
+                _raw = str(item[-1] or "").strip()
+                if len(_raw) <= 64:
+                    chunk_id = _raw
             if len(item) == 2:
                 text, pos_tag = item
                 text = " ".join((text or "").strip().split())
                 title_level = 0 if is_html_table(text) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, pos_tag, title_level))
+                mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
             elif len(item) == 3:
                 text = " ".join((item[0] or "").strip().split())
                 title_level = 0 if is_html_table(text) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, item[1], title_level))
+                mineru_sections_with_level.append((text, item[1], title_level, chunk_id))
             else:
                 text = item[0] if len(item) > 0 else ""
                 pos_tag = item[1] if len(item) > 1 else None
                 text = " ".join((text or "").strip().split())
                 title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
-                mineru_sections_with_level.append((text, pos_tag, title_level))
+                mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
 
         mineru_sections = mineru_sections_with_level
         levels_display = []
@@ -866,18 +871,20 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             if len(section_item) >= 2:
                 text, pos_tag = section_item[0], section_item[1]
                 title_level = section_item[2] if len(section_item) >= 3 else 0
+                sec_chunk_id = section_item[3] if len(section_item) >= 4 else ""
             else:
                 text = section_item[0] if len(section_item) > 0 else ""
                 pos_tag = None
                 title_level = 0
-            
+                sec_chunk_id = ""
+
             poss = _normalize_pos_list(mineru_parser.extract_positions(pos_tag)) if pos_tag else []
             if is_html_table(text):
                 tbls.append(((None, text), poss if poss else []))
                 table_indices_in_mineru.append(idx)
-                sections.append((text, idx, poss, 0))
+                sections.append((text, idx, poss, 0, sec_chunk_id))
             else:
-                sections.append((text, idx, poss, title_level))
+                sections.append((text, idx, poss, title_level, sec_chunk_id))
             section_preview = (text or "").replace("\n", " ").replace("\r", " ").strip()
             logging.info("[MinerU][Section][%d] title_level=%s poss=%s text=%s", idx + 1, title_level, poss, section_preview[:500])  # 记录 section 归一化后位置和文本
         
@@ -963,9 +970,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         else:
             section_idx_mapping = section_idx_mapping[:len(lines)]
 
-    chunks = [] 
-    chunk_positions = [] 
+    chunks = []
+    chunk_positions = []
     chunk_mineru_indices = []
+    chunk_mineru_chunk_ids = []
 
     splits = result.get('splits', [])
     
@@ -1059,6 +1067,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         poss_list = []
         mineru_indices_in_chunk = set()
+        chunk_ids_in_chunk = set()
         for idx in ancestor_indices:
             if 0 <= idx < len(section_idx_mapping):
                 sec_idx = section_idx_mapping[idx]
@@ -1068,6 +1077,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                         mineru_indices_in_chunk.add(section_item[1])
                     if len(section_item) > 2 and section_item[2]:
                         poss_list.extend(section_item[2])
+                    if len(section_item) > 4 and section_item[4]:
+                        chunk_ids_in_chunk.add(section_item[4])
         for line_idx in range(start_idx, end_idx):
             if 0 <= line_idx < len(section_idx_mapping):
                 sec_idx = section_idx_mapping[line_idx]
@@ -1080,6 +1091,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                         section_poss = section_item[2]
                         if section_poss:
                             poss_list.extend(section_poss)
+                    if len(section_item) > 4 and section_item[4]:
+                        chunk_ids_in_chunk.add(section_item[4])
 
         chunk_positions.append(poss_list)
         if mineru_indices_in_chunk:
@@ -1089,6 +1102,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             })
         else:
             chunk_mineru_indices.append({'min': -1, 'max': -1})
+        chunk_mineru_chunk_ids.append(list(chunk_ids_in_chunk))
 
     if not chunks or len(chunks) == 0:
 
@@ -1106,6 +1120,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 chunks = [fallback_chunk]
                 chunk_positions = [[]]
                 chunk_mineru_indices = [{'min': -1, 'max': -1}]
+                chunk_mineru_chunk_ids = [[]]
 
     levels_display_step3 = []
     for item in lines:
@@ -1125,7 +1140,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunks_len = len(chunks)
     positions_len = len(chunk_positions)
     indices_len = len(chunk_mineru_indices)
-    
+    chunk_ids_len = len(chunk_mineru_chunk_ids)
+
     if chunks_len != positions_len or chunks_len != indices_len:
         while len(chunk_positions) < chunks_len:
             chunk_positions.append([])
@@ -1133,20 +1149,26 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             chunk_mineru_indices.append({'min': -1, 'max': -1})
         chunk_positions = chunk_positions[:chunks_len]
         chunk_mineru_indices = chunk_mineru_indices[:chunks_len]
-    
+    while len(chunk_mineru_chunk_ids) < chunks_len:
+        chunk_mineru_chunk_ids.append([])
+    chunk_mineru_chunk_ids = chunk_mineru_chunk_ids[:chunks_len]
+
     valid_chunks = []
     valid_positions = []
     valid_indices = []
+    valid_chunk_ids = []
     for i, chunk_text in enumerate(chunks):
         if chunk_text and str(chunk_text).strip():
             valid_chunks.append(chunk_text)
             valid_positions.append(chunk_positions[i] if i < len(chunk_positions) else [])
             valid_indices.append(chunk_mineru_indices[i] if i < len(chunk_mineru_indices) else {'min': -1, 'max': -1})
-    
+            valid_chunk_ids.append(chunk_mineru_chunk_ids[i] if i < len(chunk_mineru_chunk_ids) else [])
+
     if len(valid_chunks) != len(chunks):
         chunks = valid_chunks
         chunk_positions = valid_positions
         chunk_mineru_indices = valid_indices
+        chunk_mineru_chunk_ids = valid_chunk_ids
 
     html_table_count = len(table_indices_in_mineru)
     mineru_only_tbls = tbls[html_table_count:] if html_table_count < len(tbls) else []
@@ -1206,9 +1228,11 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             all_elements.append({
                 'type': 'chunk',
                 'doc': chunk_doc,
-                'mineru_index': mineru_range['min'], 
+                'mineru_index': mineru_range['min'],
                 'mineru_range': mineru_range
             })
+        if i < len(chunk_mineru_chunk_ids) and chunk_mineru_chunk_ids[i]:
+            chunk_doc["mineru_section_chunk_ids"] = chunk_mineru_chunk_ids[i]
     
     if is_mineru_doc or is_mineru_img:
         for i, table_doc in enumerate(table_docs):

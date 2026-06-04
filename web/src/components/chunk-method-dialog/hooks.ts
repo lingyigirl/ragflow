@@ -16,6 +16,7 @@ const ParserListMap = new Map([
       'qa',
       'knowledge_graph',
       'hichunk',
+      'financial',
     ],
   ],
   [
@@ -113,6 +114,7 @@ const hideAutoKeywords = [
   'knowledge_graph',
   'tag',
   'hichunk',
+  'financial',
 ];
 
 export const useShowAutoKeywords = () => {

@@ -582,6 +582,8 @@ Example: A 1 KB message with 1024-dim embedding uses ~9 KB. The 5 MB default lim
     </p>`,
       hichunk: `<p>Best suited for <b>PDF, spreadsheet-as-PDF, and images</b> parsed through <b>MinerU</b>. After parsing, HiChunk applies heading-aware segmentation (with optional OpenAI-compatible inference).</p>
     <p>Configure the embedding model and PageRank at dataset level; for PDFs, pick layout recognition and MinerU options in the per-document parse dialog when needed.</p>`,
+      financial: `<p>Designed for <b>financial reports</b> parsed through <b>MinerU</b>. Extracts the table of contents to build a document structure tree, then applies TOC-driven chunking: tables are never split, and every chunk carries its full ancestor heading chain for precise retrieval.</p>
+    <p>Configure the embedding model and PageRank at dataset level. Supports PDF, DOCX, and images.</p>`,
       knowledgeGraph: `<p>Supported file formats are <b>DOCX, EXCEL, PPT, IMAGE, PDF, TXT, MD, JSON, EML</b>
 
 <p>This approach chunks files using the 'naive'/'General' method. It splits a document into segments and then combines adjacent segments until the token count exceeds the threshold specified by 'Chunk token number for text', at which point a chunk is created.</p>

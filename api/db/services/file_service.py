@@ -593,7 +593,7 @@ class FileService(CommonService):
 
     @staticmethod
     def get_parser(doc_type, filename, default):
-        if doc_type == FileType.VISUAL and default not in ("one", "hichunk"):
+        if doc_type == FileType.VISUAL and default not in ("one", "hichunk", "financial"):
             return ParserType.PICTURE.value
         if doc_type == FileType.AURAL:
             return ParserType.AUDIO.value

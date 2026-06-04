@@ -57,6 +57,10 @@ function HichunkConfiguration() {
   );
 }
 
+function FinancialConfiguration() {
+  return <HichunkConfiguration />;
+}
+
 const ConfigurationComponentMap = {
   [DocumentParserType.Naive]: NaiveConfiguration,
   [DocumentParserType.Qa]: QAConfiguration,
@@ -74,6 +78,7 @@ const ConfigurationComponentMap = {
   [DocumentParserType.Tag]: TagConfiguration,
   [DocumentParserType.KnowledgeGraph]: KnowledgeGraphConfiguration,
   [DocumentParserType.Hichunk]: HichunkConfiguration,
+  [DocumentParserType.Financial]: FinancialConfiguration,
 };
 
 function EmptyComponent() {
