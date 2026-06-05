@@ -709,16 +709,40 @@ class Dealer:
 
         for doc_id in doc_ids:
             doc_chunks = [ck for ck in chunks if ck["doc_id"] == doc_id]
+            kb_id = doc_chunks[0]["kb_id"]
+
+            cross_ref = None
+            try:
+                from api.db.services.document_service import DocumentService
+                docs = DocumentService.query(id=doc_id)
+                if docs:
+                    tree = docs[0].tree or {}
+                    cross_ref = tree.get("cross_ref", None)
+            except Exception:
+                pass
+
+            note_titles = []
+            table_titles = []
+            if cross_ref:
+                note_titles = list(cross_ref.get("note_to_table_mapping", {}).keys())
+                table_titles = cross_ref.get("main_tables", [])
+                table_titles = [t.get("title", "") for t in table_titles if isinstance(t, dict)]
+            if not table_titles:
+                table_titles = ["合并资产负债表", "合并利润表", "合并现金流量表",
+                              "资产负债表", "利润表", "现金流量表",
+                              "合并所有者权益变动表", "所有者权益变动表"]
+            if not note_titles:
+                note_titles = ["合并财务报表项目注释", "财务报表项目注释", "财务报表附注"]
+
             has_note = False
             for ck in doc_chunks:
                 content = ck.get("content_with_weight", "")
-                if any(kw in content for kw in ["合并财务报表项目注释", "财务报表项目注释", "财务报表附注"]):
+                if any(kw in content for kw in note_titles):
                     has_note = True
                     break
             if not has_note:
                 continue
 
-            kb_id = doc_chunks[0]["kb_id"]
             field_list = ["content_with_weight", "doc_type_kwd", "docnm_kwd", "important_kwd", "img_id", "position_int"]
             es_res = self.dataStore.search(
                 field_list, [],
@@ -726,10 +750,6 @@ class Dealer:
                 OrderByExpr(), 0, 128, idx_nms, [kb_id]
             )
             all_doc_chunks = self.dataStore.get_fields(es_res, field_list)
-
-            table_titles = ["合并资产负债表", "合并利润表", "合并现金流量表",
-                          "资产负债表", "利润表", "现金流量表",
-                          "合并所有者权益变动表", "所有者权益变动表"]
 
             existing_ids = set(ck["chunk_id"] for ck in chunks)
             vector_size = 1024

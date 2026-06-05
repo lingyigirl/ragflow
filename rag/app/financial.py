@@ -227,11 +227,11 @@ def label_to_depth(label, prev_depth):
     if re.match(r'^第[一二三四五六七八九十百千\d]+[节章条]', label):
         return 1
     if re.match(r'^#*\d+$', label):
-        return 2
+        return 1
     if re.match(r'^#*\d+\.\d+$', label):
-        return 3
+        return 2
     if re.match(r'^#*\d+\.\d+\.\d+$', label):
-        return 4
+        return 3
     if re.match(r'^[一二三四五六七八九十]+$', label):
         return 2
     if re.match(r'^[（(][一二三四五六七八九十]+[）)]$', label):
@@ -730,12 +730,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
             toc_start_idx = i
             break
-    if toc_start_idx < 0:
-        for i, section_item in enumerate(mineru_sections):
-            text = section_item[0] if len(section_item) >= 1 else ""
-            if re.search(r'第[一二三四五六七八九十百千\d]+节', text.strip()):
-                toc_start_idx = i - 1
-                break
     if toc_start_idx >= 0:
         toc_lines = []
         for i in range(toc_start_idx, min(toc_start_idx + 40, len(mineru_sections))):
@@ -792,7 +786,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
     if toc_start_idx < 0:
-        toc_start_idx = body_start_idx
+        toc_start_idx = 0
+        body_start_idx = 0
 
     cross_ref = None
     if toc_items and tenant_id:
