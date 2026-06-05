@@ -35,6 +35,17 @@ def get_section_title_level(text: str) -> int:
     if not text_stripped:
         return 0
 
+    if re.match(r'^#*\s*第[一二三四五六七八九十百千\d]+[节章条]', text_stripped):
+        return 1
+
+    m = re.match(r'^#*\s*(\d+\.\d+(?:\.\d+)*)', text_stripped)
+    if m:
+        return m.group(1).count('.') + 1
+
+    m = re.match(r'^#*\s*(\d+)(?![\d.])', text_stripped)
+    if m:
+        return 2
+
     level2_patterns = [
         r'^\d+[\.、](?!\d)',
         r'^[（(][一二三四五六七八九十]+[）)](?!\d)',
@@ -213,8 +224,14 @@ def _collapse_to_single_chunk(docs, doc, eng):
 def label_to_depth(label, prev_depth):
     if label is None:
         return prev_depth + 1
-    if re.match(r'^第[一二三四五六七八九十百千\d]+节', label):
+    if re.match(r'^第[一二三四五六七八九十百千\d]+[节章条]', label):
         return 1
+    if re.match(r'^#*\d+$', label):
+        return 2
+    if re.match(r'^#*\d+\.\d+$', label):
+        return 3
+    if re.match(r'^#*\d+\.\d+\.\d+$', label):
+        return 4
     if re.match(r'^[一二三四五六七八九十]+$', label):
         return 2
     if re.match(r'^[（(][一二三四五六七八九十]+[）)]$', label):
@@ -312,6 +329,46 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections, page_offset=0):
                 next_start = child.mineru_index_start
 
     _walk_start(toc_root, 0)
+
+    def _fill_inline_children(node):
+        if node.children:
+            for child in node.children:
+                _fill_inline_children(child)
+        if not node.children and node.mineru_index_start >= 0:
+            scan_end = len(mineru_sections)
+            if node.parent and node.parent.children:
+                siblings = node.parent.children
+                for si, sib in enumerate(siblings):
+                    if sib is node and si + 1 < len(siblings):
+                        scan_end = siblings[si + 1].mineru_index_start
+                        break
+            headings = []
+            for i in range(node.mineru_index_start + 1, scan_end):
+                item = mineru_sections[i]
+                text = item[0] if len(item) >= 1 else ""
+                lvl = item[2] if len(item) >= 3 else get_section_title_level(text)
+                if lvl > 0:
+                    headings.append((i, text.strip(), lvl))
+            if headings:
+                child_nodes = []
+                stack = [TocNode(title="__leaf_root__", depth=node.depth)]
+                base_depth = node.depth
+                for idx, h_text, h_lvl in headings:
+                    mapped_depth = base_depth + h_lvl
+                    child = TocNode(title=h_text, depth=mapped_depth, page_start=0)
+                    child.mineru_index_start = idx
+                    while stack and stack[-1].depth >= mapped_depth:
+                        stack.pop()
+                    stack[-1].children.append(child)
+                    child.parent = stack[-1]
+                    stack.append(child)
+                    child_nodes.append(child)
+                if child_nodes:
+                    node.children = child_nodes
+                    for child in node.children:
+                        _fill_inline_children(child)
+
+    _fill_inline_children(toc_root)
 
     def _walk_end(node):
         for i, child in enumerate(node.children):
@@ -795,10 +852,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         chunks_raw = [{
             "content": '\n'.join([
                 item[0] if len(item) >= 1 else str(item)
-                for item in mineru_sections[body_start_idx:]
+                for item in mineru_sections
             ]),
             "parent_chain": [],
-            "mineru_range": (body_start_idx, len(mineru_sections))
+            "mineru_range": (0, len(mineru_sections))
         }]
 
     if callback:
@@ -840,14 +897,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if not chunks:
         all_lines = []
         all_poss = []
-        for line_idx in range(body_start_idx, len(sections)):
-            section_item = sections[line_idx]
+        for section_item in sections:
             if len(section_item) >= 1:
                 all_lines.append(str(section_item[0]))
             if len(section_item) > 2 and section_item[2]:
                 all_poss.extend(section_item[2])
-        prefix = " > ".join(toc_root.title) + "\n" if toc_root.title != "root" else ""
-        chunks = [prefix + '\n'.join(all_lines)]
+        chunks = ['\n'.join(all_lines)]
         chunk_positions = [all_poss]
 
     html_table_count = len(table_indices_in_mineru)
