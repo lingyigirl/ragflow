@@ -1,3 +1,4 @@
+import asyncio
 import copy
 import re
 import os
@@ -272,7 +273,7 @@ def build_tree_from_triples(items):
             title=item.get("title", ""),
             label=item.get("label"),
             depth=depth,
-            page_start=item.get("page", 0),
+            page_start=0,
             contains_table=item.get("contains_table", False)
         )
         while stack and stack[-1].depth >= node.depth:
@@ -304,22 +305,13 @@ def _find_title_in_sections(title, sections, start_idx=0):
     return -1
 
 
-def _fix_toc_with_inline_titles(toc_root, mineru_sections, page_offset=0):
+def _fix_toc_with_inline_titles(toc_root, mineru_sections):
     def _walk_start(node, start_search_idx):
         if node.title != "root":
             idx = _find_title_in_sections(node.title, mineru_sections, start_search_idx)
             if idx >= 0:
                 node.mineru_index_start = idx
             else:
-                estimated_page = node.page_start + page_offset
-                for i in range(start_search_idx, len(mineru_sections)):
-                    item = mineru_sections[i]
-                    pos = item[1] if len(item) > 1 else None
-                    if pos and isinstance(pos, (list, tuple)) and len(pos) >= 5:
-                        if pos[0] >= estimated_page:
-                            node.mineru_index_start = i
-                            break
-            if node.mineru_index_start < 0:
                 node.mineru_index_start = start_search_idx
 
         next_start = node.mineru_index_start if node.mineru_index_start >= 0 else start_search_idx
@@ -382,6 +374,19 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections, page_offset=0):
     toc_root.mineru_index_end = len(mineru_sections)
     _walk_end(toc_root)
 
+    def _collect_nodes(node, result):
+        if node is not toc_root:
+            result.append(node)
+        for child in node.children:
+            _collect_nodes(child, result)
+
+    all_nodes = []
+    _collect_nodes(toc_root, all_nodes)
+    all_nodes.sort(key=lambda n: n.mineru_index_start)
+    for i in range(len(all_nodes) - 1):
+        if all_nodes[i].mineru_index_end < 0 or all_nodes[i].mineru_index_end > all_nodes[i + 1].mineru_index_start:
+            all_nodes[i].mineru_index_end = all_nodes[i + 1].mineru_index_start
+
     def _finalize_node_ends(node, fallback_end):
         for child in node.children:
             _finalize_node_ends(child, fallback_end)
@@ -395,9 +400,20 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections, page_offset=0):
     return toc_root
 
 
+def _tree_to_text(node, depth=1):
+    lines = []
+    indent = "    " * (depth - 1)
+    if node.title != "root":
+        suffix = " [表格]" if node.contains_table else ""
+        lines.append(f"{indent}{node.title}{suffix}")
+    for child in node.children:
+        lines.extend(_tree_to_text(child, depth + 1))
+    return lines
+
+
 def _parse_toc_text_with_llm(toc_text, llm_bundle):
-    prompt = f"""Extract the table of contents as a flat JSON array of triples (label, title, page).
-Each item: {{"label": "section_number_or_null", "title": "section_title", "page": page_number}}
+    prompt = f"""Extract the table of contents as a flat JSON array of (label, title) pairs.
+Each item: {{"label": "section_number_or_null", "title": "section_title"}}
 label is the numbering prefix like "第一节", "一", "（一）", "1.", or null for unnumbered items like table names.
 Mark financial statement tables with "contains_table": true.
 
@@ -406,7 +422,13 @@ TOC text:
 
 Output ONLY the JSON array, no other text:"""
 
-    answer, _ = llm_bundle.chat(prompt, [{"role": "user", "content": prompt}], {"temperature": 0.0})
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        answer, _ = loop.run_until_complete(
+            llm_bundle.async_chat("", [{"role": "user", "content": prompt}], {"temperature": 0.0}))
+    finally:
+        loop.close()
     try:
         answer = answer.strip()
         if answer.startswith("```"):
@@ -439,7 +461,13 @@ Output ONLY valid JSON:
   "note_to_table_mapping": {{"notes_node_title": ["table_title_1", "table_title_2"]}}
 }}"""
 
-    answer, _ = llm_bundle.chat(prompt, [{"role": "user", "content": prompt}], {"temperature": 0.0})
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        answer, _ = loop.run_until_complete(
+            llm_bundle.async_chat("", [{"role": "user", "content": prompt}], {"temperature": 0.0}))
+    finally:
+        loop.close()
     try:
         answer = answer.strip()
         if answer.startswith("```"):
@@ -477,7 +505,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
 
     if span_end <= node.mineru_index_start:
         if node.children:
-            child_chain = chain + ([node.title] if node.title else [])
+            child_chain = chain + [node.title] if node.title and node.title != "body" else chain
             results = []
             for child in node.children:
                 results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
@@ -487,7 +515,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
     sections = mineru_sections[node.mineru_index_start:span_end]
     if not sections:
         if node.children:
-            child_chain = chain + ([node.title] if node.title else [])
+            child_chain = chain + [node.title] if node.title and node.title != "body" else chain
             results = []
             for child in node.children:
                 results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
@@ -507,11 +535,11 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
 
     if has_table:
         merged = _merge_table_with_adjacent(sections)
-        return [{"content": merged, "parent_chain": chain, "mineru_range": span}]
+        return [{"content": merged, "parent_chain": chain + [node.title], "mineru_range": span}]
 
     if not content.strip():
         if node.children:
-            child_chain = chain + ([node.title] if node.title else [])
+            child_chain = chain + [node.title] if node.title and node.title != "body" else chain
             results = []
             for child in node.children:
                 results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
@@ -519,7 +547,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
         return []
 
     if estimate_tokens(content) < threshold:
-        return [{"content": content, "parent_chain": chain, "mineru_range": span}]
+        return [{"content": content, "parent_chain": chain + [node.title], "mineru_range": span}]
 
     if node.children:
         child_chain = chain + [node.title]
@@ -528,7 +556,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
             results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
         return results
 
-    return [{"content": content, "parent_chain": chain, "mineru_range": span}]
+    return [{"content": content, "parent_chain": chain + [node.title], "mineru_range": span}]
 
 
 def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
@@ -760,16 +788,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 continue
             level = section_item[2] if len(section_item) >= 3 else get_section_title_level(stripped)
             if level > 0:
-                pos_tag = section_item[1] if len(section_item) > 1 else None
-                page = 0
-                if pos_tag and isinstance(pos_tag, (list, tuple)) and len(pos_tag) >= 5:
-                    page = pos_tag[0]
                 raw_label = stripped.split()[0] if stripped.split() else ""
                 if raw_label.startswith("#"):
                     parts = stripped.split(None, 1)
                     raw_label = parts[1].split()[0] if len(parts) > 1 else raw_label.lstrip("#")
                 label = re.sub(r'[、，：:\.]$', '', raw_label)
-                toc_items.append({"label": label, "title": stripped, "page": page})
+                toc_items.append({"label": label, "title": stripped})
 
     toc_root = build_tree_from_triples(toc_items)
     toc_root.mineru_index_start = toc_start_idx if toc_start_idx >= 0 else 0
@@ -799,9 +823,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         except Exception:
             logging.exception("Failed to generate cross_ref (Financial).")
 
+    toc_text_output = '\n'.join(_tree_to_text(toc_root))
     tree_data = {
         "source": "toc_with_inline_fix" if toc_text else "inline_only",
-        "items": toc_items,
+        "toc": toc_text_output,
     }
     if cross_ref:
         tree_data["cross_ref"] = cross_ref
@@ -863,15 +888,13 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     chunks = []
     chunk_positions = []
+    chunk_chains = []
     chunk_mineru_indices = []
 
     for chunk_raw in chunks_raw:
         ck_content = chunk_raw["content"]
         ck_chain = chunk_raw.get("parent_chain", [])
         mineru_start, mineru_end = chunk_raw.get("mineru_range", (0, 0))
-
-        prefix = " > ".join(ck_chain) + "\n" if ck_chain else ""
-        chunk_text = prefix + ck_content
 
         mineru_indices_in_chunk = set()
         poss_list = []
@@ -891,8 +914,25 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         else:
             chunk_mineru_indices.append({'min': mineru_start, 'max': mineru_end})
 
-        chunks.append(chunk_text)
+        chunks.append(ck_content)
         chunk_positions.append(poss_list)
+        chunk_chains.append(ck_chain)
+
+    if doc_id and tenant_id and chunk_chains and sections:
+        try:
+            from api.db.db_models import MineruSection, DB
+            if MineruSection.table_exists():
+                with DB.connection_context():
+                    for ci in range(len(chunk_chains)):
+                        pchain = chunk_chains[ci] if ci < len(chunk_chains) else []
+                        if not pchain:
+                            continue
+                        ms, me = chunks_raw[ci].get("mineru_range", (0, 0)) if ci < len(chunks_raw) else (0, 0)
+                        sec_ids = [sections[li][3] for li in range(ms, me) if 0 <= li < len(sections) and len(sections[li]) > 3 and sections[li][3]]
+                        if sec_ids:
+                            MineruSection.update(parent_chain=pchain).where(MineruSection.chunk_id.in_(sec_ids)).execute()
+        except Exception:
+            logging.exception("Failed to update mineru_section parent_chain (Financial).")
 
     if not chunks:
         all_lines = []
@@ -904,6 +944,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 all_poss.extend(section_item[2])
         chunks = ['\n'.join(all_lines)]
         chunk_positions = [all_poss]
+        chunk_chains = [[]]
 
     html_table_count = len(table_indices_in_mineru)
     mineru_only_tbls = tbls[html_table_count:] if html_table_count < len(tbls) else []
@@ -948,6 +989,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunk_docs = tokenize_chunks(chunks, doc, eng)
 
     for i, chunk_doc in enumerate(chunk_docs):
+        if i < len(chunk_chains):
+            chunk_doc["parent_chain"] = chunk_chains[i]
         if i < len(chunk_positions):
             if chunk_positions[i]:
                 add_positions(chunk_doc, chunk_positions[i])
@@ -969,13 +1012,17 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunks_len = len(chunk_docs)
     positions_len = len(chunk_positions)
     indices_len = len(chunk_mineru_indices)
-    if chunks_len != positions_len or chunks_len != indices_len:
+    chains_len = len(chunk_chains)
+    if chunks_len != positions_len or chunks_len != indices_len or chunks_len != chains_len:
         while len(chunk_positions) < chunks_len:
             chunk_positions.append([])
         while len(chunk_mineru_indices) < chunks_len:
             chunk_mineru_indices.append({'min': -1, 'max': -1})
+        while len(chunk_chains) < chunks_len:
+            chunk_chains.append([])
         chunk_positions = chunk_positions[:chunks_len]
         chunk_mineru_indices = chunk_mineru_indices[:chunks_len]
+        chunk_chains = chunk_chains[:chunks_len]
 
     all_elements = []
     for i, chunk_doc in enumerate(chunk_docs):

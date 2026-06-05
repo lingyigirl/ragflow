@@ -736,14 +736,24 @@ class Dealer:
 
             has_note = False
             for ck in doc_chunks:
-                content = ck.get("content_with_weight", "")
-                if any(kw in content for kw in note_titles):
+                pchain = ck.get("parent_chain") or []
+                if isinstance(pchain, str):
+                    try:
+                        pchain = json.loads(pchain)
+                    except Exception:
+                        pchain = []
+                if any(any(nt in p for p in pchain) for nt in note_titles):
                     has_note = True
                     break
+                if not has_note:
+                    content = ck.get("content_with_weight", "")
+                    if any(kw in content for kw in note_titles):
+                        has_note = True
+                        break
             if not has_note:
                 continue
 
-            field_list = ["content_with_weight", "doc_type_kwd", "docnm_kwd", "important_kwd", "img_id", "position_int"]
+            field_list = ["content_with_weight", "doc_type_kwd", "docnm_kwd", "important_kwd", "img_id", "position_int", "parent_chain"]
             es_res = self.dataStore.search(
                 field_list, [],
                 {"doc_id": doc_id}, [],
@@ -757,8 +767,15 @@ class Dealer:
                 if cid in existing_ids:
                     continue
                 content = fields.get("content_with_weight", "")
+                pchain = fields.get("parent_chain") or []
+                if isinstance(pchain, str):
+                    try:
+                        pchain = json.loads(pchain)
+                    except Exception:
+                        pchain = []
                 if not any(title in content for title in table_titles):
-                    continue
+                    if not any(any(tt in p for p in pchain) for tt in table_titles):
+                        continue
 
                 d = {
                     "chunk_id": cid,
@@ -774,6 +791,7 @@ class Dealer:
                     "term_similarity": 0.0,
                     "vector": [0.0] * vector_size,
                     "positions": fields.get("position_int", []),
+                    "parent_chain": pchain,
                     "doc_type_kwd": fields.get("doc_type_kwd", "")
                 }
                 chunks.append(d)

@@ -126,8 +126,15 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
             break
 
     docs = DocumentService.get_by_ids([get_value(ck, "doc_id", "document_id") for ck in kbinfos["chunks"][:chunks_num]])
+    toc_map = {}
+    for d in docs:
+        if hasattr(d, 'tree') and d.tree and isinstance(d.tree, dict):
+            toc_text = d.tree.get("toc", "")
+            if toc_text:
+                toc_map[d.id] = toc_text
     docs = {d.id: d.meta_fields for d in docs}
 
+    toc_seen = set()
     def draw_node(k, line):
         if line is not None and not isinstance(line, str):
             line = str(line)
@@ -137,8 +144,12 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
 
     knowledges = []
     for i, ck in enumerate(kbinfos["chunks"][:chunks_num]):
+        doc_id = get_value(ck, "doc_id", "document_id")
         cnt = "\nID: {}".format(i if not hash_id else hash_str2int(get_value(ck, "id", "chunk_id"), 500))
         cnt += draw_node("Title", get_value(ck, "docnm_kwd", "document_name"))
+        if doc_id in toc_map and doc_id not in toc_seen:
+            toc_seen.add(doc_id)
+            cnt += "\n└── TOC:\n" + re.sub(r"^", "│  ", toc_map[doc_id], flags=re.MULTILINE)
         cnt += draw_node("URL", ck['url']) if "url" in ck else ""
         for k, v in docs.get(get_value(ck, "doc_id", "document_id"), {}).items():
             cnt += draw_node(k, v)

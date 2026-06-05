@@ -863,11 +863,12 @@ class MineruSection(DataBaseModel):
     table_footnote = JSONField(null=True) 
     table_body = LongTextField(null=True)
 
-    sub_type = CharField(max_length=50, null=True) 
-    list_items = JSONField(null=True) 
+    sub_type = CharField(max_length=50, null=True)
+    list_items = JSONField(null=True)
+    parent_chain = JSONField(null=True)
 
     class Meta:
-        db_table = "mineru_section" 
+        db_table = "mineru_section"
 
 
 class Dialog(DataBaseModel):
@@ -1499,6 +1500,10 @@ def migrate_db():
         pass
     try:
         migrate(migrator.add_column("evaluation_datasets", "status", IntegerField(null=False, default=1)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("mineru_section", "parent_chain", JSONField(null=True)))
     except Exception:
         pass
 
