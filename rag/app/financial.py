@@ -770,7 +770,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 page = 0
                 if pos_tag and isinstance(pos_tag, (list, tuple)) and len(pos_tag) >= 5:
                     page = pos_tag[0]
-                toc_items.append({"label": stripped.split()[0] if stripped.split() else "", "title": stripped, "page": page})
+                raw_label = stripped.split()[0] if stripped.split() else ""
+                if raw_label.startswith("#"):
+                    parts = stripped.split(None, 1)
+                    raw_label = parts[1].split()[0] if len(parts) > 1 else raw_label.lstrip("#")
+                label = re.sub(r'[、，：:\.]$', '', raw_label)
+                toc_items.append({"label": label, "title": stripped, "page": page})
 
     toc_root = build_tree_from_triples(toc_items)
     toc_root.mineru_index_start = toc_start_idx if toc_start_idx >= 0 else 0
