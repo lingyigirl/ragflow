@@ -460,7 +460,7 @@ async def build_chunks(task, progress_callback):
     if task["size"] > settings.DOC_MAXIMUM_SIZE:
         set_progress(task["id"], prog=-1, msg="File size exceeds( <= %dMb )" %
                                               (int(settings.DOC_MAXIMUM_SIZE / 1024 / 1024)))
-        return []
+        return
 
     parser_id = str(task.get("parser_id") or "").strip().lower()
     logging.info(
