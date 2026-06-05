@@ -129,7 +129,7 @@ FAILED_TASKS = 0
 CURRENT_TASKS = {}
 
 MAX_CONCURRENT_TASKS = int(os.environ.get('MAX_CONCURRENT_TASKS', "5"))
-MAX_CONCURRENT_CHUNK_BUILDERS = int(os.environ.get('MAX_CONCURRENT_CHUNK_BUILDERS', "1"))
+MAX_CONCURRENT_CHUNK_BUILDERS = int(os.environ.get('MAX_CONCURRENT_CHUNK_BUILDERS', "5"))
 MAX_CONCURRENT_MINIO = int(os.environ.get('MAX_CONCURRENT_MINIO', '10'))
 task_limiter = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 chunk_limiter = asyncio.Semaphore(MAX_CONCURRENT_CHUNK_BUILDERS)
@@ -533,227 +533,210 @@ async def build_chunks(task, progress_callback):
         logging.exception("Chunking {}/{} got exception".format(task["location"], task["name"]))
         raise
 
-    docs = []
     doc = {
         "doc_id": task["doc_id"],
         "kb_id": str(task["kb_id"])
     }
     if task["pagerank"]:
         doc[PAGERANK_FLD] = int(task["pagerank"])
-    st = timer()
 
-    @timeout(60)
-    async def upload_to_minio(document, chunk):
-        try:
-            d = copy.deepcopy(document)
-            d.update(chunk)
-            d["id"] = xxhash.xxh64(
-                (chunk["content_with_weight"] + str(d["doc_id"])).encode("utf-8", "surrogatepass")).hexdigest()
-            d["create_time"] = str(datetime.now()).replace("T", " ")[:19]
-            d["create_timestamp_flt"] = datetime.now().timestamp()
-            if not d.get("image"):
-                _ = d.pop("image", None)
-                d["img_id"] = ""
-                docs.append(d)
-                return
-            await image2id(d, partial(settings.STORAGE_IMPL.put, tenant_id=task["tenant_id"]), d["id"], task["kb_id"])
-            docs.append(d)
-        except Exception:
-            logging.exception(
-                "Saving image of chunk {}/{}/{} got exception".format(task["location"], task["name"], d["id"]))
-            raise
+    BATCH = getattr(settings, 'DOC_BULK_SIZE', 64)
+    total_chunks = len(cks)
+    batch_ranges = [(i, min(i + BATCH, total_chunks)) for i in range(0, total_chunks, BATCH)]
 
-    tasks = []
-    for ck in cks:
-        tasks.append(asyncio.create_task(upload_to_minio(doc, ck)))
-    try:
-        await asyncio.gather(*tasks, return_exceptions=False)
-    except Exception as e:
-        logging.error(f"MINIO PUT({task['name']}) got exception: {e}")
-        for t in tasks:
-            t.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-        raise
-
-    el = timer() - st
-    logging.info("MINIO PUT({}) cost {:.3f} s".format(task["name"], el))
-
-    if task["parser_config"].get("auto_keywords", 0):
+    for batch_idx, (bs, be) in enumerate(batch_ranges):
+        batch_cks = cks[bs:be]
+        batch_docs = []
         st = timer()
-        progress_callback(msg="Start to generate keywords for every chunk ...")
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
 
-        async def doc_keyword_extraction(chat_mdl, d, topn):
-            cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "keywords", {"topn": topn})
-            if not cached:
-                if has_canceled(task["id"]):
-                    progress_callback(-1, msg="Task has been canceled.")
+        @timeout(60)
+        async def upload_to_minio(document, chunk):
+            try:
+                d = copy.deepcopy(document)
+                d.update(chunk)
+                d["id"] = xxhash.xxh64(
+                    (chunk["content_with_weight"] + str(d["doc_id"])).encode("utf-8", "surrogatepass")).hexdigest()
+                d["create_time"] = str(datetime.now()).replace("T", " ")[:19]
+                d["create_timestamp_flt"] = datetime.now().timestamp()
+                if not d.get("image"):
+                    _ = d.pop("image", None)
+                    d["img_id"] = ""
+                    batch_docs.append(d)
                     return
-                async with chat_limiter:
-                    cached = await keyword_extraction(chat_mdl, d["content_with_weight"], topn)
-                set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "keywords", {"topn": topn})
-            if cached:
-                d["important_kwd"] = cached.split(",")
-                d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
-            return
+                await image2id(d, partial(settings.STORAGE_IMPL.put, tenant_id=task["tenant_id"]), d["id"], task["kb_id"])
+                batch_docs.append(d)
+            except Exception:
+                logging.exception(
+                    "Saving image of chunk {}/{}/{} got exception".format(task["location"], task["name"], d["id"]))
+                raise
 
-        tasks = []
-        for d in docs:
-            tasks.append(
-                asyncio.create_task(doc_keyword_extraction(chat_mdl, d, task["parser_config"]["auto_keywords"])))
+        tasks = [asyncio.create_task(upload_to_minio(doc, ck)) for ck in batch_cks]
         try:
             await asyncio.gather(*tasks, return_exceptions=False)
         except Exception as e:
-            logging.error("Error in doc_keyword_extraction: {}".format(e))
+            logging.error(f"MINIO PUT({task['name']}) got exception: {e}")
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
-        progress_callback(msg="Keywords generation {} chunks completed in {:.2f}s".format(len(docs), timer() - st))
+        logging.info("MINIO PUT({}) batch {}/{} cost {:.3f} s".format(task["name"], batch_idx + 1, len(batch_ranges), timer() - st))
 
-    if task["parser_config"].get("auto_questions", 0):
-        st = timer()
-        progress_callback(msg="Start to generate questions for every chunk ...")
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+        if task["parser_config"].get("auto_keywords", 0):
+            chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
 
-        async def doc_question_proposal(chat_mdl, d, topn):
-            cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "question", {"topn": topn})
-            if not cached:
-                if has_canceled(task["id"]):
-                    progress_callback(-1, msg="Task has been canceled.")
-                    return
-                async with chat_limiter:
-                    cached = await question_proposal(chat_mdl, d["content_with_weight"], topn)
-                set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "question", {"topn": topn})
-            if cached:
-                d["question_kwd"] = cached.split("\n")
-                d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
-
-        tasks = []
-        for d in docs:
-            tasks.append(
-                asyncio.create_task(doc_question_proposal(chat_mdl, d, task["parser_config"]["auto_questions"])))
-        try:
-            await asyncio.gather(*tasks, return_exceptions=False)
-        except Exception as e:
-            logging.error("Error in doc_question_proposal", exc_info=e)
-            for t in tasks:
-                t.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            raise
-        progress_callback(msg="Question generation {} chunks completed in {:.2f}s".format(len(docs), timer() - st))
-
-    if task["parser_config"].get("enable_metadata", False) and task["parser_config"].get("metadata"):
-        st = timer()
-        progress_callback(msg="Start to generate meta-data for every chunk ...")
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
-
-        async def gen_metadata_task(chat_mdl, d):
-            cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "metadata",
-                                   task["parser_config"]["metadata"])
-            if not cached:
-                if has_canceled(task["id"]):
-                    progress_callback(-1, msg="Task has been canceled.")
-                    return
-                async with chat_limiter:
-                    cached = await gen_metadata(chat_mdl,
-                                                metadata_schema(task["parser_config"]["metadata"]),
-                                                d["content_with_weight"])
-                set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "metadata",
-                              task["parser_config"]["metadata"])
-            if cached:
-                d["metadata_obj"] = cached
-
-        tasks = []
-        for d in docs:
-            tasks.append(asyncio.create_task(gen_metadata_task(chat_mdl, d)))
-        try:
-            await asyncio.gather(*tasks, return_exceptions=False)
-        except Exception as e:
-            logging.error("Error in doc_question_proposal", exc_info=e)
-            for t in tasks:
-                t.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            raise
-        metadata = {}
-        for doc in docs:
-            metadata = update_metadata_to(metadata, doc["metadata_obj"])
-            del doc["metadata_obj"]
-        if metadata:
-            e, doc = DocumentService.get_by_id(task["doc_id"])
-            if e:
-                if isinstance(doc.meta_fields, str):
-                    doc.meta_fields = json.loads(doc.meta_fields)
-                metadata = update_metadata_to(metadata, doc.meta_fields)
-                DocumentService.update_by_id(task["doc_id"], {"meta_fields": metadata})
-        progress_callback(msg="Question generation {} chunks completed in {:.2f}s".format(len(docs), timer() - st))
-
-    if task["kb_parser_config"].get("tag_kb_ids", []):
-        progress_callback(msg="Start to tag for every chunk ...")
-        kb_ids = task["kb_parser_config"]["tag_kb_ids"]
-        tenant_id = task["tenant_id"]
-        topn_tags = task["kb_parser_config"].get("topn_tags", 3)
-        S = 1000
-        st = timer()
-        examples = []
-        all_tags = get_tags_from_cache(kb_ids)
-        if not all_tags:
-            all_tags = settings.retriever.all_tags_in_portion(tenant_id, kb_ids, S)
-            set_tags_to_cache(kb_ids, all_tags)
-        else:
-            all_tags = json.loads(all_tags)
-
-        chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
-
-        docs_to_tag = []
-        for d in docs:
-            task_canceled = has_canceled(task["id"])
-            if task_canceled:
-                progress_callback(-1, msg="Task has been canceled.")
-                return None
-            if settings.retriever.tag_content(tenant_id, kb_ids, d, all_tags, topn_tags=topn_tags, S=S) and len(
-                    d[TAG_FLD]) > 0:
-                examples.append({"content": d["content_with_weight"], TAG_FLD: d[TAG_FLD]})
-            else:
-                docs_to_tag.append(d)
-
-        async def doc_content_tagging(chat_mdl, d, topn_tags):
-            cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], all_tags, {"topn": topn_tags})
-            if not cached:
-                if has_canceled(task["id"]):
-                    progress_callback(-1, msg="Task has been canceled.")
-                    return
-                picked_examples = random.choices(examples, k=2) if len(examples) > 2 else examples
-                if not picked_examples:
-                    picked_examples.append({"content": "This is an example", TAG_FLD: {'example': 1}})
-                async with chat_limiter:
-                    cached = await content_tagging(
-                        chat_mdl,
-                        d["content_with_weight"],
-                        all_tags,
-                        picked_examples,
-                        topn_tags,
-                    )
+            async def doc_keyword_extraction(chat_mdl, d, topn):
+                cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "keywords", {"topn": topn})
+                if not cached:
+                    if has_canceled(task["id"]):
+                        progress_callback(-1, msg="Task has been canceled.")
+                        return
+                    async with chat_limiter:
+                        cached = await keyword_extraction(chat_mdl, d["content_with_weight"], topn)
+                    set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "keywords", {"topn": topn})
                 if cached:
-                    cached = json.dumps(cached)
-            if cached:
-                set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, all_tags, {"topn": topn_tags})
-                d[TAG_FLD] = json.loads(cached)
+                    d["important_kwd"] = cached.split(",")
+                    d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
+                return
 
-        tasks = []
-        for d in docs_to_tag:
-            tasks.append(asyncio.create_task(doc_content_tagging(chat_mdl, d, topn_tags)))
-        try:
-            await asyncio.gather(*tasks, return_exceptions=False)
-        except Exception as e:
-            logging.error("Error tagging docs: {}".format(e))
-            for t in tasks:
-                t.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            raise
-        progress_callback(msg="Tagging {} chunks completed in {:.2f}s".format(len(docs), timer() - st))
+            tasks = [asyncio.create_task(doc_keyword_extraction(chat_mdl, d, task["parser_config"]["auto_keywords"])) for d in batch_docs]
+            try:
+                await asyncio.gather(*tasks, return_exceptions=False)
+            except Exception as e:
+                logging.error("Error in doc_keyword_extraction: {}".format(e))
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
 
-    return docs
+        if task["parser_config"].get("auto_questions", 0):
+            chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+
+            async def doc_question_proposal(chat_mdl, d, topn):
+                cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "question", {"topn": topn})
+                if not cached:
+                    if has_canceled(task["id"]):
+                        progress_callback(-1, msg="Task has been canceled.")
+                        return
+                    async with chat_limiter:
+                        cached = await question_proposal(chat_mdl, d["content_with_weight"], topn)
+                    set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "question", {"topn": topn})
+                if cached:
+                    d["question_kwd"] = cached.split("\n")
+                    d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
+
+            tasks = [asyncio.create_task(doc_question_proposal(chat_mdl, d, task["parser_config"]["auto_questions"])) for d in batch_docs]
+            try:
+                await asyncio.gather(*tasks, return_exceptions=False)
+            except Exception as e:
+                logging.error("Error in doc_question_proposal", exc_info=e)
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+
+        if task["parser_config"].get("enable_metadata", False) and task["parser_config"].get("metadata"):
+            chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+
+            async def gen_metadata_task(chat_mdl, d):
+                cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "metadata",
+                                       task["parser_config"]["metadata"])
+                if not cached:
+                    if has_canceled(task["id"]):
+                        progress_callback(-1, msg="Task has been canceled.")
+                        return
+                    async with chat_limiter:
+                        cached = await gen_metadata(chat_mdl,
+                                                    metadata_schema(task["parser_config"]["metadata"]),
+                                                    d["content_with_weight"])
+                    set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, "metadata",
+                                  task["parser_config"]["metadata"])
+                if cached:
+                    d["metadata_obj"] = cached
+
+            tasks = [asyncio.create_task(gen_metadata_task(chat_mdl, d)) for d in batch_docs]
+            try:
+                await asyncio.gather(*tasks, return_exceptions=False)
+            except Exception as e:
+                logging.error("Error in doc_question_proposal", exc_info=e)
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+            metadata = {}
+            for d in batch_docs:
+                metadata = update_metadata_to(metadata, d["metadata_obj"])
+                del d["metadata_obj"]
+            if metadata:
+                e, doc = DocumentService.get_by_id(task["doc_id"])
+                if e:
+                    if isinstance(doc.meta_fields, str):
+                        doc.meta_fields = json.loads(doc.meta_fields)
+                    metadata = update_metadata_to(metadata, doc.meta_fields)
+                    DocumentService.update_by_id(task["doc_id"], {"meta_fields": metadata})
+
+        if task["kb_parser_config"].get("tag_kb_ids", []):
+            kb_ids = task["kb_parser_config"]["tag_kb_ids"]
+            tenant_id = task["tenant_id"]
+            topn_tags = task["kb_parser_config"].get("topn_tags", 3)
+            S = 1000
+            examples = []
+            all_tags = get_tags_from_cache(kb_ids)
+            if not all_tags:
+                all_tags = settings.retriever.all_tags_in_portion(tenant_id, kb_ids, S)
+                set_tags_to_cache(kb_ids, all_tags)
+            else:
+                all_tags = json.loads(all_tags)
+
+            chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+
+            docs_to_tag = []
+            for d in batch_docs:
+                task_canceled = has_canceled(task["id"])
+                if task_canceled:
+                    progress_callback(-1, msg="Task has been canceled.")
+                    return
+                if settings.retriever.tag_content(tenant_id, kb_ids, d, all_tags, topn_tags=topn_tags, S=S) and len(
+                        d[TAG_FLD]) > 0:
+                    examples.append({"content": d["content_with_weight"], TAG_FLD: d[TAG_FLD]})
+                else:
+                    docs_to_tag.append(d)
+
+            async def doc_content_tagging(chat_mdl, d, topn_tags):
+                cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], all_tags, {"topn": topn_tags})
+                if not cached:
+                    if has_canceled(task["id"]):
+                        progress_callback(-1, msg="Task has been canceled.")
+                        return
+                    picked_examples = random.choices(examples, k=2) if len(examples) > 2 else examples
+                    if not picked_examples:
+                        picked_examples.append({"content": "This is an example", TAG_FLD: {'example': 1}})
+                    async with chat_limiter:
+                        cached = await content_tagging(
+                            chat_mdl,
+                            d["content_with_weight"],
+                            all_tags,
+                            picked_examples,
+                            topn_tags,
+                        )
+                    if cached:
+                        cached = json.dumps(cached)
+                if cached:
+                    set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, all_tags, {"topn": topn_tags})
+                    d[TAG_FLD] = json.loads(cached)
+
+            tasks = [asyncio.create_task(doc_content_tagging(chat_mdl, d, topn_tags)) for d in docs_to_tag]
+            try:
+                await asyncio.gather(*tasks, return_exceptions=False)
+            except Exception as e:
+                logging.error("Error tagging docs: {}".format(e))
+                for t in tasks:
+                    t.cancel()
+                await asyncio.gather(*tasks, return_exceptions=True)
+                raise
+
+        yield batch_docs
+
+    return
 
 
 def build_TOC(task, docs, progress_callback):
@@ -1317,7 +1300,18 @@ async def do_handle_task(task):
         should_try_voucher_classify = bool(task_parser_config.get("enable_voucher_type_classify", False))
         should_try_auto_standard_filename = bool(task_parser_config.get("enable_auto_standard_filename", False))
         start_ts = timer()
-        chunks = await build_chunks(task, progress_callback)
+        chunks = []
+        token_count = 0
+        vector_size = 0
+        async for batch_docs in build_chunks(task, progress_callback):
+            chunks.extend(batch_docs)
+            try:
+                batch_tk, vector_size = await embedding(batch_docs, embedding_model, task_parser_config, progress_callback)
+                token_count += batch_tk
+            except Exception as e:
+                error_message = "Generate embedding error:{}".format(str(e))
+                progress_callback(-1, error_message)
+                logging.exception(error_message)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
         if not chunks:
             if should_try_voucher_classify:
@@ -1327,15 +1321,6 @@ async def do_handle_task(task):
             progress_callback(1., msg=f"No chunk built from {task_document_name}")
             return
         progress_callback(msg="Generate {} chunks".format(len(chunks)))
-        start_ts = timer()
-        try:
-            token_count, vector_size = await embedding(chunks, embedding_model, task_parser_config, progress_callback)
-        except Exception as e:
-            error_message = "Generate embedding error:{}".format(str(e))
-            progress_callback(-1, error_message)
-            logging.exception(error_message)
-            token_count = 0
-            raise
         progress_message = "Embedding chunks ({:.2f}s)".format(timer() - start_ts)
         logging.info(progress_message)
         progress_callback(msg=progress_message)
