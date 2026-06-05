@@ -806,6 +806,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     chunks = []
     chunk_positions = []
+    chunk_mineru_indices = []
 
     for chunk_raw in chunks_raw:
         ck_content = chunk_raw["content"]
@@ -815,12 +816,23 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         prefix = " > ".join(ck_chain) + "\n" if ck_chain else ""
         chunk_text = prefix + ck_content
 
+        mineru_indices_in_chunk = set()
         poss_list = []
         for line_idx in range(mineru_start, mineru_end):
             if 0 <= line_idx < len(sections):
                 section_item = sections[line_idx]
+                if len(section_item) > 1:
+                    mineru_indices_in_chunk.add(section_item[1])
                 if len(section_item) > 2 and section_item[2]:
                     poss_list.extend(section_item[2])
+
+        if mineru_indices_in_chunk:
+            chunk_mineru_indices.append({
+                'min': min(mineru_indices_in_chunk),
+                'max': max(mineru_indices_in_chunk)
+            })
+        else:
+            chunk_mineru_indices.append({'min': mineru_start, 'max': mineru_end})
 
         chunks.append(chunk_text)
         chunk_positions.append(poss_list)
@@ -899,17 +911,27 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 for pos in chunk_doc["position_int"]
             ]
 
+    chunks_len = len(chunk_docs)
+    positions_len = len(chunk_positions)
+    indices_len = len(chunk_mineru_indices)
+    if chunks_len != positions_len or chunks_len != indices_len:
+        while len(chunk_positions) < chunks_len:
+            chunk_positions.append([])
+        while len(chunk_mineru_indices) < chunks_len:
+            chunk_mineru_indices.append({'min': -1, 'max': -1})
+        chunk_positions = chunk_positions[:chunks_len]
+        chunk_mineru_indices = chunk_mineru_indices[:chunks_len]
+
     all_elements = []
     for i, chunk_doc in enumerate(chunk_docs):
-        sort_idx = i
-        if i < len(chunks_raw):
-            sort_idx = chunks_raw[i].get("mineru_range", (i, i))[0]
-        all_elements.append({
-            'type': 'chunk',
-            'doc': chunk_doc,
-            'mineru_index': sort_idx,
-            'mineru_range': {'min': sort_idx, 'max': sort_idx}
-        })
+        if i < len(chunk_mineru_indices):
+            mineru_range = chunk_mineru_indices[i]
+            all_elements.append({
+                'type': 'chunk',
+                'doc': chunk_doc,
+                'mineru_index': mineru_range['min'],
+                'mineru_range': mineru_range
+            })
 
     for ti, table_doc in enumerate(table_docs):
         table_sort_idx = table_doc_orders[ti] if ti < len(table_doc_orders) else 999999
