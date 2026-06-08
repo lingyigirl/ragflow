@@ -261,6 +261,7 @@ class TocNode:
         self.mineru_index_start = -1
         self.mineru_index_end = -1
         self.contains_table = contains_table
+        self.has_embedded_parent_title = False
 
 
 def build_tree_from_triples(items):
@@ -372,6 +373,14 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
             )
 
             child.mineru_index_start = idx
+
+            if node.title and node.title != "__leaf_root__":
+                section_text = mineru_sections[idx][0] if idx < len(mineru_sections) and len(mineru_sections[idx]) >= 1 else ""
+                if section_text:
+                    norm_section = normalize_text_for_title(section_text)
+                    norm_parent = normalize_text_for_title(node.title)
+                    if norm_section.startswith(norm_parent) and norm_section != norm_parent:
+                        child.has_embedded_parent_title = True
 
             while stack and stack[-1].depth >= h_lvl:
                 stack.pop()
@@ -625,6 +634,28 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
                 results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
             return results
         return []
+
+    if node.has_embedded_parent_title and chain:
+        parent_title = chain[-1]
+        norm_parent = normalize_text_for_title(parent_title)
+        for si in range(len(sections)):
+            stext = sections[si][0] if len(sections[si]) >= 1 else ""
+            if not stext.strip():
+                continue
+            norm_stext = normalize_text_for_title(stext)
+            if norm_stext.startswith(norm_parent) and norm_stext != norm_parent:
+                n_chars = 0
+                cut = 0
+                for ci, ch in enumerate(stext):
+                    if not ch.isspace():
+                        n_chars += 1
+                    if n_chars >= len(norm_parent):
+                        cut = ci + 1
+                        break
+                sec_list = list(sections[si])
+                sec_list[0] = stext[cut:].lstrip()
+                sections[si] = tuple(sec_list)
+            break
 
     content = '\n'.join([
         item[0] if len(item) >= 1 else str(item)
@@ -885,11 +916,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             toc_end_idx = i + 1
         toc_text = '\n'.join(toc_lines)
         toc_body_boundary = toc_end_idx
-        body_start_idx = toc_end_idx
         toc_section_indices = list(range(toc_start_idx, toc_body_boundary))
     else:
         toc_body_boundary = body_start_idx
-    if body_start_idx <= 0:
+    if toc_start_idx < 0:
         for i, section_item in enumerate(mineru_sections):
             text = section_item[0] if len(section_item) >= 1 else ""
             if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', text.strip()):
@@ -948,12 +978,25 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     # logging.info("[Financial] toc_items source=%s count=%s first5=%s", source, len(toc_items), toc_items[:5])
     toc_root = build_tree_from_triples(toc_items)
 #
-    toc_root.mineru_index_start = body_start_idx if toc_start_idx >= 0 else 0
+    toc_root.mineru_index_start = toc_body_boundary if toc_start_idx >= 0 else 0
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
     if toc_start_idx < 0:
         toc_start_idx = 0
         body_start_idx = 0
+
+    if toc_start_idx >= 0 and toc_items:
+        first_title = toc_items[0].get("title", "")
+        if first_title:
+            clean_title = re.sub(r'\s*[\.….]*\s*\d{1,4}\s*$', '', first_title).strip()
+            found = _find_title_in_sections(clean_title, mineru_sections, toc_body_boundary)
+            if found < 0:
+                found = _find_title_in_sections(clean_title, mineru_sections, 0)
+            body_start_idx = found if found >= 0 else toc_body_boundary
+        else:
+            body_start_idx = toc_body_boundary
+    elif toc_start_idx >= 0:
+        body_start_idx = toc_body_boundary
 
     cross_ref = None
     if toc_items and tenant_id:
