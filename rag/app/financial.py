@@ -977,13 +977,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     source = "llm" if toc_text else "inline"
     # logging.info("[Financial] toc_items source=%s count=%s first5=%s", source, len(toc_items), toc_items[:5])
     toc_root = build_tree_from_triples(toc_items)
-#
-    toc_root.mineru_index_start = toc_body_boundary if toc_start_idx >= 0 else 0
-
-    _fix_toc_with_inline_titles(toc_root, mineru_sections)
-    if toc_start_idx < 0:
-        toc_start_idx = 0
-        body_start_idx = 0
 
     if toc_start_idx >= 0 and toc_items:
         first_title = toc_items[0].get("title", "")
@@ -997,6 +990,17 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             body_start_idx = toc_body_boundary
     elif toc_start_idx >= 0:
         body_start_idx = toc_body_boundary
+
+    if toc_start_idx >= 0:
+        search_start = body_start_idx if 0 <= body_start_idx < len(mineru_sections) else 0
+        toc_root.mineru_index_start = search_start
+    else:
+        toc_root.mineru_index_start = 0
+
+    _fix_toc_with_inline_titles(toc_root, mineru_sections)
+    if toc_start_idx < 0:
+        toc_start_idx = 0
+        body_start_idx = 0
 
     cross_ref = None
     if toc_items and tenant_id:

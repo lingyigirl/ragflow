@@ -2446,6 +2446,99 @@ async def mineru_section_chunk_ids():
         return server_error_response(e)
 
 
+@manager.route("/mineru_section/get_field", methods=["POST"])
+@api_key_required
+async def get_mineru_section_field():
+    try:
+        req = await get_request_json()
+
+        raw_chunk = req.get("chunk_id")
+        raw_field = req.get("field_name")
+
+        if not raw_chunk:
+            return get_json_result(data=False, message="chunk_id 不能为空", code=RetCode.ARGUMENT_ERROR)
+        if not raw_field:
+            return get_json_result(data=False, message="field_name 不能为空", code=RetCode.ARGUMENT_ERROR)
+
+        is_multi_chunk = isinstance(raw_chunk, list)
+        is_multi_field = isinstance(raw_field, list)
+
+        chunk_ids = []
+        if is_multi_chunk:
+            for c in raw_chunk:
+                cid = (str(c or "")).strip()
+                if cid:
+                    chunk_ids.append(cid)
+        else:
+            cid = (str(raw_chunk or "")).strip()
+            if cid:
+                chunk_ids.append(cid)
+
+        if not chunk_ids:
+            return get_json_result(data=False, message="chunk_id 不能为空", code=RetCode.ARGUMENT_ERROR)
+
+        field_names = []
+        if is_multi_field:
+            for f in raw_field:
+                fn = (str(f or "")).strip().lower()
+                if fn:
+                    field_names.append(fn)
+        else:
+            fn = (str(raw_field or "")).strip().lower()
+            if fn:
+                field_names.append(fn)
+
+        if not field_names:
+            return get_json_result(data=False, message="field_name 不能为空", code=RetCode.ARGUMENT_ERROR)
+
+        allowed_fields = {
+            "type", "text", "bbox", "page_idx", "text_level",
+            "img_path", "table_caption", "table_footnote", "table_body",
+            "sub_type", "list_items", "parent_chain", "kb_id", "doc_id",
+        }
+        for fn in field_names:
+            if fn not in allowed_fields:
+                return get_json_result(
+                    data=False,
+                    message=f"field_name 不合法：{fn}，允许的字段：{', '.join(sorted(allowed_fields))}",
+                    code=RetCode.ARGUMENT_ERROR,
+                )
+
+        missing_chunk_ids = []
+        chunk_data = {}
+        for cid in chunk_ids:
+            section = DocumentService.get_mineru_section_by_chunk_id(cid)
+            if not section:
+                missing_chunk_ids.append(cid)
+                continue
+            if is_multi_field:
+                chunk_data[cid] = {fn: getattr(section, fn, None) for fn in field_names}
+            else:
+                chunk_data[cid] = getattr(section, field_names[0], None)
+
+        if not is_multi_chunk and not is_multi_field:
+            if missing_chunk_ids:
+                return get_json_result(data=False, message="未找到对应 chunk_id 的 mineru_section 记录", code=RetCode.NOT_FOUND)
+            cid = chunk_ids[0]
+            return get_json_result(data={
+                "chunk_id": cid,
+                "field_name": field_names[0],
+                "field_value": chunk_data.get(cid),
+            })
+
+        result = {}
+        if is_multi_chunk:
+            result["chunk_ids"] = chunk_ids
+        if is_multi_field:
+            result["field_names"] = field_names
+        result["results"] = chunk_data
+        if missing_chunk_ids:
+            result["missing_chunk_ids"] = missing_chunk_ids
+        return get_json_result(data=result)
+    except Exception as e:
+        return server_error_response(e)
+
+
 # 新增凭证列表
 @manager.route("/identity_list", methods=["POST"])
 @login_required

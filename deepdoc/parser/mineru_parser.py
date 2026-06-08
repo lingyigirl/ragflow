@@ -979,25 +979,25 @@ class MinerUParser(RAGFlowPdfParser):
         _progress(0.904, f"[MinerU] mineru_section：组装行数据（解析块 {_pre_n}，MinerU 自带 id {_pre_cid}）…")
 
         def _normalize_img_path_for_mineru_section(raw_img_path: Any) -> Optional[str]:
-            """将 mineru_section 的 img_path 统一为 public_download 链接。""" 
-            if raw_img_path is None: 
-                return None 
-            raw = str(raw_img_path).strip() 
-            if not raw: 
-                return None 
-            if raw.startswith(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"): 
+            if raw_img_path is None:
+                return None
+            raw = str(raw_img_path).strip()
+            if not raw:
+                return None
+            if raw.startswith(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"):
+                path_part = raw[len(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"):]
+                key = path_part.split("?")[0].split("&")[0].strip()
+                return self._mineru_str_path_for_db(key) if key else None
+            if raw.startswith("/v1/document/download/"):
+                path_part = raw[len("/v1/document/download/"):]
+                key = path_part.split("?")[0].split("&")[0].strip()
+                return self._mineru_str_path_for_db(key) if key else None
+            img_name = Path(raw.replace("\\", "/")).name
+            if not img_name:
                 return self._mineru_str_path_for_db(raw)
-            if raw.startswith("/v1/document/download/"): 
-                normalized = raw.replace("/v1/document/download/", f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/", 1) 
-                return self._mineru_str_path_for_db(normalized) 
-            img_name = Path(raw.replace("\\", "/")).name 
-            if not img_name: 
-                return self._mineru_str_path_for_db(raw) 
             minio_key = f"{doc_id}/images/{img_name}"
             key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
-            ext = Path(img_name).suffix.lstrip(".") or "png" 
-            download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
-            return self._mineru_str_path_for_db(download_url) 
+            return self._mineru_str_path_for_db(key_b64)
 
         rows: list[dict[str, Any]] = []
         missing_native_chunk_id = 0
