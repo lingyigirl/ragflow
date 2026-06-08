@@ -326,48 +326,81 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
         if node.children:
             for child in node.children:
                 _fill_inline_children(child)
-        if not node.children and node.mineru_index_start >= 0:
-            scan_end = len(mineru_sections)
-            if node.parent and node.parent.children:
-                siblings = node.parent.children
-                for si, sib in enumerate(siblings):
-                    if sib is node and si + 1 < len(siblings):
-                        scan_end = siblings[si + 1].mineru_index_start
-                        break
-            headings = []
-            for i in range(node.mineru_index_start + 1, scan_end):
-                item = mineru_sections[i]
-                text = item[0] if len(item) >= 1 else ""
-                lvl = item[2] if len(item) >= 3 else get_section_title_level(text)
-                if lvl > 0:
-                    headings.append((i, text.strip(), lvl))
-            if headings:
-                child_nodes = []
-                stack = [TocNode(title="__leaf_root__", depth=node.depth)]
-                base_depth = node.depth
-                for idx, h_text, h_lvl in headings:
-                    mapped_depth = base_depth + h_lvl
-                    child = TocNode(title=h_text, depth=mapped_depth, page_start=0)
-                    child.mineru_index_start = idx
-                    while stack and stack[-1].depth >= mapped_depth:
-                        stack.pop()
-                    stack[-1].children.append(child)
-                    child.parent = stack[-1]
-                    stack.append(child)
-                    child_nodes.append(child)
-                if child_nodes:
-                    node.children = child_nodes
-                    for child in node.children:
-                        _fill_inline_children(child)
+
+        if node.children or node.mineru_index_start < 0:
+            return
+
+        scan_end = len(mineru_sections)
+
+        if node.parent and node.parent.children:
+            siblings = node.parent.children
+            for si, sib in enumerate(siblings):
+                if sib is node and si + 1 < len(siblings):
+                    nxt = siblings[si + 1].mineru_index_start
+                    if nxt >= 0:
+                        scan_end = nxt
+                    break
+
+        node_level = get_section_title_level(node.title)
+
+        headings = []
+
+        for i in range(node.mineru_index_start + 1, scan_end):
+            item = mineru_sections[i]
+            text = item[0] if len(item) >= 1 else ""
+            lvl = item[2] if len(item) >= 3 else get_section_title_level(text)
+
+            if lvl <= 0:
+                continue
+
+            if node_level > 0 and lvl <= node_level:
+                break
+
+            headings.append((i, text.strip(), lvl))
+
+        if not headings:
+            return
+
+        stack = [TocNode(title="__leaf_root__", depth=0)]
+        child_nodes = []
+
+        for idx, h_text, h_lvl in headings:
+            child = TocNode(
+                title=h_text,
+                depth=h_lvl,
+                page_start=0
+            )
+
+            child.mineru_index_start = idx
+
+            while stack and stack[-1].depth >= h_lvl:
+                stack.pop()
+
+            stack[-1].children.append(child)
+            child.parent = stack[-1]
+
+            stack.append(child)
+            child_nodes.append(child)
+
+        node.children = child_nodes
+
+        for child in node.children:
+            _fill_inline_children(child)
 
     _fill_inline_children(toc_root)
 
     def _walk_end(node):
         for i, child in enumerate(node.children):
+
             if i + 1 < len(node.children):
                 child.mineru_index_end = node.children[i + 1].mineru_index_start
+
+            elif node.mineru_index_end >= 0:
+                child.mineru_index_end = node.mineru_index_end
+
             else:
-                child.mineru_index_end = node.mineru_index_end if node.mineru_index_end > 0 else len(mineru_sections)
+                child.mineru_index_end = len(mineru_sections)
+
             _walk_end(child)
 
     toc_root.mineru_index_start = 0
@@ -377,11 +410,28 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
     def _finalize_node_ends(node, fallback_end):
         for child in node.children:
             _finalize_node_ends(child, fallback_end)
-        if node.children:
-            last_end = node.children[-1].mineru_index_end
-            node.mineru_index_end = last_end if last_end >= 0 else fallback_end
-        elif node.mineru_index_end < 0:
-            node.mineru_index_end = fallback_end
+
+        if not node.children:
+            if node.mineru_index_end < 0:
+                node.mineru_index_end = fallback_end
+            return
+
+        child_end = max(
+            (
+                c.mineru_index_end
+                for c in node.children
+                if c.mineru_index_end >= 0
+            ),
+            default=fallback_end
+        )
+
+        if node.mineru_index_end < 0:
+            node.mineru_index_end = child_end
+        else:
+            node.mineru_index_end = min(
+                node.mineru_index_end,
+                child_end
+            )
 
     _finalize_node_ends(toc_root, len(mineru_sections))
 
@@ -401,12 +451,49 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
 
     all_nodes = []
     _collect_nodes(toc_root, all_nodes)
-    all_nodes.sort(key=lambda n: n.mineru_index_start)
+    all_nodes.sort(
+        key=lambda n: (
+            n.mineru_index_start,
+            n.depth
+        )
+    )
+
     for i in range(len(all_nodes) - 1):
-        if _is_ancestor(all_nodes[i], all_nodes[i + 1]):
+
+        cur = all_nodes[i]
+
+        for j in range(i + 1, len(all_nodes)):
+
+            nxt = all_nodes[j]
+
+            if nxt.mineru_index_start < 0:
+                continue
+
+            if _is_ancestor(cur, nxt):
+                continue
+
+            if nxt.mineru_index_start <= cur.mineru_index_start:
+                continue
+
+            if (
+                cur.mineru_index_end < 0
+                or cur.mineru_index_end > nxt.mineru_index_start
+            ):
+                cur.mineru_index_end = nxt.mineru_index_start
+
+            break
+
+    for node in all_nodes:
+
+        if node.mineru_index_start < 0:
             continue
-        if all_nodes[i].mineru_index_end < 0 or all_nodes[i].mineru_index_end > all_nodes[i + 1].mineru_index_start:
-            all_nodes[i].mineru_index_end = all_nodes[i + 1].mineru_index_start
+
+        if node.mineru_index_end <= node.mineru_index_start:
+
+            node.mineru_index_end = min(
+                node.mineru_index_start + 1,
+                len(mineru_sections)
+            )
 
     return toc_root
 
@@ -527,7 +614,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
         if span_end < 0:
             span_end = len(mineru_sections)
 
-    if span_end <= node.mineru_index_start:
+    if span_end < node.mineru_index_start:
         if node.children:
             child_chain = chain + [node.title] if node.title and node.title != "body" else chain
             results = []
