@@ -758,16 +758,41 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
             toc_start_idx = i
             break
+    body_start_idx = 0
     if toc_start_idx >= 0:
         toc_lines = []
-        for i in range(toc_start_idx, min(toc_start_idx + 40, len(mineru_sections))):
+        toc_end_idx = toc_start_idx
+        for i in range(toc_start_idx, min(toc_start_idx + 80, len(mineru_sections))):
             text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
             stripped = text.strip()
-            if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped) and i > toc_start_idx + 2:
+            has_section = bool(re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped))
+            has_page_end = bool(re.search(r'\d{1,4}\s*$', stripped))
+            if len(toc_lines) > 5 and has_section and not has_page_end:
+                toc_end_idx = i
                 break
             toc_lines.append(stripped)
+            toc_end_idx = i + 1
         toc_text = '\n'.join(toc_lines)
+        body_start_idx = toc_end_idx
+    if body_start_idx <= 0:
+        for i, section_item in enumerate(mineru_sections):
+            text = section_item[0] if len(section_item) >= 1 else ""
+            if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', text.strip()):
+                body_start_idx = i
+                break
 
+# 打印输入给LLM的目录信息
+    if toc_text:
+        # logging.info("[Financial] toc_start_idx=%s, toc_text[]: %s", toc_start_idx, toc_text[:])
+        lines = toc_text.splitlines()
+        logging.info("打印输入给LLM的目录信息:")
+        logging.info("mineru_sections:")
+        for idx, line in enumerate(lines):
+            logging.info("  [%d] %s", idx, line)
+        logging.info("toc_start_idx = %s", toc_start_idx)
+    else:
+        logging.info("[Financial] toc_start_idx=%s, toc_text=\"no TOC found\"", toc_start_idx)
+#
     toc_items = None
     if toc_text:
         try:
@@ -795,18 +820,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 label = re.sub(r'[、，：:\.]$', '', raw_label)
                 toc_items.append({"label": label, "title": stripped})
 
+# 打印LLM返回的目录结构
+    source = "llm" if toc_text else "inline"
+    # logging.info("[Financial] toc_items source=%s count=%s first5=%s", source, len(toc_items), toc_items[:5])
     toc_root = build_tree_from_triples(toc_items)
-    toc_root.mineru_index_start = toc_start_idx if toc_start_idx >= 0 else 0
-
-    body_start_idx = 0
-    first_section_heading = None
-    for i, section_item in enumerate(mineru_sections):
-        text = section_item[0] if len(section_item) >= 1 else ""
-        if re.search(r'第[一二三四五六七八九十百千\d]+节', text.strip()):
-            first_section_heading = i
-            break
-    if first_section_heading is not None:
-        body_start_idx = first_section_heading
+#
+    toc_root.mineru_index_start = body_start_idx if toc_start_idx >= 0 else 0
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
     if toc_start_idx < 0:
@@ -830,6 +849,11 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     }
     if cross_ref:
         tree_data["cross_ref"] = cross_ref
+# 入库存储的目录结构树内容
+    toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
+    logging.info("入库存储的目录结构树内容：\n[Financial] tree_data source=%s toc_len=%s cross_ref=%s toc_preview=%s",
+                 tree_data["source"], len(toc_text_output), bool(cross_ref), toc_preview)
+#    
     if doc_id and tenant_id:
         try:
             from api.db.services.document_service import DocumentService
@@ -923,14 +947,22 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             from api.db.db_models import MineruSection, DB
             if MineruSection.table_exists():
                 with DB.connection_context():
+                    total_sec_updated = 0
+                    total_chain_count = len(chunk_chains)
+                    logging.info("输出chunk块对应的父子连关系：")
                     for ci in range(len(chunk_chains)):
                         pchain = chunk_chains[ci] if ci < len(chunk_chains) else []
                         if not pchain:
+                            logging.info("[Financial] mineru_parent_chain chunk=%s/%s chain=[] skipped", ci + 1, total_chain_count)
                             continue
                         ms, me = chunks_raw[ci].get("mineru_range", (0, 0)) if ci < len(chunks_raw) else (0, 0)
                         sec_ids = [sections[li][3] for li in range(ms, me) if 0 <= li < len(sections) and len(sections[li]) > 3 and sections[li][3]]
                         if sec_ids:
                             MineruSection.update(parent_chain=pchain).where(MineruSection.chunk_id.in_(sec_ids)).execute()
+                            updated_count = len(sec_ids)
+                            total_sec_updated += updated_count
+                            logging.info("[Financial] mineru_parent_chain chunk=%s/%s chain=%s sec_count=%s updated=%s", ci + 1, total_chain_count, pchain, updated_count, updated_count)
+                    logging.info("[Financial] mineru_parent_chain done total_chunks=%s total_sections_updated=%s", total_chain_count, total_sec_updated)
         except Exception:
             logging.exception("Failed to update mineru_section parent_chain (Financial).")
 
