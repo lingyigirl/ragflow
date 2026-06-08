@@ -694,8 +694,13 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             text = " ".join((text or "").strip().split())
             title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
             mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
+# 返回mineru的section内容：            
     mineru_sections = mineru_sections_with_level
-
+    for idx, sec in enumerate(mineru_sections):
+        preview = (sec[0] if len(sec) >= 1 else "")[:150]
+        lvl = sec[2] if len(sec) >= 3 else 0
+        logging.info("解析返回的块信息：mineru_sections[%s] level=%s text=%s", idx, lvl, preview)
+#
     def _normalize_pos_list(poss):
         norm = []
         if not poss:
