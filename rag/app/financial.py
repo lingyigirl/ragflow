@@ -374,19 +374,6 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
     toc_root.mineru_index_end = len(mineru_sections)
     _walk_end(toc_root)
 
-    def _collect_nodes(node, result):
-        if node is not toc_root:
-            result.append(node)
-        for child in node.children:
-            _collect_nodes(child, result)
-
-    all_nodes = []
-    _collect_nodes(toc_root, all_nodes)
-    all_nodes.sort(key=lambda n: n.mineru_index_start)
-    for i in range(len(all_nodes) - 1):
-        if all_nodes[i].mineru_index_end < 0 or all_nodes[i].mineru_index_end > all_nodes[i + 1].mineru_index_start:
-            all_nodes[i].mineru_index_end = all_nodes[i + 1].mineru_index_start
-
     def _finalize_node_ends(node, fallback_end):
         for child in node.children:
             _finalize_node_ends(child, fallback_end)
@@ -397,6 +384,30 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
             node.mineru_index_end = fallback_end
 
     _finalize_node_ends(toc_root, len(mineru_sections))
+
+    def _is_ancestor(a, b):
+        cur = b.parent
+        while cur:
+            if cur is a:
+                return True
+            cur = cur.parent
+        return False
+
+    def _collect_nodes(node, result):
+        if node is not toc_root:
+            result.append(node)
+        for child in node.children:
+            _collect_nodes(child, result)
+
+    all_nodes = []
+    _collect_nodes(toc_root, all_nodes)
+    all_nodes.sort(key=lambda n: n.mineru_index_start)
+    for i in range(len(all_nodes) - 1):
+        if _is_ancestor(all_nodes[i], all_nodes[i + 1]):
+            continue
+        if all_nodes[i].mineru_index_end < 0 or all_nodes[i].mineru_index_end > all_nodes[i + 1].mineru_index_start:
+            all_nodes[i].mineru_index_end = all_nodes[i + 1].mineru_index_start
+
     return toc_root
 
 
@@ -479,6 +490,19 @@ Output ONLY valid JSON:
         return {"main_tables": [], "note_to_table_mapping": {}}
 
 
+def _is_noise_section(text):
+    if not text or not str(text).strip():
+        return True
+    t = str(text).strip()
+    if re.match(r'^\d{1,4}$', t):
+        return True
+    if re.match(r'^第\s*\d+\s*页$', t):
+        return True
+    if len(t) <= 2 and re.match(r'^[A-Za-z0-9\s]+$', t):
+        return True
+    return False
+
+
 def _merge_table_with_adjacent(content_sections):
     merged = []
     for item in content_sections:
@@ -525,6 +549,7 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
     content = '\n'.join([
         item[0] if len(item) >= 1 else str(item)
         for item in sections
+        if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
     ])
 
     has_table = node.contains_table or any(
@@ -778,13 +803,24 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             toc_lines.append(stripped)
             toc_end_idx = i + 1
         toc_text = '\n'.join(toc_lines)
+        toc_body_boundary = toc_end_idx
         body_start_idx = toc_end_idx
+    else:
+        toc_body_boundary = body_start_idx
     if body_start_idx <= 0:
         for i, section_item in enumerate(mineru_sections):
             text = section_item[0] if len(section_item) >= 1 else ""
             if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', text.strip()):
                 body_start_idx = i
                 break
+
+    pre_toc_boundary = toc_start_idx if toc_start_idx >= 0 else 0
+    for i in range(toc_start_idx - 1, -1, -1) if toc_start_idx > 0 else range(0):
+        text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
+        stripped = text.strip()
+        if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped) and not re.search(r'\d{1,4}\s*$', stripped):
+            pre_toc_boundary = i
+            break
 
 # 打印输入给LLM的目录信息
     if toc_text:
@@ -871,21 +907,32 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     chunks_raw = []
 
-    if toc_start_idx > 0:
+    if pre_toc_boundary > 0:
         pre_toc_text = '\n'.join([
             item[0] if len(item) >= 1 else str(item)
-            for item in mineru_sections[:toc_start_idx]
+            for item in mineru_sections[:pre_toc_boundary]
+            if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
         ])
         if pre_toc_text.strip():
-            chunks_raw.append({"content": pre_toc_text, "parent_chain": [], "mineru_range": (0, toc_start_idx)})
+            chunks_raw.append({"content": pre_toc_text, "parent_chain": [], "mineru_range": (0, pre_toc_boundary)})
 
-    if toc_start_idx < body_start_idx:
+    if pre_toc_boundary < toc_start_idx:
+        pre_body_text = '\n'.join([
+            item[0] if len(item) >= 1 else str(item)
+            for item in mineru_sections[pre_toc_boundary:toc_start_idx]
+            if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
+        ])
+        if pre_body_text.strip():
+            chunks_raw.append({"content": pre_body_text, "parent_chain": [], "mineru_range": (pre_toc_boundary, toc_start_idx)})
+
+    if toc_start_idx >= 0 and toc_start_idx < toc_body_boundary:
         toc_content = '\n'.join([
             item[0] if len(item) >= 1 else str(item)
-            for item in mineru_sections[toc_start_idx:body_start_idx]
+            for item in mineru_sections[toc_start_idx:toc_body_boundary]
+            if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
         ])
         if toc_content.strip():
-            chunks_raw.append({"content": toc_content, "parent_chain": [], "mineru_range": (toc_start_idx, body_start_idx)})
+            chunks_raw.append({"content": toc_content, "parent_chain": [], "mineru_range": (toc_start_idx, toc_body_boundary)})
 
     body_root_children = []
     for child in toc_root.children:
@@ -907,6 +954,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             "content": '\n'.join([
                 item[0] if len(item) >= 1 else str(item)
                 for item in mineru_sections
+                if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
             ]),
             "parent_chain": [],
             "mineru_range": (0, len(mineru_sections))
@@ -976,7 +1024,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         all_poss = []
         for section_item in sections:
             if len(section_item) >= 1:
-                all_lines.append(str(section_item[0]))
+                txt = str(section_item[0])
+                if not _is_noise_section(txt):
+                    all_lines.append(txt)
             if len(section_item) > 2 and section_item[2]:
                 all_poss.extend(section_item[2])
         chunks = ['\n'.join(all_lines)]
