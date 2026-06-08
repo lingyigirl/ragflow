@@ -580,13 +580,6 @@ Output ONLY valid JSON:
 def _is_noise_section(text):
     if not text or not str(text).strip():
         return True
-    t = str(text).strip()
-    if re.match(r'^\d{1,4}$', t):
-        return True
-    if re.match(r'^第\s*\d+\s*页$', t):
-        return True
-    if len(t) <= 2 and re.match(r'^[A-Za-z0-9\s]+$', t):
-        return True
     return False
 
 
@@ -875,6 +868,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
             toc_start_idx = i
             break
+    toc_section_indices = []
     body_start_idx = 0
     if toc_start_idx >= 0:
         toc_lines = []
@@ -892,6 +886,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         toc_text = '\n'.join(toc_lines)
         toc_body_boundary = toc_end_idx
         body_start_idx = toc_end_idx
+        toc_section_indices = list(range(toc_start_idx, toc_body_boundary))
     else:
         toc_body_boundary = body_start_idx
     if body_start_idx <= 0:
@@ -1011,15 +1006,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         ])
         if pre_body_text.strip():
             chunks_raw.append({"content": pre_body_text, "parent_chain": [], "mineru_range": (pre_toc_boundary, toc_start_idx)})
-
-    if toc_start_idx >= 0 and toc_start_idx < toc_body_boundary:
-        toc_content = '\n'.join([
-            item[0] if len(item) >= 1 else str(item)
-            for item in mineru_sections[toc_start_idx:toc_body_boundary]
-            if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
-        ])
-        if toc_content.strip():
-            chunks_raw.append({"content": toc_content, "parent_chain": [], "mineru_range": (toc_start_idx, toc_body_boundary)})
 
     body_root_children = []
     for child in toc_root.children:
@@ -1220,6 +1206,27 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     all_elements.sort(key=lambda x: x['mineru_index'])
     res = [elem['doc'] for elem in all_elements]
+
+    if toc_section_indices:
+        toc_lines = []
+        toc_poss = []
+        for i in toc_section_indices:
+            if 0 <= i < len(sections):
+                text = sections[i][0] if len(sections[i]) >= 1 else str(sections[i])
+                if not _is_noise_section(text):
+                    toc_lines.append(text)
+                if len(sections[i]) > 2 and sections[i][2]:
+                    toc_poss.extend(sections[i][2])
+        if toc_lines:
+            toc_chunk_docs = tokenize_chunks(['\n'.join(toc_lines)], doc, eng)
+            if toc_poss:
+                add_positions(toc_chunk_docs[0], toc_poss)
+            else:
+                toc_chunk_docs[0]["position_int"] = []
+                toc_chunk_docs[0]["page_num_int"] = []
+                toc_chunk_docs[0]["top_int"] = []
+            toc_chunk_docs[0]["parent_chain"] = []
+            res.insert(0, toc_chunk_docs[0])
 
     if callback:
         callback(1.0, "Financial chunking done.")

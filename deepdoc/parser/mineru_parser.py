@@ -688,10 +688,12 @@ class MinerUParser(RAGFlowPdfParser):
                         )  
                     case MinerUContentType.LIST | "list":  
                         section = self._join_mineru_lines(output.get("list_items"), "\n")  
-                    case "header" | "page_number":  
-                        section = output.get("text", "") or ""  
-                    case MinerUContentType.DISCARDED | "discarded":  
-                        continue  
+                    case "header":
+                        section = output.get("text", "") or ""
+                    case "page_number":
+                        continue
+                    case MinerUContentType.DISCARDED | "discarded":
+                        continue
 
                 if section is None:  
                     _fallback = output.get("text")  
