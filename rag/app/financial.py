@@ -746,6 +746,23 @@ def _section_title_level(item):
     return get_section_title_level(text)
 
 
+def _display_level_tag(item):
+    text = _section_text(item)
+    if not text or not str(text).strip():
+        return "空"
+    if is_html_table(text):
+        return "tab"
+    return _section_title_level(item)
+
+
+def _levels_display_for_range(mineru_sections, start, end):
+    tags = []
+    for i in range(start, end):
+        if 0 <= i < len(mineru_sections):
+            tags.append(_display_level_tag(mineru_sections[i]))
+    return tags
+
+
 def build_chunk_points_by_title_level(lines_with_level):
     if not lines_with_level:
         return [0]
@@ -1103,12 +1120,32 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             text = " ".join((text or "").strip().split())
             title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
             mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
-# 返回mineru的section内容：            
     mineru_sections = mineru_sections_with_level
+    levels_display = [_display_level_tag(item) for item in mineru_sections]
+    logging.info(
+        "[Financial][打标] 层级序列（0=正文 1~4=标题 tab=表格 空=空行）: %s",
+        levels_display,
+    )
+    lines_with_level_preview = [
+        (item[0], item[2]) if len(item) >= 3 else (item[0] if len(item) >= 1 else "", 0)
+        for item in mineru_sections
+    ]
+    label_split_preview = _labeled_split_points(lines_with_level_preview)
+    preview_chunks_levels = [
+        levels_display[s:e]
+        for s, e in zip(label_split_preview, label_split_preview[1:] + [len(levels_display)])
+        if s < e
+    ]
+    logging.info(
+        "[Financial][打标] 按层级切分预览（连续0会并入同段，表格 tab 在合并阶段单独成块）: %s",
+        preview_chunks_levels,
+    )
     for idx, sec in enumerate(mineru_sections):
-        preview = (sec[0] if len(sec) >= 1 else "")[:150]
-        lvl = sec[2] if len(sec) >= 3 else 0
-        logging.info("解析返回的块信息：mineru_sections[%s] level=%s text=%s", idx, lvl, preview)
+        preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
+        logging.info(
+            "[Financial][打标] [%d] level=%s text=%s",
+            idx, levels_display[idx] if idx < len(levels_display) else "?", preview,
+        )
 #
     def _normalize_pos_list(poss):
         norm = []
@@ -1293,6 +1330,21 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunks_raw = [cr for cr in chunks_raw if cr.get("mineru_range", (0, 0))[1] > cr.get("mineru_range", (0, 0))[0]]
     if not chunks_raw:
         return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial merge produced no chunks.")
+
+    for ci, chunk_raw in enumerate(chunks_raw):
+        ms, me = chunk_raw.get("mineru_range", (0, 0))
+        lv_seq = _levels_display_for_range(mineru_sections, ms, me)
+        content_preview = (chunk_raw.get("content") or "").replace("\n", " ")[:100]
+        logging.info(
+            "[Financial][分块] chunk=%d/%d range=[%d,%d) levels=%s parent_chain=%s preview=%s",
+            ci + 1,
+            len(chunks_raw),
+            ms,
+            me,
+            lv_seq,
+            chunk_raw.get("parent_chain", []),
+            content_preview,
+        )
 
     if callback:
         callback(0.5, "Building chunks (Financial)...")
