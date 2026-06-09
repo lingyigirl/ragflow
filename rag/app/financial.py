@@ -14,6 +14,79 @@ load_dotenv()
 
 TITLE_NUM_RE = re.compile(r'^(\d+(?:\.\d+)*)')
 
+# Common accounting subject names found in Chinese financial report notes.
+# These appear as unnumbered sub-headings under "财务报表项目注释" and would
+# otherwise be missed by get_section_title_level (no numbering prefix).
+_FINANCIAL_NOTE_TITLES = {
+    # 资产类
+    '货币资金', '应收账款', '应收票据', '预付款项', '其他应收款',
+    '存货', '固定资产', '在建工程', '无形资产', '长期待摊费用',
+    '递延所得税资产', '商誉', '投资性房地产', '长期股权投资',
+    '交易性金融资产', '债权投资', '其他债权投资', '其他权益工具投资',
+    '持有待售资产', '使用权资产', '开发支出', '油气资产',
+    '应收款项融资', '合同资产', '发出商品', '委托加工物资',
+    # 负债类
+    '短期借款', '应付账款', '应付票据', '预收款项', '其他应付款',
+    '应付职工薪酬', '应交税费', '长期借款', '应付债券',
+    '长期应付款', '预计负债', '递延收益', '递延所得税负债',
+    '合同负债', '租赁负债', '交易性金融负债',
+    # 权益类
+    '实收资本', '资本公积', '盈余公积', '未分配利润',
+    '其他综合收益', '少数股东权益', '归属于母公司所有者权益',
+    '库存股', '专项储备', '一般风险准备',
+    # 损益类
+    '营业收入', '营业成本', '税金及附加', '销售费用', '管理费用',
+    '研发费用', '财务费用', '投资收益', '信用减值损失',
+    '资产减值损失', '资产处置收益', '营业外收入', '营业外支出',
+    '所得税费用', '其他收益', '公允价值变动收益', '汇兑收益',
+    '利息收入', '利息支出', '手续费及佣金收入', '手续费及佣金支出',
+    # 现金流量表附注
+    '经营活动产生的现金流量', '投资活动产生的现金流量',
+    '筹资活动产生的现金流量', '现金及现金等价物',
+    # 常见补充
+    '关联方关系及其交易', '或有事项', '承诺事项',
+    '资产负债表日后事项', '分部报告', '金融工具及其风险',
+    '所有者权益变动表', '合并范围的变更', '外币折算',
+    '会计政策变更', '会计估计变更', '前期差错更正',
+    '其他流动资产', '其他非流动资产', '其他流动负债', '其他非流动负债',
+}
+
+# Financial bigrams — if a short text contains one of these, it is likely a
+# note heading even if not in _FINANCIAL_NOTE_TITLES.
+_FINANCIAL_BIGRAMS = {
+    '账款', '票据', '付款', '收款', '借款', '存款', '债券',
+    '股权', '公积', '损益', '折旧', '摊销', '减值', '准备',
+    '税金', '薪酬', '担保', '承诺', '租赁', '商誉', '专利',
+    '商标', '特许', '矿权', '林权', '养殖', '捕捞', '生物',
+    '永续', '可转债', '优先股', '期货', '期权', '套期',
+}
+
+
+def _looks_like_financial_note_heading(text):
+    """Check if text looks like an unnumbered financial note sub-heading."""
+    if not text:
+        return False
+    stripped = text.strip()
+    if not stripped:
+        return False
+    # Must be short enough to be a heading (not a paragraph)
+    if len(stripped) > 20:
+        return False
+    # Must not look like a regular sentence (no sentence-ending punctuation)
+    if re.search(r'[。！？;；]', stripped):
+        return False
+
+    # Phase 1: exact match in known titles
+    if stripped in _FINANCIAL_NOTE_TITLES:
+        return True
+
+    # Phase 2: contains financial bigram (catch titles not in the set)
+    for bg in _FINANCIAL_BIGRAMS:
+        if bg in stripped:
+            return True
+
+    return False
+
 
 def is_html_table(txt) -> bool:
     if not isinstance(txt, str):
@@ -88,6 +161,9 @@ def get_section_title_level(text: str) -> int:
         dot_count = m.group(1).count('.')
         if dot_count >= 3:
             return dot_count + 1
+
+    if _looks_like_financial_note_heading(text_stripped):
+        return 2
 
     return 0
 
@@ -267,12 +343,19 @@ class TocNode:
 def build_tree_from_triples(items):
     root = TocNode(title="root", depth=0)
     stack = [root]
+    last_non_null_depth = 0
 
     for item in items:
-        depth = label_to_depth(item.get("label"), stack[-1].depth)
+        label = item.get("label")
+        if label is None:
+            depth = last_non_null_depth + 1
+        else:
+            depth = label_to_depth(label, stack[-1].depth)
+            last_non_null_depth = depth
+
         node = TocNode(
             title=item.get("title", ""),
-            label=item.get("label"),
+            label=label,
             depth=depth,
             page_start=0,
             contains_table=item.get("contains_table", False)
@@ -286,22 +369,52 @@ def build_tree_from_triples(items):
     return root
 
 
+def normalize_heading(s):
+    """Strip numbering/prefix patterns from a heading, leaving only the semantic title."""
+    if not s:
+        return ""
+    s = s.strip()
+    # 第X节/章/条
+    s = re.sub(r'^第[一二三四五六七八九十百千\d]+[节章条]\s*', '', s)
+    # （一）/ (一) / （1）/ (1)
+    s = re.sub(r'^[（(][一二三四五六七八九十\d]+[）)]\s*', '', s)
+    # 1. / 1.1 / 1.1.1 / 1、
+    s = re.sub(r'^\d+(?:\.\d+)*[\.、]\s*', '', s)
+    # 一、/ 二、
+    s = re.sub(r'^[一二三四五六七八九十]+[、，]\s*', '', s)
+    # # headers
+    s = re.sub(r'^#+\s*', '', s)
+    return s.strip()
+
+
 def _fuzzy_match_title(toc_title, text):
     if not toc_title or not text:
         return False
+
     def _normalize(s):
         s = re.sub(r'[\.、．\s]', '', s)
         s = re.sub(r'[（(]', '(', s)
         s = re.sub(r'[）)]', ')', s)
         return s
+
+    # Phase 1: strict startswith (handles page-number rejection in TOC lines)
     nt = _normalize(text)
     ntt = _normalize(toc_title)
-    if not nt.startswith(ntt):
-        return False
-    remaining = nt[len(ntt):]
-    if re.match(r'^[\s.]*\d{1,4}[\s.]*$', remaining):
-        return False
-    return True
+    if nt.startswith(ntt):
+        remaining = nt[len(ntt):]
+        if not re.match(r'^[\s.]*\d{1,4}[\s.]*$', remaining):
+            return True
+
+    # Phase 2: strip numbering prefixes, compare semantic titles
+    # Handles cases like:
+    #   TOC: "一、货币资金"  vs  body: "（一）货币资金"
+    #   TOC: "货币资金"      vs  body: "五、货币资金"
+    norm_toc = normalize_heading(toc_title)
+    norm_text = normalize_heading(text)
+    if norm_toc and norm_text and norm_toc in norm_text:
+        return True
+
+    return False
 
 
 def _find_title_in_sections(title, sections, start_idx=0):
@@ -319,8 +432,7 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
             idx = _find_title_in_sections(node.title, mineru_sections, start_search_idx)
             if idx >= 0:
                 node.mineru_index_start = idx
-            else:
-                node.mineru_index_start = start_search_idx
+            # else: leave as -1 — a fake start is more dangerous than a missing one
 
         next_start = node.mineru_index_start if node.mineru_index_start >= 0 else start_search_idx
         for child in node.children:
@@ -409,7 +521,11 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
         for i, child in enumerate(node.children):
 
             if i + 1 < len(node.children):
-                child.mineru_index_end = node.children[i + 1].mineru_index_start
+                nxt_start = node.children[i + 1].mineru_index_start
+                if nxt_start >= 0 and nxt_start > child.mineru_index_start:
+                    child.mineru_index_end = nxt_start
+                # else: next sibling shares same start or is invalid —
+                # leave child's end unset, _finalize_node_ends will fill it
 
             elif node.mineru_index_end >= 0:
                 child.mineru_index_end = node.mineru_index_end
@@ -442,6 +558,9 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
         )
 
         if node.mineru_index_end < 0:
+            node.mineru_index_end = child_end
+        elif node.mineru_index_end <= node.mineru_index_start and child_end > node.mineru_index_end:
+            # end was poisoned by sibling start collision; override with children's extent
             node.mineru_index_end = child_end
         else:
             node.mineru_index_end = min(
@@ -477,6 +596,9 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
     for i in range(len(all_nodes) - 1):
 
         cur = all_nodes[i]
+
+        if cur.mineru_index_start < 0:
+            continue
 
         for j in range(i + 1, len(all_nodes)):
 
@@ -611,6 +733,12 @@ def _walk_node_for_chunk(node, mineru_sections, chain, threshold):
     chain = list(chain)
 
     if node.mineru_index_start < 0:
+        if node.children:
+            child_chain = chain + [node.title] if node.title and node.title != "body" else chain
+            results = []
+            for child in node.children:
+                results.extend(_walk_node_for_chunk(child, mineru_sections, child_chain, threshold))
+            return results
         return []
 
     span_end = node.mineru_index_end
@@ -909,14 +1037,40 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             break
     if toc_start_idx >= 0:
         toc_lines = []
-        for i in range(toc_start_idx, min(toc_start_idx + 80, len(mineru_sections))):
+        MAX_TOC = 300  # generous ceiling for long annual reports
+        NON_TOC_STREAK = 8  # consecutive non-TOC lines to trigger early stop
+        non_toc_run = 0
+
+        for i in range(toc_start_idx, min(toc_start_idx + MAX_TOC, len(mineru_sections))):
             text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
             stripped = text.strip()
+
             has_section = bool(re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped))
             has_page_end = bool(re.search(r'\d{1,4}\s*$', stripped))
+
+            # Primary: body section title without trailing page number → TOC ended
             if len(toc_lines) > 5 and has_section and not has_page_end:
                 break
+
             toc_lines.append(stripped)
+
+            # Secondary: after enough entries, detect drift into non-TOC content
+            if len(toc_lines) > 20:
+                looks_toc = (
+                    has_section
+                    or has_page_end
+                    or bool(re.search(r'[\.．]{3,}', stripped))       # dot leaders
+                    or bool(re.search(r'^\s*[（(]?\d+[）).、]', stripped))  # numbered entry
+                    or bool(re.search(r'^[（(][一二三四五六七八九十]+[）)]', stripped))
+                )
+                if looks_toc:
+                    non_toc_run = 0
+                else:
+                    non_toc_run += 1
+                    if non_toc_run >= NON_TOC_STREAK:
+                        toc_lines = toc_lines[:-NON_TOC_STREAK]
+                        break
+
         toc_text = '\n'.join(toc_lines)
     if toc_start_idx < 0:
         for i, section_item in enumerate(mineru_sections):
