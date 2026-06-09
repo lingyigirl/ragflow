@@ -102,11 +102,22 @@ def normalize_text_for_title(text: str) -> str:
     return re.sub(r"\s+", "", s)
 
 
+def _looks_like_cover_metadata(text_stripped):
+    if re.match(r'^#*\s*\d{4}年', text_stripped):
+        return True
+    if re.match(r'^#*\s*\d{4}-\d+', text_stripped):
+        return True
+    return False
+
+
 def get_section_title_level(text: str) -> int:
     if not isinstance(text, str) or not text.strip():
         return 0
     text_stripped = normalize_text_for_title(text)
     if not text_stripped:
+        return 0
+
+    if _looks_like_cover_metadata(text_stripped):
         return 0
 
     if re.match(r'^#*\s*第[一二三四五六七八九十百千\d]+[节章条]', text_stripped):
@@ -115,10 +126,6 @@ def get_section_title_level(text: str) -> int:
     m = re.match(r'^#*\s*(\d+\.\d+(?:\.\d+)*)', text_stripped)
     if m:
         return m.group(1).count('.') + 1
-
-    m = re.match(r'^#*\s*(\d+)(?![\d.])', text_stripped)
-    if m:
-        return 2
 
     level2_patterns = [
         r'^\d+[\.、](?!\d)',
@@ -298,26 +305,231 @@ def _collapse_to_single_chunk(docs, doc, eng):
     return chunk_docs
 
 
-def label_to_depth(label, prev_depth):
-    if label is None:
-        return prev_depth + 1
-    if re.match(r'^第[一二三四五六七八九十百千\d]+[节章条]', label):
-        return 1
-    if re.match(r'^#*\d+$', label):
-        return 1
-    if re.match(r'^#*\d+\.\d+$', label):
-        return 2
-    if re.match(r'^#*\d+\.\d+\.\d+$', label):
-        return 3
-    if re.match(r'^[一二三四五六七八九十]+$', label):
-        return 2
-    if re.match(r'^[（(][一二三四五六七八九十]+[）)]$', label):
-        return 3
-    if re.match(r'^\d+\.$', label):
-        return 4
-    if re.match(r'^[（(]\d+[）)]$', label):
-        return 5
-    return prev_depth + 1
+def _detect_title_kind(text_stripped):
+    if not text_stripped:
+        return None
+    if _looks_like_cover_metadata(text_stripped):
+        return None
+    if re.match(r'^#*\s*第[一二三四五六七八九十百千\d]+[节章条]', text_stripped):
+        return "section"
+    if re.match(r'^#*\s*[一二三四五六七八九十]+[、．.]', text_stripped):
+        return "cn_num"
+    if re.match(r'^#*\s*[（(][一二三四五六七八九十]+[）)]', text_stripped):
+        return "cn_paren"
+    m = re.match(r'^#*\s*(\d+(?:\.\d+)+)', text_stripped)
+    if m:
+        seg_count = m.group(1).count('.') + 1
+        return f"digit_x{seg_count}"
+    if re.match(r'^#*\s*\d+[、．.]', text_stripped):
+        return "digit_dot"
+    if _looks_like_financial_note_heading(text_stripped):
+        return "note"
+    if get_section_title_level(text_stripped) > 0:
+        return "other"
+    return None
+
+
+def _induce_dynamic_level_map(mineru_sections, scan_start, scan_end):
+    kind_depth = {}
+    stack = []
+    level_map = {}
+    for i in range(scan_start, scan_end):
+        if i < 0 or i >= len(mineru_sections):
+            continue
+        item = mineru_sections[i]
+        text = _section_text(item)
+        if not text.strip() or is_html_table(text):
+            continue
+        text_stripped = normalize_text_for_title(text)
+        kind = _detect_title_kind(text_stripped)
+        if kind is None:
+            continue
+        if kind in kind_depth:
+            depth = kind_depth[kind]
+        else:
+            if not stack:
+                depth = 1
+            else:
+                depth = stack[-1][2] + 1
+            kind_depth[kind] = depth
+        while stack and stack[-1][2] >= depth:
+            stack.pop()
+        stack.append((i, text_stripped, depth, kind))
+        level_map[i] = depth
+    return level_map
+
+
+def _extract_label_for_toc_item(stripped):
+    if not stripped:
+        return None
+    text_stripped = normalize_text_for_title(stripped)
+    m = re.match(r'^#*\s*(第[一二三四五六七八九十百千\d]+[节章条])', text_stripped)
+    if m:
+        return m.group(1)
+    m = re.match(r'^#*\s*(\d+\.\d+(?:\.\d+)*)', text_stripped)
+    if m:
+        return m.group(1)
+    m = re.match(r'^#*\s*([一二三四五六七八九十]+)[、．.]', text_stripped)
+    if m:
+        return m.group(1)
+    m = re.match(r'^#*\s*[（(]([一二三四五六七八九十]+)[）)]', text_stripped)
+    if m:
+        return '（' + m.group(1) + '）'
+    m = re.match(r'^#*\s*(\d+)[、．.]', text_stripped)
+    if m:
+        return m.group(1) + '.'
+    parts = stripped.split()
+    if parts:
+        raw_label = parts[0]
+        if raw_label.startswith("#"):
+            sub = stripped.split(None, 1)
+            raw_label = sub[1].split()[0] if len(sub) > 1 else raw_label.lstrip("#")
+        return re.sub(r'[、，：:\.]$', '', raw_label)
+    return None
+
+
+def _toc_items_from_induced_outline(mineru_sections, level_map, scan_start, scan_end):
+    items = []
+    for i in range(scan_start, scan_end):
+        if i not in level_map:
+            continue
+        text = _section_text(mineru_sections[i]).strip()
+        if not text:
+            continue
+        items.append({
+            "label": _extract_label_for_toc_item(text),
+            "title": text,
+            "induced_depth": level_map[i],
+        })
+    return items
+
+
+def build_tree_from_induced_items(items):
+    root = TocNode(title="root", depth=0)
+    stack = [root]
+    for item in items:
+        depth = item.get("induced_depth") or 1
+        node = TocNode(
+            title=item.get("title", ""),
+            label=item.get("label"),
+            depth=depth,
+            page_start=0,
+            contains_table=item.get("contains_table", False),
+        )
+        while stack and stack[-1].depth >= node.depth:
+            stack.pop()
+        stack[-1].children.append(node)
+        node.parent = stack[-1]
+        stack.append(node)
+    return root
+
+
+def _induction_scan_start(toc_start_idx, body_start_idx):
+    if toc_start_idx >= 0:
+        return max(body_start_idx, 0)
+    return 0
+
+
+def _repack_section_item(item, new_level):
+    text = item[0] if len(item) >= 1 else ""
+    chunk_id = item[3] if len(item) >= 4 else ""
+    pos_tag = item[1] if len(item) >= 2 else None
+    return (text, pos_tag, new_level, chunk_id)
+
+
+def _apply_induced_dynamic_levels(mineru_sections, toc_start_idx, body_start_idx):
+    scan_start = _induction_scan_start(toc_start_idx, body_start_idx)
+    scan_end = len(mineru_sections)
+    level_map = _induce_dynamic_level_map(mineru_sections, scan_start, scan_end)
+    if not level_map:
+        return mineru_sections, level_map, False
+
+    updated = []
+    for i, item in enumerate(mineru_sections):
+        text = _section_text(item)
+        if not text.strip() or is_html_table(text):
+            updated.append(item)
+            continue
+        if i in level_map:
+            new_level = level_map[i]
+        elif toc_start_idx >= 0 and toc_start_idx <= i < body_start_idx:
+            new_level = 0
+        elif toc_start_idx >= 0 and i < toc_start_idx:
+            new_level = get_section_title_level(text)
+            if _looks_like_cover_metadata(normalize_text_for_title(text)):
+                new_level = 0
+        else:
+            new_level = get_section_title_level(text)
+        updated.append(_repack_section_item(item, new_level))
+    return updated, level_map, True
+
+
+def _tree_nodes_for_storage(toc_root):
+    nodes = []
+
+    def walk(node):
+        if node.title != "root":
+            nodes.append({
+                "title": node.title,
+                "label": node.label,
+                "depth": node.depth,
+                "mineru_index": node.mineru_index_start,
+            })
+        for child in node.children:
+            walk(child)
+
+    walk(toc_root)
+    return nodes
+
+
+def _tree_level_by_index_from_nodes(tree_nodes):
+    level_by_index = {}
+    if not tree_nodes:
+        return level_by_index
+    for node in tree_nodes:
+        idx = node.get("mineru_index")
+        if idx is None or idx < 0:
+            continue
+        level_by_index[idx] = node.get("depth") or 1
+    return level_by_index
+
+
+def _apply_tree_levels_to_sections(mineru_sections, tree_level_by_index, level_map, toc_start_idx, body_start_idx):
+    updated = []
+    for i, item in enumerate(mineru_sections):
+        text = _section_text(item)
+        if not text.strip() or is_html_table(text):
+            updated.append(item)
+            continue
+        if toc_start_idx >= 0 and toc_start_idx <= i < body_start_idx:
+            new_level = 0
+        elif i in tree_level_by_index:
+            new_level = tree_level_by_index[i]
+        elif i in level_map:
+            new_level = level_map[i]
+        elif toc_start_idx >= 0 and i < toc_start_idx:
+            new_level = get_section_title_level(text)
+            if _looks_like_cover_metadata(normalize_text_for_title(text)):
+                new_level = 0
+        else:
+            new_level = 0
+        updated.append(_repack_section_item(item, new_level))
+    return updated
+
+
+def _sync_sections_title_levels(sections, mineru_sections):
+    synced = []
+    for idx, sec in enumerate(sections):
+        lvl = sec[3] if len(sec) >= 4 else 0
+        if idx < len(mineru_sections) and len(mineru_sections[idx]) >= 3:
+            lvl = mineru_sections[idx][2]
+        if len(sec) >= 5:
+            synced.append((sec[0], sec[1], sec[2], lvl, sec[4]))
+        elif len(sec) >= 4:
+            synced.append((sec[0], sec[1], sec[2], lvl))
+        else:
+            synced.append(sec)
+    return synced
 
 
 def estimate_tokens(text):
@@ -338,35 +550,6 @@ class TocNode:
         self.mineru_index_end = -1
         self.contains_table = contains_table
         self.has_embedded_parent_title = False
-
-
-def build_tree_from_triples(items):
-    root = TocNode(title="root", depth=0)
-    stack = [root]
-    last_non_null_depth = 0
-
-    for item in items:
-        label = item.get("label")
-        if label is None:
-            depth = last_non_null_depth + 1
-        else:
-            depth = label_to_depth(label, stack[-1].depth)
-            last_non_null_depth = depth
-
-        node = TocNode(
-            title=item.get("title", ""),
-            label=label,
-            depth=depth,
-            page_start=0,
-            contains_table=item.get("contains_table", False)
-        )
-        while stack and stack[-1].depth >= node.depth:
-            stack.pop()
-        stack[-1].children.append(node)
-        node.parent = stack[-1]
-        stack.append(node)
-
-    return root
 
 
 def normalize_heading(s):
@@ -467,14 +650,17 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
                         scan_end = nxt
                     break
 
-        node_level = get_section_title_level(node.title)
+        if node.mineru_index_start >= 0:
+            node_level = _section_title_level(mineru_sections[node.mineru_index_start])
+        else:
+            node_level = get_section_title_level(node.title)
 
         headings = []
 
         for i in range(node.mineru_index_start + 1, scan_end):
             item = mineru_sections[i]
             text = item[0] if len(item) >= 1 else ""
-            lvl = item[2] if len(item) >= 3 else get_section_title_level(text)
+            lvl = _section_title_level(item)
 
             if lvl <= 0:
                 continue
@@ -651,42 +837,6 @@ def _tree_to_text(node, depth=1):
     for child in node.children:
         lines.extend(_tree_to_text(child, depth + 1))
     return lines
-
-
-def _parse_toc_text_with_llm(toc_text, llm_bundle):
-    prompt = f"""Extract the table of contents as a flat JSON array of (label, title) pairs.
-Each item: {{"label": "section_number_or_null", "title": "section_title"}}
-label is the numbering prefix like "第一节", "一", "（一）", "1.", or null for unnumbered items like table names.
-Mark financial statement tables with "contains_table": true.
-
-TOC text:
-{toc_text}
-
-Output ONLY the JSON array, no other text:"""
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        answer, _ = loop.run_until_complete(
-            llm_bundle.async_chat("", [{"role": "user", "content": prompt}], {"temperature": 0.0}))
-    finally:
-        loop.close()
-    try:
-        answer = answer.strip()
-        if answer.startswith("```"):
-            answer = re.sub(r'^```\w*\n?', '', answer)
-            answer = re.sub(r'\n?```$', '', answer)
-        items = json.loads(answer)
-        return items
-    except Exception:
-        logging.warning("Failed to parse TOC LLM response as JSON, attempting to extract...")
-        match = re.search(r'\[.*\]', answer, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group())
-            except Exception:
-                pass
-        return None
 
 
 def _generate_cross_ref_with_llm(toc_items, llm_bundle):
@@ -1237,30 +1387,30 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 body_start_idx = len(mineru_sections)
 
         toc_text = '\n'.join(toc_lines)
-# 打印输入给LLM的目录信息
     if toc_text:
-        # logging.info("[Financial] toc_start_idx=%s, toc_text[]: %s", toc_start_idx, toc_text[:])
         lines = toc_text.splitlines()
-        logging.info("打印输入给LLM的目录信息:")
-        logging.info("mineru_sections:")
+        logging.info("[Financial] 目录页文本 toc_start_idx=%s lines=%s", toc_start_idx, len(lines))
         for idx, line in enumerate(lines):
             logging.info("  [%d] %s", idx, line)
-        logging.info("toc_start_idx = %s", toc_start_idx)
     else:
         logging.info("[Financial] toc_start_idx=%s, toc_text=\"no TOC found\"", toc_start_idx)
-#
-    toc_items = None
-    if toc_text:
-        try:
-            from api.db.services.llm_service import LLMBundle
-            from common.constants import LLMType
-            if tenant_id:
-                chat_bundle = LLMBundle(tenant_id, LLMType.CHAT)
-                toc_items = _parse_toc_text_with_llm(toc_text, chat_bundle)
-        except Exception:
-            logging.exception("Failed to parse TOC with LLM (Financial).")
 
-    if toc_items is None:
+    scan_start = _induction_scan_start(toc_start_idx, body_start_idx)
+    mineru_sections, level_map, induced = _apply_induced_dynamic_levels(
+        mineru_sections, toc_start_idx, body_start_idx,
+    )
+    sections = _sync_sections_title_levels(sections, mineru_sections)
+    if induced:
+        levels_aligned = [_display_level_tag(item) for item in mineru_sections]
+        logging.info(
+            "[Financial][动态层级] 按出现顺序诱导后: %s",
+            levels_aligned,
+        )
+
+    toc_items = _toc_items_from_induced_outline(
+        mineru_sections, level_map, scan_start, len(mineru_sections),
+    )
+    if not toc_items:
         toc_items = []
         for i, section_item in enumerate(mineru_sections):
             text = section_item[0] if len(section_item) >= 1 else ""
@@ -1269,24 +1419,27 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 continue
             level = section_item[2] if len(section_item) >= 3 else get_section_title_level(stripped)
             if level > 0:
-                raw_label = stripped.split()[0] if stripped.split() else ""
-                if raw_label.startswith("#"):
-                    parts = stripped.split(None, 1)
-                    raw_label = parts[1].split()[0] if len(parts) > 1 else raw_label.lstrip("#")
-                label = re.sub(r'[、，：:\.]$', '', raw_label)
-                toc_items.append({"label": label, "title": stripped})
-
-# 打印LLM返回的目录结构
-    source = "llm" if toc_text else "inline"
-    # logging.info("[Financial] toc_items source=%s count=%s first5=%s", source, len(toc_items), toc_items[:5])
-    toc_root = build_tree_from_triples(toc_items)
-
-    if toc_start_idx >= 0:
-        toc_root.mineru_index_start = 0
-    else:
-        toc_root.mineru_index_start = 0
+                toc_items.append({
+                    "label": _extract_label_for_toc_item(stripped),
+                    "title": stripped,
+                    "induced_depth": level,
+                })
+    toc_root = build_tree_from_induced_items(toc_items)
+    toc_root.mineru_index_start = 0
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
+
+    tree_nodes = _tree_nodes_for_storage(toc_root)
+    tree_level_by_index = _tree_level_by_index_from_nodes(tree_nodes)
+    mineru_sections = _apply_tree_levels_to_sections(
+        mineru_sections, tree_level_by_index, level_map, toc_start_idx, body_start_idx,
+    )
+    sections = _sync_sections_title_levels(sections, mineru_sections)
+    tree_levels_display = [_display_level_tag(item) for item in mineru_sections]
+    logging.info(
+        "[Financial][树层级] 块合并采用目录树 level: %s",
+        tree_levels_display,
+    )
 
     cross_ref = None
     if toc_items and tenant_id:
@@ -1300,15 +1453,16 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     toc_text_output = '\n'.join(_tree_to_text(toc_root))
     tree_data = {
-        "source": "toc_with_inline_fix" if toc_text else "inline_only",
+        "source": "induced",
         "toc": toc_text_output,
+        "nodes": tree_nodes,
     }
     if cross_ref:
         tree_data["cross_ref"] = cross_ref
 # 入库存储的目录结构树内容
     toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
-    logging.info("入库存储的目录结构树内容：\n[Financial] tree_data source=%s toc_len=%s cross_ref=%s toc_preview=%s",
-                 tree_data["source"], len(toc_text_output), bool(cross_ref), toc_preview)
+    logging.info("入库存储的目录结构树内容：\n[Financial] tree_data source=%s nodes=%s toc_len=%s cross_ref=%s toc_preview=%s",
+                 tree_data["source"], len(tree_nodes), len(toc_text_output), bool(cross_ref), toc_preview)
 #    
     if doc_id and tenant_id:
         try:
