@@ -746,11 +746,66 @@ def _section_title_level(item):
     return get_section_title_level(text)
 
 
-def _is_level1_section(item):
-    text = _section_text(item).strip()
-    if not text or is_html_table(text):
-        return False
-    return _section_title_level(item) == 1
+def build_chunk_points_by_title_level(lines_with_level):
+    if not lines_with_level:
+        return [0]
+
+    levels = [
+        item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0
+        for item in lines_with_level
+    ]
+    n = len(levels)
+
+    level_to_indices = {}
+    for i, lvl in enumerate(levels):
+        if lvl > 0:
+            level_to_indices.setdefault(lvl, []).append(i)
+
+    chunk_starts = [0]
+    for i, lvl in enumerate(levels):
+        if lvl > 0 and len(level_to_indices.get(lvl, [])) > 1:
+            if i not in chunk_starts:
+                chunk_starts.append(i)
+
+    if n not in chunk_starts:
+        chunk_starts.append(n)
+
+    return sorted(set(chunk_starts))
+
+
+def _level1_chunk_points(lines_with_level):
+    n = len(lines_with_level)
+    if n == 0:
+        return [0]
+    points = {0, n}
+    for idx, item in enumerate(lines_with_level):
+        lvl = item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0
+        if lvl == 1:
+            points.add(idx)
+    return sorted(points)
+
+
+def _labeled_split_points(lines_with_level):
+    return sorted(set(build_chunk_points_by_title_level(lines_with_level)) | set(_level1_chunk_points(lines_with_level)))
+
+
+def _lines_with_level_for_range(mineru_sections, start, end):
+    lines = []
+    for i in range(start, end):
+        item = mineru_sections[i]
+        text = _section_text(item)
+        if is_html_table(text):
+            lines.append((text, 0))
+        else:
+            lines.append((text, _section_title_level(item)))
+    return lines
+
+
+def _title_stack_at(mineru_sections, start, end):
+    stack = []
+    for k in range(start, end):
+        stack = _apply_title_stack(stack, mineru_sections[k])
+    return stack
 
 
 def _apply_title_stack(stack, item):
@@ -780,62 +835,88 @@ def _join_sections_range(mineru_sections, start, end):
     return '\n'.join(parts)
 
 
-def _merge_body_sections_linear(mineru_sections, body_start, threshold):
-    n = len(mineru_sections)
-    if body_start >= n:
+def _process_labeled_range(mineru_sections, range_start, range_end, token_threshold):
+    if range_start >= range_end:
         return []
 
     chunks = []
-    buf_start = None
-    buf_chain = []
-    title_stack = []
+    lines_with_level = _lines_with_level_for_range(mineru_sections, range_start, range_end)
+    split_points = _labeled_split_points(lines_with_level)
 
-    def flush(end):
-        nonlocal buf_start, buf_chain
-        if buf_start is None or end <= buf_start:
-            buf_start = None
-            buf_chain = []
-            return
-        chunks.append({
-            "content": _join_sections_range(mineru_sections, buf_start, end),
-            "parent_chain": list(buf_chain),
-            "mineru_range": (buf_start, end),
-        })
+    for si in range(len(split_points) - 1):
+        rel_s = split_points[si]
+        rel_e = split_points[si + 1]
+        abs_s = range_start + rel_s
+        abs_e = range_start + rel_e
+
         buf_start = None
-        buf_chain = []
+        title_stack = []
+        j = abs_s
 
-    i = body_start
-    while i < n:
-        item = mineru_sections[i]
-        text = _section_text(item)
-
-        if is_html_table(text):
-            flush(i)
-            title_stack = _apply_title_stack(title_stack, item)
+        def flush_buf(end_idx):
+            nonlocal buf_start, title_stack
+            if buf_start is None or end_idx <= buf_start:
+                buf_start = None
+                return
             chunks.append({
-                "content": text.strip(),
+                "content": _join_sections_range(mineru_sections, buf_start, end_idx),
                 "parent_chain": _stack_to_chain(title_stack),
-                "mineru_range": (i, i + 1),
+                "mineru_range": (buf_start, end_idx),
             })
-            i += 1
-            continue
+            buf_start = None
 
-        if _is_level1_section(item) and buf_start is not None and buf_start < i:
-            flush(i)
+        while j < abs_e:
+            item = mineru_sections[j]
+            text = _section_text(item)
 
-        if buf_start is not None:
-            trial = _join_sections_range(mineru_sections, buf_start, i + 1)
-            if trial.strip() and estimate_tokens(trial) > threshold:
-                flush(i)
+            if is_html_table(text):
+                flush_buf(j)
+                table_chain = _stack_to_chain(_title_stack_at(mineru_sections, abs_s, j))
+                chunks.append({
+                    "content": text.strip(),
+                    "parent_chain": table_chain,
+                    "mineru_range": (j, j + 1),
+                })
+                j += 1
+                continue
 
-        if buf_start is None:
-            buf_start = i
+            if buf_start is not None:
+                trial = _join_sections_range(mineru_sections, buf_start, j + 1)
+                if trial.strip() and estimate_tokens(trial) > token_threshold:
+                    flush_buf(j)
 
-        title_stack = _apply_title_stack(title_stack, item)
-        buf_chain = _stack_to_chain(title_stack)
-        i += 1
+            if buf_start is None:
+                buf_start = j
+                title_stack = _title_stack_at(mineru_sections, abs_s, j)
 
-    flush(n)
+            title_stack = _apply_title_stack(title_stack, item)
+            j += 1
+
+        flush_buf(abs_e)
+
+    return chunks
+
+
+def _build_chunks_from_labeled_sections(mineru_sections, toc_start_idx, body_start_idx, token_threshold):
+    n = len(mineru_sections)
+    chunks = []
+
+    if toc_start_idx >= 0:
+        toc_end = min(max(body_start_idx, toc_start_idx + 1), n)
+        if toc_start_idx < toc_end:
+            chunks.append({
+                "content": _join_sections_range(mineru_sections, toc_start_idx, toc_end),
+                "parent_chain": [],
+                "mineru_range": (toc_start_idx, toc_end),
+            })
+        if toc_start_idx > 0:
+            chunks.extend(_process_labeled_range(mineru_sections, 0, toc_start_idx, token_threshold))
+        if toc_end < n:
+            chunks.extend(_process_labeled_range(mineru_sections, toc_end, n, token_threshold))
+    else:
+        chunks.extend(_process_labeled_range(mineru_sections, 0, n, token_threshold))
+
+    chunks.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
     return chunks
 
 
@@ -876,14 +957,14 @@ def _assert_text_coverage(mineru_sections, chunks_raw):
     return True
 
 
-def _fallback_body_single_chunk(mineru_sections, body_start):
+def _fallback_full_single_chunk(mineru_sections):
     n = len(mineru_sections)
-    if body_start >= n:
+    if n <= 0:
         return []
     return [{
-        "content": _join_sections_range(mineru_sections, body_start, n),
+        "content": _join_sections_range(mineru_sections, 0, n),
         "parent_chain": [],
-        "mineru_range": (body_start, n),
+        "mineru_range": (0, n),
     }]
 
 
@@ -1119,21 +1200,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 body_start_idx = len(mineru_sections)
 
         toc_text = '\n'.join(toc_lines)
-    if toc_start_idx < 0:
-        for i, section_item in enumerate(mineru_sections):
-            text = section_item[0] if len(section_item) >= 1 else ""
-            if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', text.strip()):
-                body_start_idx = i
-                break
-
-    pre_toc_boundary = toc_start_idx if toc_start_idx >= 0 else 0
-    for i in range(toc_start_idx - 1, -1, -1) if toc_start_idx > 0 else range(0):
-        text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
-        stripped = text.strip()
-        if re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped) and not re.search(r'\d{1,4}\s*$', stripped):
-            pre_toc_boundary = i
-            break
-
 # 打印输入给LLM的目录信息
     if toc_text:
         # logging.info("[Financial] toc_start_idx=%s, toc_text[]: %s", toc_start_idx, toc_text[:])
@@ -1217,49 +1283,16 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if callback:
         callback(0.3, "Building chunks (Financial)...")
 
-    chunks_raw = []
-
-    if toc_start_idx >= 0:
-        if pre_toc_boundary > 0:
-            chunks_raw.append({
-                "content": _join_sections_range(mineru_sections, 0, pre_toc_boundary),
-                "parent_chain": [],
-                "mineru_range": (0, pre_toc_boundary),
-            })
-        if pre_toc_boundary < toc_start_idx:
-            chunks_raw.append({
-                "content": _join_sections_range(mineru_sections, pre_toc_boundary, toc_start_idx),
-                "parent_chain": [],
-                "mineru_range": (pre_toc_boundary, toc_start_idx),
-            })
-        if body_start_idx > toc_start_idx:
-            chunks_raw.append({
-                "content": _join_sections_range(mineru_sections, toc_start_idx, body_start_idx),
-                "parent_chain": [],
-                "mineru_range": (toc_start_idx, body_start_idx),
-            })
-        merge_start = body_start_idx
-    else:
-        merge_start = body_start_idx if body_start_idx > 0 else 0
-        if body_start_idx > 0:
-            chunks_raw.append({
-                "content": _join_sections_range(mineru_sections, 0, body_start_idx),
-                "parent_chain": [],
-                "mineru_range": (0, body_start_idx),
-            })
-
-    body_chunks = _merge_body_sections_linear(mineru_sections, merge_start, token_threshold)
-    if not _assert_text_coverage(mineru_sections, chunks_raw + body_chunks):
-        logging.warning("Financial chunk coverage assertion failed, fallback to single body chunk.")
-        body_chunks = _fallback_body_single_chunk(mineru_sections, merge_start)
-    chunks_raw.extend(body_chunks)
-    chunks_raw.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
+    chunks_raw = _build_chunks_from_labeled_sections(
+        mineru_sections, toc_start_idx, body_start_idx, token_threshold,
+    )
+    if not _assert_text_coverage(mineru_sections, chunks_raw):
+        logging.warning("Financial chunk coverage assertion failed, fallback to single chunk.")
+        chunks_raw = _fallback_full_single_chunk(mineru_sections)
 
     chunks_raw = [cr for cr in chunks_raw if cr.get("mineru_range", (0, 0))[1] > cr.get("mineru_range", (0, 0))[0]]
-    if merge_start < len(mineru_sections) and not any(
-        cr.get("mineru_range", (0, 0))[0] >= merge_start for cr in chunks_raw
-    ):
-        return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial merge produced no body chunks.")
+    if not chunks_raw:
+        return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial merge produced no chunks.")
 
     if callback:
         callback(0.5, "Building chunks (Financial)...")
