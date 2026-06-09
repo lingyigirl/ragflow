@@ -296,7 +296,7 @@ def _fuzzy_match_title(toc_title, text):
         return s
     nt = _normalize(text)
     ntt = _normalize(toc_title)
-    if not nt.startswith(ntt) or nt == ntt:
+    if not nt.startswith(ntt):
         return False
     remaining = nt[len(ntt):]
     if re.match(r'^[\s.]*\d{1,4}[\s.]*$', remaining):
