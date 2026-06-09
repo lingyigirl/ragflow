@@ -294,7 +294,14 @@ def _fuzzy_match_title(toc_title, text):
         s = re.sub(r'[（(]', '(', s)
         s = re.sub(r'[）)]', ')', s)
         return s
-    return _normalize(toc_title) == _normalize(text)
+    nt = _normalize(text)
+    ntt = _normalize(toc_title)
+    if not nt.startswith(ntt) or nt == ntt:
+        return False
+    remaining = nt[len(ntt):]
+    if re.match(r'^[\s.]*\d{1,4}[\s.]*$', remaining):
+        return False
+    return True
 
 
 def _find_title_in_sections(title, sections, start_idx=0):
@@ -894,31 +901,23 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     toc_text = ""
     toc_start_idx = -1
+    body_start_idx = 0
     for i, section_item in enumerate(mineru_sections):
         text = section_item[0] if len(section_item) >= 1 else ""
         if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
             toc_start_idx = i
             break
-    toc_section_indices = []
-    body_start_idx = 0
     if toc_start_idx >= 0:
         toc_lines = []
-        toc_end_idx = toc_start_idx
         for i in range(toc_start_idx, min(toc_start_idx + 80, len(mineru_sections))):
             text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
             stripped = text.strip()
             has_section = bool(re.search(r'第[一二三四五六七八九十百千\d]+[节章]', stripped))
             has_page_end = bool(re.search(r'\d{1,4}\s*$', stripped))
             if len(toc_lines) > 5 and has_section and not has_page_end:
-                toc_end_idx = i
                 break
             toc_lines.append(stripped)
-            toc_end_idx = i + 1
         toc_text = '\n'.join(toc_lines)
-        toc_body_boundary = toc_end_idx
-        toc_section_indices = list(range(toc_start_idx, toc_body_boundary))
-    else:
-        toc_body_boundary = body_start_idx
     if toc_start_idx < 0:
         for i, section_item in enumerate(mineru_sections):
             text = section_item[0] if len(section_item) >= 1 else ""
@@ -978,29 +977,22 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     # logging.info("[Financial] toc_items source=%s count=%s first5=%s", source, len(toc_items), toc_items[:5])
     toc_root = build_tree_from_triples(toc_items)
 
-    if toc_start_idx >= 0 and toc_items:
-        first_title = toc_items[0].get("title", "")
-        if first_title:
-            clean_title = re.sub(r'\s*[\.….]*\s*\d{1,4}\s*$', '', first_title).strip()
-            found = _find_title_in_sections(clean_title, mineru_sections, toc_body_boundary)
-            if found < 0:
-                found = _find_title_in_sections(clean_title, mineru_sections, 0)
-            body_start_idx = found if found >= 0 else toc_body_boundary
-        else:
-            body_start_idx = toc_body_boundary
-    elif toc_start_idx >= 0:
-        body_start_idx = toc_body_boundary
-
     if toc_start_idx >= 0:
-        search_start = body_start_idx if 0 <= body_start_idx < len(mineru_sections) else 0
-        toc_root.mineru_index_start = search_start
+        toc_root.mineru_index_start = 0
     else:
         toc_root.mineru_index_start = 0
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
-    if toc_start_idx < 0:
+
+    if toc_start_idx >= 0:
+        body_start_idx = len(mineru_sections)
+        for child in toc_root.children:
+            if child.mineru_index_start >= 0:
+                body_start_idx = min(body_start_idx, child.mineru_index_start)
+        if body_start_idx >= len(mineru_sections):
+            body_start_idx = 0
+    else:
         toc_start_idx = 0
-        body_start_idx = 0
 
     cross_ref = None
     if toc_items and tenant_id:
@@ -1070,15 +1062,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunks_raw = [cr for cr in chunks_raw if str(cr.get("content", "")).strip()]
     has_body_chunk = any(cr.get("mineru_range", (0, 0))[0] >= body_start_idx for cr in chunks_raw)
     if not has_body_chunk:
-        chunks_raw = [{
-            "content": '\n'.join([
-                item[0] if len(item) >= 1 else str(item)
-                for item in mineru_sections
-                if not _is_noise_section(item[0] if len(item) >= 1 else str(item))
-            ]),
-            "parent_chain": [],
-            "mineru_range": (0, len(mineru_sections))
-        }]
+        return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial tree produced no body chunks.")
 
     if callback:
         callback(0.5, "Building chunks (Financial)...")
@@ -1140,18 +1124,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             logging.exception("Failed to update mineru_section parent_chain (Financial).")
 
     if not chunks:
-        all_lines = []
-        all_poss = []
-        for section_item in sections:
-            if len(section_item) >= 1:
-                txt = str(section_item[0])
-                if not _is_noise_section(txt):
-                    all_lines.append(txt)
-            if len(section_item) > 2 and section_item[2]:
-                all_poss.extend(section_item[2])
-        chunks = ['\n'.join(all_lines)]
-        chunk_positions = [all_poss]
-        chunk_chains = [[]]
+        return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial chunking produced empty result.")
 
     html_table_count = len(table_indices_in_mineru)
     mineru_only_tbls = tbls[html_table_count:] if html_table_count < len(tbls) else []
@@ -1254,26 +1227,13 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     all_elements.sort(key=lambda x: x['mineru_index'])
     res = [elem['doc'] for elem in all_elements]
 
-    if toc_section_indices:
-        toc_lines = []
-        toc_poss = []
-        for i in toc_section_indices:
-            if 0 <= i < len(sections):
-                text = sections[i][0] if len(sections[i]) >= 1 else str(sections[i])
-                if not _is_noise_section(text):
-                    toc_lines.append(text)
-                if len(sections[i]) > 2 and sections[i][2]:
-                    toc_poss.extend(sections[i][2])
-        if toc_lines:
-            toc_chunk_docs = tokenize_chunks(['\n'.join(toc_lines)], doc, eng)
-            if toc_poss:
-                add_positions(toc_chunk_docs[0], toc_poss)
-            else:
-                toc_chunk_docs[0]["position_int"] = []
-                toc_chunk_docs[0]["page_num_int"] = []
-                toc_chunk_docs[0]["top_int"] = []
-            toc_chunk_docs[0]["parent_chain"] = []
-            res.insert(0, toc_chunk_docs[0])
+    if toc_text and toc_text.strip():
+        toc_docs = tokenize_chunks([toc_text], doc, eng)
+        toc_docs[0]["parent_chain"] = []
+        toc_docs[0]["position_int"] = []
+        toc_docs[0]["page_num_int"] = []
+        toc_docs[0]["top_int"] = []
+        res.insert(0, toc_docs[0])
 
     if callback:
         callback(1.0, "Financial chunking done.")
