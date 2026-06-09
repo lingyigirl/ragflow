@@ -412,6 +412,12 @@ def _fuzzy_match_title(toc_title, text):
     norm_toc = normalize_heading(toc_title)
     norm_text = normalize_heading(text)
     if norm_toc and norm_text and norm_toc in norm_text:
+        idx = norm_text.index(norm_toc)
+        remaining = norm_text[idx + len(norm_toc):]
+        # Reject TOC lines that end with page numbers
+        # e.g. TOC title "货币资金" vs text "第一节 货币资金 15" → remaining = " 15"
+        if re.match(r'^\s*\.{0,3}\s*\d{1,4}\s*$', remaining):
+            return False
         return True
 
     return False
@@ -1035,8 +1041,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if re.match(r'^\s*(?:目\s*录|目\s*次|CONTENTS|Table\s*of\s*Contents)\s*$', text, re.IGNORECASE):
             toc_start_idx = i
             break
+    toc_lines = []
     if toc_start_idx >= 0:
-        toc_lines = []
         MAX_TOC = 300  # generous ceiling for long annual reports
         NON_TOC_STREAK = 8  # consecutive non-TOC lines to trigger early stop
         non_toc_run = 0
@@ -1138,16 +1144,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
 
-    if toc_start_idx >= 0:
-        body_start_idx = len(mineru_sections)
-        for child in toc_root.children:
-            if child.mineru_index_start >= 0:
-                body_start_idx = min(body_start_idx, child.mineru_index_start)
-        if body_start_idx >= len(mineru_sections):
-            body_start_idx = 0
-    else:
-        toc_start_idx = 0
-
     cross_ref = None
     if toc_items and tenant_id:
         try:
@@ -1200,17 +1196,52 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if pre_body_text.strip():
             chunks_raw.append({"content": pre_body_text, "parent_chain": [], "mineru_range": (pre_toc_boundary, toc_start_idx)})
 
-    body_root_children = []
-    for child in toc_root.children:
-        if child.mineru_index_start >= body_start_idx or child.mineru_index_start < 0:
-            body_root_children.append(child)
+    # Compute body_start_idx from TOC lines — rule-based, no LLM
+    if toc_start_idx >= 0:
+        body_start_idx = toc_start_idx + len(toc_lines)
+        if body_start_idx > len(mineru_sections):
+            body_start_idx = len(mineru_sections)
 
-    body_root = TocNode(title="body", depth=0)
-    body_root.children = body_root_children
-    body_root.mineru_index_start = body_start_idx
-    body_root.mineru_index_end = len(mineru_sections)
+    # Build chunk tree from body sections using level info (rule-based, no LLM)
+    chunk_root = TocNode(title="body", depth=0)
+    chunk_root.mineru_index_start = body_start_idx
+    chunk_root.mineru_index_end = len(mineru_sections)
 
-    for child in body_root.children:
+    stack = [(chunk_root, 0)]  # (node, level)
+    for i in range(body_start_idx, len(mineru_sections)):
+        text = mineru_sections[i][0] if len(mineru_sections[i]) >= 1 else ""
+        stripped = text.strip()
+        if not stripped:
+            continue
+        level = mineru_sections[i][2] if len(mineru_sections[i]) >= 3 else get_section_title_level(stripped)
+        if level <= 0:
+            continue
+
+        node = TocNode(
+            title=stripped,
+            depth=level,
+            page_start=0,
+            contains_table=is_html_table(stripped)
+        )
+        node.mineru_index_start = i
+
+        while len(stack) > 1 and stack[-1][1] >= level:
+            stack.pop()
+        stack[-1][0].children.append(node)
+        node.parent = stack[-1][0]
+        stack.append((node, level))
+
+    # Set mineru_index_end for each node based on next sibling / parent end
+    def _set_section_ends(n):
+        for ci, c in enumerate(n.children):
+            if ci + 1 < len(n.children):
+                c.mineru_index_end = n.children[ci + 1].mineru_index_start
+            else:
+                c.mineru_index_end = n.mineru_index_end
+            _set_section_ends(c)
+    _set_section_ends(chunk_root)
+
+    for child in chunk_root.children:
         chunks_raw.extend(_walk_node_for_chunk(child, mineru_sections, [], token_threshold))
 
     chunks_raw = [cr for cr in chunks_raw if str(cr.get("content", "")).strip()]

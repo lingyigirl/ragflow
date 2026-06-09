@@ -689,7 +689,7 @@ class MinerUParser(RAGFlowPdfParser):
                     case MinerUContentType.LIST | "list":  
                         section = self._join_mineru_lines(output.get("list_items"), "\n")  
                     case "header":
-                        section = output.get("text", "") or ""
+                        continue
                     case "page_number":
                         continue
                     case MinerUContentType.DISCARDED | "discarded":
