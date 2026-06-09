@@ -1032,7 +1032,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     body_start_idx = 0
     for i, section_item in enumerate(mineru_sections):
         text = section_item[0] if len(section_item) >= 1 else ""
-        if re.search(r'目\s*录|目次|CONTENTS', text.strip()):
+        if re.match(r'^\s*(?:目\s*录|目\s*次|CONTENTS|Table\s*of\s*Contents)\s*$', text, re.IGNORECASE):
             toc_start_idx = i
             break
     if toc_start_idx >= 0:
