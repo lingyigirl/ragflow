@@ -41,6 +41,7 @@ from deepdoc.parser.pdf_parser import RAGFlowPdfParser
 from common import settings
 
 DOCUMENT_PUBLIC_DOWNLOAD_PREFIX = "/v1/document/public_download"
+MINERU_SECTION_IMG_PATH_MAX_LEN = 1024
 
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
 if LOCK_KEY_pdfplumber not in sys.modules:
@@ -780,6 +781,52 @@ class MinerUParser(RAGFlowPdfParser):
         return s[: max_len - 1] + "…"  
 
     @staticmethod
+    def _mineru_public_download_url_for_db(
+        raw_img_path: Any,
+        kb_id: str,
+        doc_id: str,
+        *,
+        max_len: int = MINERU_SECTION_IMG_PATH_MAX_LEN,
+    ) -> Optional[str]:
+        """将 img_path 规范为与 content_list.json 一致的完整 public_download URL 后写入 DB。"""
+        if raw_img_path is None:
+            return None
+        raw = str(raw_img_path).strip()
+        if not raw:
+            return None
+        if raw.startswith(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"):
+            return MinerUParser._mineru_str_path_for_db(raw, max_len=max_len)
+        if raw.startswith("/v1/document/download/"):
+            normalized = raw.replace("/v1/document/download/", f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/", 1)
+            return MinerUParser._mineru_str_path_for_db(normalized, max_len=max_len)
+        img_path_obj = Path(raw.replace("\\", "/"))
+        img_name = img_path_obj.name
+        if not img_name:
+            return MinerUParser._mineru_str_path_for_db(raw, max_len=max_len)
+        ext = img_path_obj.suffix.lstrip(".") or "jpg"
+        minio_key = f"{doc_id}/images/{img_name}"
+        key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
+        download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
+        return MinerUParser._mineru_str_path_for_db(download_url, max_len=max_len)
+
+    @staticmethod
+    def _sync_public_download_img_paths(
+        target_list: list[dict[str, Any]],
+        source_list: list[dict[str, Any]],
+        img_keys: tuple[str, ...] = ("img_path", "table_img_path", "equation_img_path"),
+    ) -> None:
+        """MinIO 上传后，将 content_list 中已替换的完整图片 URL 同步回 outputs。"""
+        if len(target_list) != len(source_list):
+            return
+        for tgt, src in zip(target_list, source_list):
+            if not isinstance(tgt, dict) or not isinstance(src, dict):
+                continue
+            for key in img_keys:
+                val = src.get(key)
+                if val and isinstance(val, str) and str(val).strip():
+                    tgt[key] = val
+
+    @staticmethod
     def _mineru_json_safe_scalar(x: Any) -> Any:  
         if x is None:  
             return None  
@@ -981,25 +1028,7 @@ class MinerUParser(RAGFlowPdfParser):
         _progress(0.904, f"[MinerU] mineru_section：组装行数据（解析块 {_pre_n}，MinerU 自带 id {_pre_cid}）…")
 
         def _normalize_img_path_for_mineru_section(raw_img_path: Any) -> Optional[str]:
-            if raw_img_path is None:
-                return None
-            raw = str(raw_img_path).strip()
-            if not raw:
-                return None
-            if raw.startswith(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"):
-                path_part = raw[len(f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/"):]
-                key = path_part.split("?")[0].split("&")[0].strip()
-                return self._mineru_str_path_for_db(key) if key else None
-            if raw.startswith("/v1/document/download/"):
-                path_part = raw[len("/v1/document/download/"):]
-                key = path_part.split("?")[0].split("&")[0].strip()
-                return self._mineru_str_path_for_db(key) if key else None
-            img_name = Path(raw.replace("\\", "/")).name
-            if not img_name:
-                return self._mineru_str_path_for_db(raw)
-            minio_key = f"{doc_id}/images/{img_name}"
-            key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
-            return self._mineru_str_path_for_db(key_b64)
+            return self._mineru_public_download_url_for_db(raw_img_path, kb_id, doc_id)
 
         rows: list[dict[str, Any]] = []
         missing_native_chunk_id = 0
@@ -2000,7 +2029,9 @@ class MinerUParser(RAGFlowPdfParser):
                             callback=callback,
                             pdf_path=pdf,
                         )
-                        if not ok:
+                        if ok:
+                            self._sync_public_download_img_paths(outputs, content_list_for_minio)
+                        else:
                             self.logger.warning(
                                 "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
                                 doc_id, kb_id,
