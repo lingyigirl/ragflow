@@ -2428,6 +2428,10 @@ async def mineru_section_chunk_ids():
                 data = row.get("table_footnote") or row.get("text")
             elif row_type == "table_body":
                 data = row.get("table_body") or row.get("text")
+            elif row_type == "page_number":
+                data = row.get("text")
+            elif row_type == "image":
+                data = row.get("img_path")
             else:
                 data = row.get("text")
             item = {

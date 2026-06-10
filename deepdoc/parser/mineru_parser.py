@@ -1050,7 +1050,13 @@ class MinerUParser(RAGFlowPdfParser):
             item_type_db_norm = str(item_type_db).strip().lower()  
             if item_type_db_norm == "text":
                 if item.get("text") is not None and str(item.get("text")).strip() != "":
-                    row["text"] = self._mineru_longtext_for_db(item.get("text"))
+                    _text = str(item.get("text"))
+                    _tl = row.get("text_level")
+                    if _tl is not None and isinstance(_tl, int) and _tl > 0:
+                        _level = max(1, min(6, _tl))
+                        if not _text.lstrip().startswith("#"):
+                            _text = f"{'#' * _level} {_text}"
+                    row["text"] = self._mineru_longtext_for_db(_text)
             elif item_type_db_norm == "table":
                 if item.get("table_caption") is not None: 
                     row["table_caption"] = self._mineru_json_field_for_db(item.get("table_caption")) 
@@ -1077,7 +1083,21 @@ class MinerUParser(RAGFlowPdfParser):
                 if _table_body is not None and str(_table_body).strip() != "":
                     row["table_body"] = self._mineru_longtext_for_db(_table_body)
             else:
-                if item.get("text") is not None and str(item.get("text")).strip() != "":
+                if item_type_db_norm == "image":
+                    _img_parts = []
+                    _img_cap = item.get("image_caption")
+                    _img_fn = item.get("image_footnote")
+                    if isinstance(_img_cap, list):
+                        _img_parts.extend(str(c) for c in _img_cap if str(c).strip())
+                    elif isinstance(_img_cap, str) and _img_cap.strip():
+                        _img_parts.append(_img_cap.strip())
+                    if isinstance(_img_fn, list):
+                        _img_parts.extend(str(f) for f in _img_fn if str(f).strip())
+                    elif isinstance(_img_fn, str) and _img_fn.strip():
+                        _img_parts.append(_img_fn.strip())
+                    if _img_parts:
+                        row["text"] = self._mineru_longtext_for_db("\n".join(_img_parts))
+                elif item.get("text") is not None and str(item.get("text")).strip() != "":
                     row["text"] = self._mineru_longtext_for_db(item.get("text"))
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = _normalize_img_path_for_mineru_section(item.get("img_path")) 
