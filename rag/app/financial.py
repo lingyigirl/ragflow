@@ -913,6 +913,117 @@ def _levels_display_for_range(mineru_sections, start, end):
     return tags
 
 
+def _section_page(item):
+    pos_tag = item[1] if len(item) >= 2 else None
+    if not pos_tag:
+        return None
+    for tag in re.findall(r"@@([0-9-]+)\t[0-9.\t]+##", str(pos_tag)):
+        try:
+            return int(tag.split("-")[0]) - 1
+        except (TypeError, ValueError):
+            continue
+    return None
+
+
+def _is_level0_or_table_section(item):
+    text = _section_text(item)
+    if is_html_table(text):
+        return True
+    if _is_noise_section(text):
+        return True
+    return _section_title_level(item) <= 0
+
+
+def _find_inline_enum_merge_spans(mineru_sections, range_start, range_end):
+    spans = []
+    i = range_start
+    while i < range_end:
+        item = mineru_sections[i]
+        text = _section_text(item)
+        if _is_noise_section(text):
+            i += 1
+            continue
+        if is_html_table(text):
+            i += 1
+            continue
+        run_level = _section_title_level(item)
+        if run_level <= 0:
+            i += 1
+            continue
+        run_start = i
+        j = i + 1
+        while j < range_end:
+            cur = mineru_sections[j]
+            cur_text = _section_text(cur)
+            if _is_noise_section(cur_text):
+                j += 1
+                continue
+            if is_html_table(cur_text):
+                break
+            if _section_title_level(cur) == run_level:
+                j += 1
+            else:
+                break
+        if j - run_start < 2:
+            i += 1
+            continue
+        block_start = run_start
+        k = run_start - 1
+        while k >= range_start and _is_level0_or_table_section(mineru_sections[k]):
+            block_start = k
+            k -= 1
+        last_title_idx = j - 1
+        body2_start = j
+        if body2_start >= range_end:
+            i = j
+            continue
+        while body2_start < range_end and _is_noise_section(_section_text(mineru_sections[body2_start])):
+            body2_start += 1
+        if body2_start >= range_end:
+            i = j
+            continue
+        body2_item = mineru_sections[body2_start]
+        if is_html_table(_section_text(body2_item)):
+            i = j
+            continue
+        if _section_title_level(body2_item) == run_level:
+            i = j
+            continue
+        last_title_page = _section_page(mineru_sections[last_title_idx])
+        body2_page = _section_page(body2_item)
+        if last_title_page is None or body2_page is None or last_title_page != body2_page:
+            i = j
+            continue
+        block_end = body2_start + 1
+        t = body2_start + 1
+        while t < range_end:
+            tail = mineru_sections[t]
+            if not _is_level0_or_table_section(tail):
+                break
+            tail_page = _section_page(tail)
+            if tail_page is None or tail_page != body2_page:
+                break
+            block_end = t + 1
+            t += 1
+        spans.append((block_start - range_start, block_end - range_start))
+        i = block_end
+    return spans
+
+
+def _apply_inline_enum_merge_to_split_points(split_points, merge_spans):
+    if not merge_spans:
+        return split_points
+    out = set(split_points)
+    for ms, me in merge_spans:
+        out.add(ms)
+        if me not in out:
+            out.add(me)
+        for p in list(out):
+            if ms < p < me:
+                out.discard(p)
+    return sorted(out)
+
+
 def build_chunk_points_by_title_level(lines_with_level):
     if not lines_with_level:
         return [0]
@@ -1008,7 +1119,10 @@ def _process_labeled_range(mineru_sections, range_start, range_end, token_thresh
 
     chunks = []
     lines_with_level = _lines_with_level_for_range(mineru_sections, range_start, range_end)
-    split_points = _labeled_split_points(lines_with_level)
+    merge_spans = _find_inline_enum_merge_spans(mineru_sections, range_start, range_end)
+    split_points = _apply_inline_enum_merge_to_split_points(
+        _labeled_split_points(lines_with_level), merge_spans,
+    )
 
     for si in range(len(split_points) - 1):
         rel_s = split_points[si]
