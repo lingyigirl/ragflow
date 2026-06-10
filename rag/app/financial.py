@@ -14,6 +14,8 @@ load_dotenv()
 
 TITLE_NUM_RE = re.compile(r'^(\d+(?:\.\d+)*)')
 
+TOC_SECTION_LEVEL = -1
+
 # Common accounting subject names found in Chinese financial report notes.
 # These appear as unnumbered sub-headings under "财务报表项目注释" and would
 # otherwise be missed by get_section_title_level (no numbering prefix).
@@ -430,6 +432,10 @@ def _induction_scan_start(toc_start_idx, body_start_idx):
     return 0
 
 
+def _in_toc_range(idx, toc_start_idx, body_start_idx):
+    return toc_start_idx >= 0 and toc_start_idx <= idx < body_start_idx
+
+
 def _repack_section_item(item, new_level):
     text = item[0] if len(item) >= 1 else ""
     chunk_id = item[3] if len(item) >= 4 else ""
@@ -447,13 +453,17 @@ def _apply_induced_dynamic_levels(mineru_sections, toc_start_idx, body_start_idx
     updated = []
     for i, item in enumerate(mineru_sections):
         text = _section_text(item)
+        if _in_toc_range(i, toc_start_idx, body_start_idx):
+            if not text.strip():
+                updated.append(item)
+            else:
+                updated.append(_repack_section_item(item, TOC_SECTION_LEVEL))
+            continue
         if not text.strip() or is_html_table(text):
             updated.append(item)
             continue
         if i in level_map:
             new_level = level_map[i]
-        elif toc_start_idx >= 0 and toc_start_idx <= i < body_start_idx:
-            new_level = 0
         elif toc_start_idx >= 0 and i < toc_start_idx:
             new_level = get_section_title_level(text)
             if _looks_like_cover_metadata(normalize_text_for_title(text)):
@@ -498,12 +508,16 @@ def _apply_tree_levels_to_sections(mineru_sections, tree_level_by_index, level_m
     updated = []
     for i, item in enumerate(mineru_sections):
         text = _section_text(item)
+        if _in_toc_range(i, toc_start_idx, body_start_idx):
+            if not text.strip():
+                updated.append(item)
+            else:
+                updated.append(_repack_section_item(item, TOC_SECTION_LEVEL))
+            continue
         if not text.strip() or is_html_table(text):
             updated.append(item)
             continue
-        if toc_start_idx >= 0 and toc_start_idx <= i < body_start_idx:
-            new_level = 0
-        elif i in tree_level_by_index:
+        if i in tree_level_by_index:
             new_level = tree_level_by_index[i]
         elif i in level_map:
             new_level = level_map[i]
@@ -900,6 +914,8 @@ def _display_level_tag(item):
     text = _section_text(item)
     if not text or not str(text).strip():
         return "空"
+    if len(item) >= 3 and item[2] == TOC_SECTION_LEVEL:
+        return "toc"
     if is_html_table(text):
         return "tab"
     return _section_title_level(item)
@@ -934,8 +950,8 @@ def _is_level0_or_table_section(item):
     return _section_title_level(item) <= 0
 
 
-def _find_inline_enum_merge_spans(mineru_sections, range_start, range_end):
-    spans = []
+def _scan_inline_enum_patterns(mineru_sections, range_start, range_end):
+    patterns = []
     i = range_start
     while i < range_end:
         item = mineru_sections[i]
@@ -1005,8 +1021,49 @@ def _find_inline_enum_merge_spans(mineru_sections, range_start, range_end):
                 break
             block_end = t + 1
             t += 1
-        spans.append((block_start - range_start, block_end - range_start))
+        patterns.append({
+            "block_start": block_start,
+            "block_end": block_end,
+            "run_start": run_start,
+            "run_end": j,
+        })
         i = block_end
+    return patterns
+
+
+def _demote_inline_enum_titles_for_tree(mineru_sections, level_map, patterns):
+    if not patterns or not level_map:
+        return mineru_sections, level_map
+    demote = set()
+    for pattern in patterns:
+        for idx in range(pattern["run_start"], pattern["run_end"]):
+            if idx in level_map:
+                demote.add(idx)
+    if not demote:
+        return mineru_sections, level_map
+    new_map = {idx: lvl for idx, lvl in level_map.items() if idx not in demote}
+    updated = []
+    for i, item in enumerate(mineru_sections):
+        if i in demote:
+            updated.append(_repack_section_item(item, 0))
+        else:
+            updated.append(item)
+    return updated, new_map
+
+
+def _find_inline_enum_merge_spans(mineru_sections, range_start, range_end, patterns=None):
+    if patterns is None:
+        patterns = _scan_inline_enum_patterns(mineru_sections, range_start, range_end)
+    spans = []
+    for pattern in patterns:
+        bs = pattern["block_start"]
+        be = pattern["block_end"]
+        if be <= range_start or bs >= range_end:
+            continue
+        rel_s = max(bs, range_start) - range_start
+        rel_e = min(be, range_end) - range_start
+        if rel_s < rel_e:
+            spans.append((rel_s, rel_e))
     return spans
 
 
@@ -1113,13 +1170,15 @@ def _join_sections_range(mineru_sections, start, end):
     return '\n'.join(parts)
 
 
-def _process_labeled_range(mineru_sections, range_start, range_end, token_threshold):
+def _process_labeled_range(mineru_sections, range_start, range_end, token_threshold, inline_patterns=None):
     if range_start >= range_end:
         return []
 
     chunks = []
     lines_with_level = _lines_with_level_for_range(mineru_sections, range_start, range_end)
-    merge_spans = _find_inline_enum_merge_spans(mineru_sections, range_start, range_end)
+    merge_spans = _find_inline_enum_merge_spans(
+        mineru_sections, range_start, range_end, patterns=inline_patterns,
+    )
     split_points = _apply_inline_enum_merge_to_split_points(
         _labeled_split_points(lines_with_level), merge_spans,
     )
@@ -1178,7 +1237,9 @@ def _process_labeled_range(mineru_sections, range_start, range_end, token_thresh
     return chunks
 
 
-def _build_chunks_from_labeled_sections(mineru_sections, toc_start_idx, body_start_idx, token_threshold):
+def _build_chunks_from_labeled_sections(
+    mineru_sections, toc_start_idx, body_start_idx, token_threshold, inline_patterns=None,
+):
     n = len(mineru_sections)
     chunks = []
 
@@ -1191,11 +1252,17 @@ def _build_chunks_from_labeled_sections(mineru_sections, toc_start_idx, body_sta
                 "mineru_range": (toc_start_idx, toc_end),
             })
         if toc_start_idx > 0:
-            chunks.extend(_process_labeled_range(mineru_sections, 0, toc_start_idx, token_threshold))
+            chunks.extend(_process_labeled_range(
+                mineru_sections, 0, toc_start_idx, token_threshold, inline_patterns=inline_patterns,
+            ))
         if toc_end < n:
-            chunks.extend(_process_labeled_range(mineru_sections, toc_end, n, token_threshold))
+            chunks.extend(_process_labeled_range(
+                mineru_sections, toc_end, n, token_threshold, inline_patterns=inline_patterns,
+            ))
     else:
-        chunks.extend(_process_labeled_range(mineru_sections, 0, n, token_threshold))
+        chunks.extend(_process_labeled_range(
+            mineru_sections, 0, n, token_threshold, inline_patterns=inline_patterns,
+        ))
 
     chunks.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
     return chunks
@@ -1521,6 +1588,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             levels_aligned,
         )
 
+    inline_patterns = _scan_inline_enum_patterns(mineru_sections, scan_start, len(mineru_sections))
+    mineru_sections, level_map = _demote_inline_enum_titles_for_tree(
+        mineru_sections, level_map, inline_patterns,
+    )
+    sections = _sync_sections_title_levels(sections, mineru_sections)
+
     toc_items = _toc_items_from_induced_outline(
         mineru_sections, level_map, scan_start, len(mineru_sections),
     )
@@ -1551,7 +1624,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     sections = _sync_sections_title_levels(sections, mineru_sections)
     tree_levels_display = [_display_level_tag(item) for item in mineru_sections]
     logging.info(
-        "[Financial][树层级] 块合并采用目录树 level: %s",
+        "[Financial][树层级] 块合并采用目录树 level（-1=目录 0=正文 1~=标题）: %s",
         tree_levels_display,
     )
 
@@ -1590,6 +1663,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     chunks_raw = _build_chunks_from_labeled_sections(
         mineru_sections, toc_start_idx, body_start_idx, token_threshold,
+        inline_patterns=inline_patterns,
     )
     if not _assert_text_coverage(mineru_sections, chunks_raw):
         logging.warning("Financial chunk coverage assertion failed, fallback to single chunk.")

@@ -686,10 +686,12 @@ class MinerUParser(RAGFlowPdfParser):
                         section = (output.get("code_body") or "") + self._join_mineru_lines(
                             output.get("code_caption"), "\n"
                         )  
-                    case MinerUContentType.LIST | "list":  
-                        section = self._join_mineru_lines(output.get("list_items"), "\n")  
+                    case MinerUContentType.LIST | "list":
+                        section = self._join_mineru_lines(output.get("list_items"), "\n")
                     case "header":
                         continue
+                    case "footer":
+                        section = output.get("text", "") or ""
                     case "page_number":
                         continue
                     case MinerUContentType.DISCARDED | "discarded":
@@ -1069,11 +1071,14 @@ class MinerUParser(RAGFlowPdfParser):
                 if _table_footnote is not None and str(_table_footnote).strip() != "":
                     row["table_footnote"] = self._mineru_json_field_for_db(_table_footnote)
             elif item_type_db_norm == "table_body":
-                _table_body = item.get("table_body") 
+                _table_body = item.get("table_body")
                 if (_table_body is None or str(_table_body).strip() == "") and item.get("text") is not None and str(item.get("text")).strip() != "":
-                    _table_body = item.get("text") 
+                    _table_body = item.get("text")
                 if _table_body is not None and str(_table_body).strip() != "":
                     row["table_body"] = self._mineru_longtext_for_db(_table_body)
+            else:
+                if item.get("text") is not None and str(item.get("text")).strip() != "":
+                    row["text"] = self._mineru_longtext_for_db(item.get("text"))
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = _normalize_img_path_for_mineru_section(item.get("img_path")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":

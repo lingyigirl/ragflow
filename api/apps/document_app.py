@@ -2440,6 +2440,9 @@ async def mineru_section_chunk_ids():
             img_path = row.get("img_path")
             if img_path:
                 item["img_path"] = img_path
+            text_level = row.get("text_level")
+            if text_level is not None:
+                item["text_level"] = text_level
             result.append(item)
         return get_json_result(data={"doc_id": doc_id, "sections": result, "count": len(result)})
     except Exception as e:

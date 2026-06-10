@@ -649,6 +649,7 @@ class DocumentService(CommonService):
                     MineruSection.bbox,
                     MineruSection.page_idx,
                     MineruSection.img_path,
+                    MineruSection.text_level,
                 )
                 .where(MineruSection.doc_id == str(doc_id).strip())
                 .order_by(MineruSection.page_idx.asc(), MineruSection.id.asc())
