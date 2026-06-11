@@ -1084,7 +1084,9 @@ def _titles_in_index_range(mineru_sections, start, end):
     return titles
 
 
-def _collect_logical_units(mineru_sections, range_start, range_end, unit_stop_depth=1, use_toc_unit_stop=False):
+def _collect_logical_units(
+    mineru_sections, range_start, range_end, unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None,
+):
     units = []
     i = range_start
     seen_d1 = False
@@ -1101,9 +1103,14 @@ def _collect_logical_units(mineru_sections, range_start, range_end, unit_stop_de
             if _is_noise_section(_section_text(mineru_sections[j])):
                 j += 1
                 continue
-            d = _section_title_level(mineru_sections[j])
-            if d == TOC_SECTION_LEVEL or d == unit_stop_depth:
-                break
+            if use_toc_unit_stop and toc_kind_depth:
+                toc_d = _toc_depth_for_text(_section_text(mineru_sections[j]), toc_kind_depth)
+                if toc_d == unit_stop_depth:
+                    break
+            else:
+                d = _section_title_level(mineru_sections[j])
+                if d == TOC_SECTION_LEVEL or d == unit_stop_depth:
+                    break
             j += 1
         return j
 
@@ -1143,11 +1150,27 @@ def _collect_logical_units(mineru_sections, range_start, range_end, unit_stop_de
             units.append({"type": "leading_zero", "start": s, "end": i})
             continue
 
-        if use_toc_unit_stop and depth > 0:
-            s = i
-            i = _extend_until_unit_stop(s)
-            units.append({"type": "orphan", "start": s, "end": i})
-            continue
+        if use_toc_unit_stop and toc_kind_depth:
+            toc_d = _toc_depth_for_text(_section_text(mineru_sections[i]), toc_kind_depth)
+            if toc_d > 0:
+                s = i
+                i = _extend_until_unit_stop(s)
+                units.append({"type": "orphan", "start": s, "end": i})
+                continue
+            if depth > 0:
+                s = i
+                i += 1
+                while i < range_end:
+                    if _is_noise_section(_section_text(mineru_sections[i])):
+                        i += 1
+                        continue
+                    if _toc_depth_for_text(_section_text(mineru_sections[i]), toc_kind_depth) > 0:
+                        break
+                    if _section_title_level(mineru_sections[i]) == TOC_SECTION_LEVEL:
+                        break
+                    i += 1
+                units.append({"type": "leading_zero", "start": s, "end": i})
+                continue
 
         if not seen_d1 and depth > 0 and depth != 1:
             s = i
@@ -1302,10 +1325,13 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
     return chunks
 
 
-def _scan_merge_range(mineru_sections, range_start, range_end, token_budget, unit_stop_depth=1, use_toc_unit_stop=False):
+def _scan_merge_range(
+    mineru_sections, range_start, range_end, token_budget,
+    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None,
+):
     chunks = []
     units = _collect_logical_units(
-        mineru_sections, range_start, range_end, unit_stop_depth, use_toc_unit_stop,
+        mineru_sections, range_start, range_end, unit_stop_depth, use_toc_unit_stop, toc_kind_depth,
     )
     for unit in units:
         chain_start = unit.get("anchor", unit["start"])
@@ -1322,7 +1348,7 @@ def _scan_merge_range(mineru_sections, range_start, range_end, token_budget, uni
 
 def _build_chunks_from_labeled_sections(
     mineru_sections, toc_start_idx, body_start_idx, token_budget,
-    unit_stop_depth=1, use_toc_unit_stop=False,
+    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None,
 ):
     n = len(mineru_sections)
     chunks = []
@@ -1335,18 +1361,18 @@ def _build_chunks_from_labeled_sections(
             chunks.extend(_scan_merge_range(mineru_sections, toc_start_idx, toc_end, token_budget))
         if toc_end < n:
             chunks.extend(_scan_merge_range(
-                mineru_sections, toc_end, n, token_budget, unit_stop_depth, use_toc_unit_stop,
+                mineru_sections, toc_end, n, token_budget, unit_stop_depth, use_toc_unit_stop, toc_kind_depth,
             ))
     else:
         chunks.extend(_scan_merge_range(
-            mineru_sections, 0, n, token_budget, unit_stop_depth, False,
+            mineru_sections, 0, n, token_budget, unit_stop_depth, False, None,
         ))
 
     chunks.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
     return chunks
 
 
-def _toc_depth_bounds(toc_lines):
+def _parse_toc_kind_depths(toc_lines):
     kind_depth = {}
     stack = []
     depths = []
@@ -1375,28 +1401,37 @@ def _toc_depth_bounds(toc_lines):
         stack.append((0, "", depth, kind))
         depths.append(depth)
     if not depths:
-        return 0, 0
-    return min(depths), max(depths)
+        return {}, 0, 0
+    return kind_depth, min(depths), max(depths)
 
 
-def _resolve_unit_stop_depth(toc_lines, toc_start_idx, body_start_idx, mineru_sections):
+def _toc_depth_bounds(toc_lines):
+    _, toc_min_d, toc_max_d = _parse_toc_kind_depths(toc_lines)
+    return toc_min_d, toc_max_d
+
+
+def _toc_depth_for_text(text, kind_depth):
+    if not kind_depth or not text:
+        return 0
+    stripped = text.strip() if isinstance(text, str) else ""
+    if not stripped:
+        return 0
+    text_stripped = normalize_text_for_title(stripped)
+    if not text_stripped:
+        return 0
+    kind = _detect_title_kind(text_stripped)
+    if kind is None:
+        return 0
+    return kind_depth.get(kind, 0)
+
+
+def _resolve_unit_stop_depth(toc_lines, toc_start_idx):
     if toc_start_idx < 0 or len(toc_lines) < 3:
-        return 1, False
-    toc_min_d, toc_max_d = _toc_depth_bounds(toc_lines)
-    if toc_max_d <= 0:
-        return 1, False
-    body_depths = []
-    for i in range(body_start_idx, len(mineru_sections)):
-        d = _section_title_level(mineru_sections[i])
-        if d > 0:
-            body_depths.append(d)
-    if not body_depths:
-        return 1, False
-    body_base = min(body_depths)
-    unit_stop = body_base + toc_max_d - toc_min_d
-    if unit_stop < 1:
-        unit_stop = 1
-    return unit_stop, True
+        return 1, False, {}
+    kind_depth, _, toc_max_d = _parse_toc_kind_depths(toc_lines)
+    if toc_max_d <= 0 or not kind_depth:
+        return 1, False, {}
+    return toc_max_d, True, kind_depth
 
 
 def _looks_like_toc_entry(stripped):
@@ -1780,12 +1815,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         except Exception:
             pass
 
-    unit_stop_depth, use_toc_unit_stop = _resolve_unit_stop_depth(
-        toc_lines, toc_start_idx, body_start_idx, mineru_sections,
+    unit_stop_depth, use_toc_unit_stop, toc_kind_depth = _resolve_unit_stop_depth(
+        toc_lines, toc_start_idx,
     )
     chunks_raw = _build_chunks_from_labeled_sections(
         mineru_sections, toc_start_idx, body_start_idx, token_budget,
-        unit_stop_depth, use_toc_unit_stop,
+        unit_stop_depth, use_toc_unit_stop, toc_kind_depth,
     )
     if not _assert_text_coverage(mineru_sections, chunks_raw):
         logging.warning("Financial chunk coverage assertion failed, fallback to single chunk.")
