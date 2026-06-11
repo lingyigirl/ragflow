@@ -58,6 +58,34 @@ class MinerUContentType(StrEnum):
     DISCARDED = "discarded"
 
 
+# MinerU 将财报勾选框误判为空的 \boxed{\begin{array}...\end{array}} 公式
+_MINERU_EMPTY_BOXED_ARRAY_RE = re.compile(
+    r"\$?\s*\\boxed\s*\{\s*\\begin\{array\}\{[^}]*\}\s*\\end\{array\}\s*\}\s*\$?",
+    re.IGNORECASE,
+)
+# 无 boxed 包裹的空 array 环境（同类误判）
+_MINERU_EMPTY_ARRAY_ONLY_RE = re.compile(
+    r"\$?\s*\\begin\{array\}\{[^}]*\}\s*\\end\{array\}\s*\$?",
+    re.IGNORECASE,
+)
+
+
+def normalize_mineru_checkbox_latex(text: str) -> str:
+    """将 MinerU 误判为公式的勾选框 LaTeX 还原为可读符号。"""
+    if not text or not isinstance(text, str):
+        return text
+    # 无 LaTeX 勾选特征则原样返回
+    if "\\boxed" not in text and "\\begin{array}" not in text:
+        return text
+    # 空 boxed array → 已勾选 ☑
+    normalized = _MINERU_EMPTY_BOXED_ARRAY_RE.sub("☑", text)
+    # 兜底：单独的空 array 环境
+    normalized = _MINERU_EMPTY_ARRAY_ONLY_RE.sub("☑", normalized)
+    # 合并多余空白，避免替换后留下双空格
+    normalized = re.sub(r"[ \t]{2,}", " ", normalized)
+    return normalized
+
+
 # Mapping from language names to MinerU language codes
 LANGUAGE_TO_MINERU_MAP = {
     'English': 'en',
@@ -718,6 +746,8 @@ class MinerUParser(RAGFlowPdfParser):
 
                 _cid = output.get("chunk_id") or output.get("chuck_id") or output.get("id") or output.get("block_id") or ""
                 _cid = str(_cid).strip()[:64] if _cid else ""
+                if section:
+                    section = normalize_mineru_checkbox_latex(str(section))
                 if section and parse_method == "manual":
                     sections.append((section, output["type"], self._line_tag(output), _cid))
                 elif section and parse_method == "paper":
@@ -1090,7 +1120,7 @@ class MinerUParser(RAGFlowPdfParser):
             item_type_db_norm = str(item_type_db).strip().lower()  
             if item_type_db_norm == "text":
                 if item.get("text") is not None and str(item.get("text")).strip() != "":
-                    _text = str(item.get("text"))
+                    _text = normalize_mineru_checkbox_latex(str(item.get("text")))
                     _tl = row.get("text_level")
                     if _tl is not None and isinstance(_tl, int) and _tl > 0:
                         _level = max(1, min(6, _tl))
@@ -1138,7 +1168,9 @@ class MinerUParser(RAGFlowPdfParser):
                     if _img_parts:
                         row["text"] = self._mineru_longtext_for_db("\n".join(_img_parts))
                 elif item.get("text") is not None and str(item.get("text")).strip() != "":
-                    row["text"] = self._mineru_longtext_for_db(item.get("text"))
+                    row["text"] = self._mineru_longtext_for_db(
+                        normalize_mineru_checkbox_latex(str(item.get("text")))
+                    )
             if "img_path" in item and item.get("img_path") is not None and str(item.get("img_path")).strip() != "":
                 row["img_path"] = _normalize_img_path_for_mineru_section(item.get("img_path")) 
             if "sub_type" in item and item.get("sub_type") is not None and str(item.get("sub_type")).strip() != "":

@@ -125,11 +125,12 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
             logging.warning(f"Not all the retrieval into prompt: {len(knowledges)}/{kwlg_len}")
             break
 
+    from api.utils.json_encode import unicode_unescape_text
     docs = DocumentService.get_by_ids([get_value(ck, "doc_id", "document_id") for ck in kbinfos["chunks"][:chunks_num]])
     toc_map = {}
     for d in docs:
         if hasattr(d, 'tree') and d.tree and isinstance(d.tree, dict):
-            toc_text = d.tree.get("toc", "")
+            toc_text = unicode_unescape_text(d.tree.get("toc", ""))
             if toc_text:
                 toc_map[d.id] = toc_text
     docs = {d.id: d.meta_fields for d in docs}

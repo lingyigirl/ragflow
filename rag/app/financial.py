@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
 
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
-from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env
+from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env, normalize_mineru_checkbox_latex
 
 load_dotenv()
 
@@ -895,7 +895,8 @@ def _merge_table_with_adjacent(content_sections):
 
 
 def _section_text(item):
-    return item[0] if len(item) >= 1 else str(item)
+    raw = item[0] if len(item) >= 1 else str(item)
+    return normalize_mineru_checkbox_latex(raw)
 
 
 def _section_title_level(item):
@@ -905,7 +906,8 @@ def _section_title_level(item):
     return get_section_title_level(text)
 
 
-def _display_level_tag(item):
+def _display_depth_tag(item):
+    """日志用：展示块在目录树/诱导后的结构 depth（非静态标题 level）。"""
     text = _section_text(item)
     if not text or not str(text).strip():
         return "空"
@@ -916,11 +918,21 @@ def _display_level_tag(item):
     return _section_title_level(item)
 
 
-def _levels_display_for_range(mineru_sections, start, end):
+def _display_title_level_tag(item):
+    """日志用：展示 get_section_title_level 的静态标题层级（0~4）。"""
+    text = _section_text(item)
+    if not text or not str(text).strip():
+        return "空"
+    if is_html_table(text):
+        return "tab"
+    return get_section_title_level(text)
+
+
+def _depths_display_for_range(mineru_sections, start, end):
     tags = []
     for i in range(start, end):
         if 0 <= i < len(mineru_sections):
-            tags.append(_display_level_tag(mineru_sections[i]))
+            tags.append(_display_depth_tag(mineru_sections[i]))
     return tags
 
 
@@ -1486,17 +1498,11 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             title_level = 0 if (not text or is_html_table(text)) else get_section_title_level(text)
             mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
     mineru_sections = mineru_sections_with_level
-    levels_display = [_display_level_tag(item) for item in mineru_sections]
+    title_levels_display = [_display_title_level_tag(item) for item in mineru_sections]
     logging.info(
-        "[Financial][打标] 层级序列（0=正文 1~4=标题 tab=表格 空=空行）: %s",
-        levels_display,
+        "[Financial][静态标题] 标题层级序列（0=正文 1~4=标题 tab=表格 空=空行，非分块 depth）: %s",
+        title_levels_display,
     )
-    for idx, sec in enumerate(mineru_sections):
-        preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
-        logging.info(
-            "[Financial][打标] [%d] level=%s text=%s",
-            idx, levels_display[idx] if idx < len(levels_display) else "?", preview,
-        )
 #
     def _normalize_pos_list(poss):
         norm = []
@@ -1602,10 +1608,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     )
     sections = _sync_sections_title_levels(sections, mineru_sections)
     if induced:
-        levels_aligned = [_display_level_tag(item) for item in mineru_sections]
+        depths_induced = [_display_depth_tag(item) for item in mineru_sections]
         logging.info(
-            "[Financial][动态层级] 按出现顺序诱导后: %s",
-            levels_aligned,
+            "[Financial][诱导depth] 按出现顺序诱导后: %s",
+            depths_induced,
         )
 
     inline_patterns = _scan_inline_enum_patterns(mineru_sections, scan_start, len(mineru_sections))
@@ -1642,11 +1648,19 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         mineru_sections, tree_level_by_index, level_map, toc_start_idx, body_start_idx,
     )
     sections = _sync_sections_title_levels(sections, mineru_sections)
-    tree_levels_display = [_display_level_tag(item) for item in mineru_sections]
+    depths_display = [_display_depth_tag(item) for item in mineru_sections]
     logging.info(
-        "[Financial][树层级] 块合并采用目录树 level（-1=目录 0=正文 1~=标题）: %s",
-        tree_levels_display,
+        "[Financial][树depth] 块合并采用的目录树 depth（-1=目录 0=正文 1~=标题深度）: %s",
+        depths_display,
     )
+    for idx, sec in enumerate(mineru_sections):
+        preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
+        logging.info(
+            "[Financial][打标] [%d] depth=%s text=%s",
+            idx,
+            depths_display[idx] if idx < len(depths_display) else "?",
+            preview,
+        )
 
     cross_ref = None
     if toc_items and tenant_id:
@@ -1666,11 +1680,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     }
     if cross_ref:
         tree_data["cross_ref"] = cross_ref
-# 入库存储的目录结构树内容
     toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
     logging.info("入库存储的目录结构树内容：\n[Financial] tree_data source=%s nodes=%s toc_len=%s cross_ref=%s toc_preview=%s",
                  tree_data["source"], len(tree_nodes), len(toc_text_output), bool(cross_ref), toc_preview)
-#    
     if doc_id and tenant_id:
         try:
             from api.db.services.document_service import DocumentService
@@ -1705,15 +1717,15 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     for ci, chunk_raw in enumerate(chunks_raw):
         ms, me = chunk_raw.get("mineru_range", (0, 0))
-        lv_seq = _levels_display_for_range(mineru_sections, ms, me)
+        depth_seq = _depths_display_for_range(mineru_sections, ms, me)
         content_preview = (chunk_raw.get("content") or "").replace("\n", " ")[:100]
         logging.info(
-            "[Financial][分块] chunk=%d/%d range=[%d,%d) levels=%s parent_chain=%s preview=%s",
+            "[Financial][分块] chunk=%d/%d range=[%d,%d) depths=%s parent_chain=%s preview=%s",
             ci + 1,
             len(chunks_raw),
             ms,
             me,
-            lv_seq,
+            depth_seq,
             chunk_raw.get("parent_chain", []),
             content_preview,
         )
@@ -1752,6 +1764,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         chunks.append(ck_content)
         chunk_positions.append(poss_list)
         chunk_chains.append(ck_chain)
+
+    from api.utils.json_encode import normalize_parent_chain_for_storage
+    chunk_chains = [normalize_parent_chain_for_storage(c) for c in chunk_chains]
 
     if doc_id and tenant_id and chunk_chains and sections:
         try:

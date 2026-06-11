@@ -16,8 +16,48 @@
 
 import datetime
 import json
+import re
 from enum import Enum, IntEnum
 from api.utils.common import string_to_bytes, bytes_to_string
+
+# 识别 JSON 风格的 \\uXXXX 转义片段
+_UNICODE_ESCAPE_FRAGMENT_RE = re.compile(r"\\u[0-9a-fA-F]{4}|\\U[0-9a-fA-F]{8}")
+
+
+def unicode_unescape_text(text):
+    """将误存为 \\uXXXX 字面量的字符串还原为可读文本；正常中文/英文原样返回。"""
+    if not isinstance(text, str) or not text:
+        return text
+    if not _UNICODE_ESCAPE_FRAGMENT_RE.search(text):
+        return text
+    try:
+        return text.encode("utf-8").decode("unicode_escape")
+    except (UnicodeError, UnicodeDecodeError):
+        return text
+
+
+def unicode_unescape_text_fields(obj):
+    """递归还原 JSON 字段中误存的 \\uXXXX 字面量文本。"""
+    if isinstance(obj, str):
+        return unicode_unescape_text(obj)
+    if isinstance(obj, dict):
+        restored = {}
+        for key, value in obj.items():
+            restored_key = unicode_unescape_text(key) if isinstance(key, str) else key
+            restored[restored_key] = unicode_unescape_text_fields(value)
+        return restored
+    if isinstance(obj, list):
+        return [unicode_unescape_text_fields(item) for item in obj]
+    return obj
+
+
+def normalize_parent_chain_for_storage(chain):
+    """写入 parent_chain 前确保为可读中文/英文，而非 \\uXXXX 字面量。"""
+    if not chain:
+        return chain
+    if not isinstance(chain, list):
+        return chain
+    return [unicode_unescape_text(item) if isinstance(item, str) else item for item in chain]
 
 
 class BaseType:
@@ -81,7 +121,9 @@ def json_dumps(src, byte=False, indent=None, with_type=False):
         src,
         indent=indent,
         cls=CustomJSONEncoder,
-        with_type=with_type)
+        with_type=with_type,
+        ensure_ascii=False,
+    )
     if byte:
         dest = string_to_bytes(dest)
     return dest

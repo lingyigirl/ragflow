@@ -2511,6 +2511,14 @@ async def get_mineru_section_field():
                     code=RetCode.ARGUMENT_ERROR,
                 )
 
+        from api.utils.json_encode import normalize_parent_chain_for_storage
+
+        def _normalize_mineru_field_value(field_name, value):
+            # parent_chain 误存为 \\uXXXX 字面量时，接口返回前还原为可读文本
+            if field_name == "parent_chain":
+                return normalize_parent_chain_for_storage(value)
+            return value
+
         missing_chunk_ids = []
         chunk_data = {}
         for cid in chunk_ids:
@@ -2519,9 +2527,14 @@ async def get_mineru_section_field():
                 missing_chunk_ids.append(cid)
                 continue
             if is_multi_field:
-                chunk_data[cid] = {fn: getattr(section, fn, None) for fn in field_names}
+                chunk_data[cid] = {
+                    fn: _normalize_mineru_field_value(fn, getattr(section, fn, None))
+                    for fn in field_names
+                }
             else:
-                chunk_data[cid] = getattr(section, field_names[0], None)
+                chunk_data[cid] = _normalize_mineru_field_value(
+                    field_names[0], getattr(section, field_names[0], None)
+                )
 
         if not is_multi_chunk and not is_multi_field:
             if missing_chunk_ids:

@@ -716,8 +716,9 @@ class Dealer:
                 from api.db.services.document_service import DocumentService
                 docs = DocumentService.query(id=doc_id)
                 if docs:
+                    from api.utils.json_encode import unicode_unescape_text_fields
                     tree = docs[0].tree or {}
-                    cross_ref = tree.get("cross_ref", None)
+                    cross_ref = unicode_unescape_text_fields(tree.get("cross_ref", None))
             except Exception:
                 pass
 
