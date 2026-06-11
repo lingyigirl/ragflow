@@ -1097,20 +1097,30 @@ def _collect_logical_units(
             idx += 1
         return idx
 
-    def _extend_until_unit_stop(start):
+    def _extend_until_tree_stop(start, stop_depth):
         j = start + 1
         while j < range_end:
             if _is_noise_section(_section_text(mineru_sections[j])):
                 j += 1
                 continue
-            if use_toc_unit_stop and toc_kind_depth:
-                toc_d = _toc_depth_for_text(_section_text(mineru_sections[j]), toc_kind_depth)
-                if toc_d == unit_stop_depth:
-                    break
-            else:
-                d = _section_title_level(mineru_sections[j])
-                if d == TOC_SECTION_LEVEL or d == unit_stop_depth:
-                    break
+            d = _section_title_level(mineru_sections[j])
+            if d == TOC_SECTION_LEVEL or d == stop_depth:
+                break
+            j += 1
+        return j
+
+    def _extend_until_toc_stop(start, stop_depth, kind_depth):
+        j = start + 1
+        while j < range_end:
+            if _is_noise_section(_section_text(mineru_sections[j])):
+                j += 1
+                continue
+            d = _section_title_level(mineru_sections[j])
+            if d == TOC_SECTION_LEVEL:
+                break
+            toc_d = _toc_depth_for_text(_section_text(mineru_sections[j]), kind_depth)
+            if toc_d == stop_depth:
+                break
             j += 1
         return j
 
@@ -1154,27 +1164,13 @@ def _collect_logical_units(
             toc_d = _toc_depth_for_text(_section_text(mineru_sections[i]), toc_kind_depth)
             if toc_d > 0:
                 s = i
-                i = _extend_until_unit_stop(s)
+                i = _extend_until_toc_stop(s, unit_stop_depth, toc_kind_depth)
                 units.append({"type": "orphan", "start": s, "end": i})
-                continue
-            if depth > 0:
-                s = i
-                i += 1
-                while i < range_end:
-                    if _is_noise_section(_section_text(mineru_sections[i])):
-                        i += 1
-                        continue
-                    if _toc_depth_for_text(_section_text(mineru_sections[i]), toc_kind_depth) > 0:
-                        break
-                    if _section_title_level(mineru_sections[i]) == TOC_SECTION_LEVEL:
-                        break
-                    i += 1
-                units.append({"type": "leading_zero", "start": s, "end": i})
                 continue
 
         if not seen_d1 and depth > 0 and depth != 1:
             s = i
-            i = _extend_until_unit_stop(s)
+            i = _extend_until_tree_stop(s, unit_stop_depth)
             units.append({"type": "orphan", "start": s, "end": i})
             continue
 
@@ -1217,7 +1213,7 @@ def _collect_logical_units(
 
         if seen_d1 and depth > 1:
             s = i
-            i = _extend_until_unit_stop(s)
+            i = _extend_until_tree_stop(s, unit_stop_depth)
             units.append({"type": "orphan", "start": s, "end": i})
             continue
 
