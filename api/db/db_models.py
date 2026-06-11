@@ -858,7 +858,7 @@ class MineruSection(DataBaseModel):
     page_idx = IntegerField(null=True) 
     text_level = IntegerField(null=True) 
 
-    img_path = CharField(max_length=1024, null=True) 
+    img_path = CharField(max_length=2048, null=True) 
     table_caption = JSONField(null=True) 
     table_footnote = JSONField(null=True) 
     table_body = LongTextField(null=True)

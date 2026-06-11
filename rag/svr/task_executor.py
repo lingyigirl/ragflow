@@ -63,7 +63,7 @@ from rag.app import laws, paper, presentation, manual, qa, table, book, resume, 
     email, tag
 from rag.nlp import search, rag_tokenizer, add_positions
 from rag.raptor import RecursiveAbstractiveProcessing4TreeOrganizedRetrieval as Raptor
-from common.token_utils import num_tokens_from_string, truncate
+from common.token_utils import num_tokens_from_string, encode_texts_respecting_length
 from rag.utils.redis_conn import REDIS_CONN, RedisDistributedLock
 from graphrag.utils import chat_limiter
 from common.signal_utils import start_tracemalloc_and_snapshot, stop_tracemalloc
@@ -813,7 +813,7 @@ async def embedding(docs, mdl, parser_config=None, callback=None):
     @timeout(60)
     def batch_encode(txts):
         nonlocal mdl
-        return mdl.encode([truncate(c, mdl.max_length - 10) for c in txts])
+        return encode_texts_respecting_length(mdl, txts)
 
     cnts_ = np.array([])
     for i in range(0, len(cnts), settings.EMBEDDING_BATCH_SIZE):
@@ -896,7 +896,7 @@ async def run_dataflow(task: dict):
             @timeout(60)
             def batch_encode(txts):
                 nonlocal embedding_model
-                return embedding_model.encode([truncate(c, embedding_model.max_length - 10) for c in txts])
+                return encode_texts_respecting_length(embedding_model, txts)
 
             vects = np.array([])
             texts = [o.get("questions", o.get("summary", o["text"])) for o in chunks]

@@ -546,11 +546,6 @@ def _sync_sections_title_levels(sections, mineru_sections):
     return synced
 
 
-def estimate_tokens(text):
-    from common.token_utils import num_tokens_from_string
-    return num_tokens_from_string(text)
-
-
 class TocNode:
     def __init__(self, title, label=None, depth=0, page_start=0, contains_table=False):
         self.title = title
@@ -1051,218 +1046,266 @@ def _demote_inline_enum_titles_for_tree(mineru_sections, level_map, patterns):
     return updated, new_map
 
 
-def _find_inline_enum_merge_spans(mineru_sections, range_start, range_end, patterns=None):
-    if patterns is None:
-        patterns = _scan_inline_enum_patterns(mineru_sections, range_start, range_end)
-    spans = []
-    for pattern in patterns:
-        bs = pattern["block_start"]
-        be = pattern["block_end"]
-        if be <= range_start or bs >= range_end:
-            continue
-        rel_s = max(bs, range_start) - range_start
-        rel_e = min(be, range_end) - range_start
-        if rel_s < rel_e:
-            spans.append((rel_s, rel_e))
-    return spans
-
-
-def _apply_inline_enum_merge_to_split_points(split_points, merge_spans):
-    if not merge_spans:
-        return split_points
-    out = set(split_points)
-    for ms, me in merge_spans:
-        out.add(ms)
-        if me not in out:
-            out.add(me)
-        for p in list(out):
-            if ms < p < me:
-                out.discard(p)
-    return sorted(out)
-
-
-def build_chunk_points_by_title_level(lines_with_level):
-    if not lines_with_level:
-        return [0]
-
-    levels = [
-        item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0
-        for item in lines_with_level
-    ]
-    n = len(levels)
-
-    level_to_indices = {}
-    for i, lvl in enumerate(levels):
-        if lvl > 0:
-            level_to_indices.setdefault(lvl, []).append(i)
-
-    chunk_starts = [0]
-    for i, lvl in enumerate(levels):
-        if lvl > 0 and len(level_to_indices.get(lvl, [])) > 1:
-            if i not in chunk_starts:
-                chunk_starts.append(i)
-
-    if n not in chunk_starts:
-        chunk_starts.append(n)
-
-    return sorted(set(chunk_starts))
-
-
-def _level1_chunk_points(lines_with_level):
-    n = len(lines_with_level)
-    if n == 0:
-        return [0]
-    points = {0, n}
-    for idx, item in enumerate(lines_with_level):
-        lvl = item[1] if isinstance(item, (list, tuple)) and len(item) >= 2 else 0
-        if lvl == 1:
-            points.add(idx)
-    return sorted(points)
-
-
-def _labeled_split_points(lines_with_level):
-    return sorted(set(build_chunk_points_by_title_level(lines_with_level)) | set(_level1_chunk_points(lines_with_level)))
-
-
-def _lines_with_level_for_range(mineru_sections, start, end):
-    lines = []
-    for i in range(start, end):
-        item = mineru_sections[i]
-        text = _section_text(item)
-        if is_html_table(text):
-            lines.append((text, 0))
-        else:
-            lines.append((text, _section_title_level(item)))
-    return lines
-
-
-def _title_stack_at(mineru_sections, start, end):
-    stack = []
-    for k in range(start, end):
-        stack = _apply_title_stack(stack, mineru_sections[k])
-    return stack
-
-
-def _apply_title_stack(stack, item):
-    text = _section_text(item).strip()
-    if not text or is_html_table(text):
-        return stack
-    level = _section_title_level(item)
-    if level <= 0:
-        return stack
-    stack = list(stack)
-    while stack and stack[-1][1] >= level:
-        stack.pop()
-    stack.append((text, level))
-    return stack
-
-
-def _stack_to_chain(stack):
-    return [title for title, _ in stack]
-
-
 def _join_sections_range(mineru_sections, start, end):
     parts = []
     for item in mineru_sections[start:end]:
         text = _section_text(item)
         if not _is_noise_section(text):
             parts.append(text)
-    return '\n'.join(parts)
+    return "\n".join(parts)
 
 
-def _process_labeled_range(mineru_sections, range_start, range_end, token_threshold, inline_patterns=None):
-    if range_start >= range_end:
+def _titles_in_index_range(mineru_sections, start, end):
+    titles = []
+    for idx in range(start, end):
+        if idx < 0 or idx >= len(mineru_sections):
+            continue
+        item = mineru_sections[idx]
+        text = _section_text(item)
+        if _is_noise_section(text):
+            continue
+        level = _section_title_level(item)
+        if level > 0:
+            stripped = text.strip()
+            if stripped:
+                titles.append(stripped)
+    return titles
+
+
+def _collect_logical_units(mineru_sections, range_start, range_end):
+    units = []
+    i = range_start
+    seen_d1 = False
+    last_d1_idx = None
+
+    def _advance_noise(idx):
+        while idx < range_end and _is_noise_section(_section_text(mineru_sections[idx])):
+            idx += 1
+        return idx
+
+    while i < range_end:
+        i = _advance_noise(i)
+        if i >= range_end:
+            break
+
+        depth = _section_title_level(mineru_sections[i])
+
+        if depth == TOC_SECTION_LEVEL:
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                if _section_title_level(mineru_sections[i]) != TOC_SECTION_LEVEL:
+                    break
+                i += 1
+            units.append({"type": "toc", "start": s, "end": i})
+            continue
+
+        if not seen_d1 and depth <= 0:
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                d = _section_title_level(mineru_sections[i])
+                if d == TOC_SECTION_LEVEL:
+                    break
+                if d > 0:
+                    break
+                i += 1
+            units.append({"type": "leading_zero", "start": s, "end": i})
+            continue
+
+        if not seen_d1 and depth > 0 and depth != 1:
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                d = _section_title_level(mineru_sections[i])
+                if d == TOC_SECTION_LEVEL or d == 1:
+                    break
+                if d > 0:
+                    break
+                i += 1
+            units.append({"type": "orphan", "start": s, "end": i})
+            continue
+
+        if depth == 1:
+            seen_d1 = True
+            last_d1_idx = i
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                d = _section_title_level(mineru_sections[i])
+                if d == TOC_SECTION_LEVEL:
+                    break
+                if d == 1:
+                    break
+                i += 1
+            units.append({"type": "d1_unit", "start": s, "end": i, "anchor": s})
+            continue
+
+        if seen_d1 and depth <= 0:
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                d = _section_title_level(mineru_sections[i])
+                if d == TOC_SECTION_LEVEL or d == 1:
+                    break
+                i += 1
+            units.append({
+                "type": "d1_continuation",
+                "start": s,
+                "end": i,
+                "anchor": last_d1_idx if last_d1_idx is not None else s,
+            })
+            continue
+
+        if not seen_d1:
+            s = i
+            i += 1
+            while i < range_end:
+                if _is_noise_section(_section_text(mineru_sections[i])):
+                    i += 1
+                    continue
+                if _section_title_level(mineru_sections[i]) == TOC_SECTION_LEVEL:
+                    break
+                i += 1
+            units.append({"type": "no_d1_body", "start": s, "end": i})
+            continue
+
+        i += 1
+
+    return units
+
+
+def _unit_parent_chain(mineru_sections, unit_start, chunk_end_exclusive, chain_start=None):
+    if chunk_end_exclusive <= unit_start:
+        return []
+    start = chain_start if chain_start is not None else unit_start
+    return _titles_in_index_range(mineru_sections, start, chunk_end_exclusive)
+
+
+def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token_budget, unit_type, chain_start=None):
+    from common.token_utils import num_tokens_from_string, split_text_by_token_budget
+
+    if unit_start >= unit_end:
+        return []
+
+    pieces = []
+    for idx in range(unit_start, unit_end):
+        item = mineru_sections[idx]
+        text = _section_text(item)
+        if _is_noise_section(text):
+            continue
+        body = text.strip()
+        if not body:
+            continue
+        if is_html_table(body):
+            pieces.append({"indices": [idx], "text": body, "tokens": num_tokens_from_string(body), "atomic": True})
+            continue
+        tokens = num_tokens_from_string(body)
+        if tokens <= token_budget:
+            pieces.append({"indices": [idx], "text": body, "tokens": tokens, "atomic": False})
+        else:
+            for part in split_text_by_token_budget(body, token_budget):
+                if part.strip():
+                    pieces.append({
+                        "indices": [idx],
+                        "text": part,
+                        "tokens": num_tokens_from_string(part),
+                        "atomic": False,
+                    })
+
+    if not pieces:
         return []
 
     chunks = []
-    lines_with_level = _lines_with_level_for_range(mineru_sections, range_start, range_end)
-    merge_spans = _find_inline_enum_merge_spans(
-        mineru_sections, range_start, range_end, patterns=inline_patterns,
-    )
-    split_points = _apply_inline_enum_merge_to_split_points(
-        _labeled_split_points(lines_with_level), merge_spans,
-    )
+    buf_texts = []
+    buf_indices = set()
+    buf_tokens = 0
 
-    for si in range(len(split_points) - 1):
-        rel_s = split_points[si]
-        rel_e = split_points[si + 1]
-        abs_s = range_start + rel_s
-        abs_e = range_start + rel_e
+    def _flush_buffer():
+        nonlocal buf_texts, buf_indices, buf_tokens
+        if not buf_texts:
+            return
+        chunk_start = min(buf_indices)
+        chunk_end = max(buf_indices) + 1
+        chain = [] if unit_type == "toc" else _unit_parent_chain(
+            mineru_sections, unit_start, chunk_end, chain_start=chain_start,
+        )
+        chunks.append({
+            "content": "\n".join(buf_texts),
+            "parent_chain": chain,
+            "mineru_range": (chunk_start, chunk_end),
+        })
+        buf_texts = []
+        buf_indices = set()
+        buf_tokens = 0
 
-        buf_start = None
-        title_stack = []
-        j = abs_s
+    for piece in pieces:
+        piece_tokens = piece["tokens"]
+        join_cost = 1 if buf_texts else 0
+        if piece.get("atomic") and buf_texts and buf_tokens + join_cost + piece_tokens > token_budget:
+            _flush_buffer()
+        elif not piece.get("atomic") and buf_texts and buf_tokens + join_cost + piece_tokens > token_budget:
+            _flush_buffer()
 
-        def flush_buf(end_idx):
-            nonlocal buf_start, title_stack
-            if buf_start is None or end_idx <= buf_start:
-                buf_start = None
-                return
-            chunks.append({
-                "content": _join_sections_range(mineru_sections, buf_start, end_idx),
-                "parent_chain": _stack_to_chain(title_stack),
-                "mineru_range": (buf_start, end_idx),
-            })
-            buf_start = None
+        if not buf_texts and piece_tokens > token_budget:
+            buf_texts.append(piece["text"])
+            buf_indices.update(piece["indices"])
+            _flush_buffer()
+            continue
 
-        while j < abs_e:
-            item = mineru_sections[j]
-            text = _section_text(item)
+        buf_texts.append(piece["text"])
+        buf_indices.update(piece["indices"])
+        buf_tokens += piece_tokens + join_cost
 
-            if is_html_table(text):
-                flush_buf(j)
-                table_chain = _stack_to_chain(_title_stack_at(mineru_sections, abs_s, j))
-                chunks.append({
-                    "content": text.strip(),
-                    "parent_chain": table_chain,
-                    "mineru_range": (j, j + 1),
-                })
-                j += 1
-                continue
-
-            if buf_start is not None:
-                trial = _join_sections_range(mineru_sections, buf_start, j + 1)
-                if trial.strip() and estimate_tokens(trial) > token_threshold:
-                    flush_buf(j)
-
-            if buf_start is None:
-                buf_start = j
-                title_stack = _title_stack_at(mineru_sections, abs_s, j)
-
-            title_stack = _apply_title_stack(title_stack, item)
-            j += 1
-
-        flush_buf(abs_e)
-
+    _flush_buffer()
     return chunks
 
 
-def _build_chunks_from_labeled_sections(
-    mineru_sections, toc_start_idx, body_start_idx, token_threshold, inline_patterns=None,
-):
+def _scan_merge_range(mineru_sections, range_start, range_end, token_budget):
+    chunks = []
+    units = _collect_logical_units(mineru_sections, range_start, range_end)
+    for unit in units:
+        chain_start = unit.get("anchor", unit["start"])
+        chunks.extend(_split_logical_unit_into_chunks(
+            mineru_sections,
+            unit["start"],
+            unit["end"],
+            token_budget,
+            unit["type"],
+            chain_start=chain_start,
+        ))
+    return chunks
+
+
+def _build_chunks_from_labeled_sections(mineru_sections, toc_start_idx, body_start_idx, token_budget):
     n = len(mineru_sections)
     chunks = []
 
     if toc_start_idx >= 0:
         toc_end = min(max(body_start_idx, toc_start_idx + 1), n)
-        if toc_start_idx < toc_end:
-            chunks.append({
-                "content": _join_sections_range(mineru_sections, toc_start_idx, toc_end),
-                "parent_chain": [],
-                "mineru_range": (toc_start_idx, toc_end),
-            })
         if toc_start_idx > 0:
-            chunks.extend(_process_labeled_range(
-                mineru_sections, 0, toc_start_idx, token_threshold, inline_patterns=inline_patterns,
-            ))
+            chunks.extend(_scan_merge_range(mineru_sections, 0, toc_start_idx, token_budget))
+        if toc_start_idx < toc_end:
+            chunks.extend(_scan_merge_range(mineru_sections, toc_start_idx, toc_end, token_budget))
         if toc_end < n:
-            chunks.extend(_process_labeled_range(
-                mineru_sections, toc_end, n, token_threshold, inline_patterns=inline_patterns,
-            ))
+            chunks.extend(_scan_merge_range(mineru_sections, toc_end, n, token_budget))
     else:
-        chunks.extend(_process_labeled_range(
-            mineru_sections, 0, n, token_threshold, inline_patterns=inline_patterns,
-        ))
+        chunks.extend(_scan_merge_range(mineru_sections, 0, n, token_budget))
 
     chunks.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
     return chunks
@@ -1329,16 +1372,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     tenant_id = kwargs.get("tenant_id")
     kb_id = kwargs.get("kb_id")
     doc_id = kwargs.get("doc_id")
-
-    token_threshold = 8192
-    if tenant_id:
-        try:
-            from api.db.services.llm_service import LLMBundle
-            from common.constants import LLMType
-            embd_bundle = LLMBundle(tenant_id, LLMType.EMBEDDING)
-            token_threshold = embd_bundle.max_length
-        except Exception:
-            pass
 
     sections, tbls = [], []
     table_indices_in_mineru = []
@@ -1432,7 +1465,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     mineru_sections_with_level = []
     for item in mineru_sections:
         chunk_id = ""
-        if len(item) >= 4:
+        # MinerU 默认三元组 (text, pos, chunk_id)，manual 模式为四元组，chunk_id 均在末尾
+        if len(item) >= 3:
             _raw = str(item[-1] or "").strip()
             if len(_raw) <= 64:
                 chunk_id = _raw
@@ -1661,9 +1695,19 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if callback:
         callback(0.3, "Building chunks (Financial)...")
 
+    from common.token_utils import embedding_token_budget
+    token_budget = embedding_token_budget(8192)
+    if tenant_id:
+        try:
+            from api.db.services.llm_service import LLMBundle
+            from common.constants import LLMType
+            embd_bundle = LLMBundle(tenant_id, LLMType.EMBEDDING)
+            token_budget = embedding_token_budget(embd_bundle.max_length)
+        except Exception:
+            pass
+
     chunks_raw = _build_chunks_from_labeled_sections(
-        mineru_sections, toc_start_idx, body_start_idx, token_threshold,
-        inline_patterns=inline_patterns,
+        mineru_sections, toc_start_idx, body_start_idx, token_budget,
     )
     if not _assert_text_coverage(mineru_sections, chunks_raw):
         logging.warning("Financial chunk coverage assertion failed, fallback to single chunk.")
@@ -1737,7 +1781,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                             logging.info("[Financial] mineru_parent_chain chunk=%s/%s chain=[] skipped", ci + 1, total_chain_count)
                             continue
                         ms, me = chunks_raw[ci].get("mineru_range", (0, 0)) if ci < len(chunks_raw) else (0, 0)
-                        sec_ids = [sections[li][3] for li in range(ms, me) if 0 <= li < len(sections) and len(sections[li]) > 3 and sections[li][3]]
+                        # sections 元组为 (text, idx, poss, title_level, chunk_id)，chunk_id 在索引 4
+                        sec_ids = [
+                            sections[li][4]
+                            for li in range(ms, me)
+                            if 0 <= li < len(sections) and len(sections[li]) > 4 and sections[li][4]
+                        ]
                         if sec_ids:
                             MineruSection.update(parent_chain=pchain).where(MineruSection.chunk_id.in_(sec_ids)).execute()
                             updated_count = len(sec_ids)

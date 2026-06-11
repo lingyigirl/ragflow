@@ -41,7 +41,7 @@ from deepdoc.parser.pdf_parser import RAGFlowPdfParser
 from common import settings
 
 DOCUMENT_PUBLIC_DOWNLOAD_PREFIX = "/v1/document/public_download"
-MINERU_SECTION_IMG_PATH_MAX_LEN = 1024
+MINERU_SECTION_IMG_PATH_MAX_LEN = 2048
 
 LOCK_KEY_pdfplumber = "global_shared_lock_pdfplumber"
 if LOCK_KEY_pdfplumber not in sys.modules:
@@ -777,7 +777,18 @@ class MinerUParser(RAGFlowPdfParser):
             return None  
         s = str(p).strip()  
         if len(s) <= max_len:  
-            return s  
+            return s
+        
+        # 如果包含查询参数（?），保护查询参数不被截断
+        if "?" in s:
+            base_path, query_string = s.split("?", 1)
+            # 为查询参数预留空间（加上 "?" 本身）
+            query_len = len(query_string) + 1
+            available_len = max(max_len - query_len, 50)  # 至少保留50字符的base路径
+            if available_len > 0 and len(base_path) > available_len:
+                truncated_base = base_path[:available_len - 1] + "…"
+                return truncated_base + "?" + query_string
+        
         return s[: max_len - 1] + "…"  
 
     @staticmethod
