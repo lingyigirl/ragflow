@@ -1491,20 +1491,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         "[Financial][打标] 层级序列（0=正文 1~4=标题 tab=表格 空=空行）: %s",
         levels_display,
     )
-    lines_with_level_preview = [
-        (item[0], item[2]) if len(item) >= 3 else (item[0] if len(item) >= 1 else "", 0)
-        for item in mineru_sections
-    ]
-    label_split_preview = _labeled_split_points(lines_with_level_preview)
-    preview_chunks_levels = [
-        levels_display[s:e]
-        for s, e in zip(label_split_preview, label_split_preview[1:] + [len(levels_display)])
-        if s < e
-    ]
-    logging.info(
-        "[Financial][打标] 按层级切分预览（连续0会并入同段，表格 tab 在合并阶段单独成块）: %s",
-        preview_chunks_levels,
-    )
     for idx, sec in enumerate(mineru_sections):
         preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
         logging.info(

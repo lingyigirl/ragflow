@@ -16,6 +16,7 @@
 
 
 import os
+import re  # split_text_preserving_tables 中解析 HTML 表格块需要正则
 import tiktoken
 import numpy as np
 
