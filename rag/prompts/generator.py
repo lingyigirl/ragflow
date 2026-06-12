@@ -125,17 +125,32 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
             logging.warning(f"Not all the retrieval into prompt: {len(knowledges)}/{kwlg_len}")
             break
 
-    from api.utils.json_encode import unicode_unescape_text
-    docs = DocumentService.get_by_ids([get_value(ck, "doc_id", "document_id") for ck in kbinfos["chunks"][:chunks_num]])
+    from api.utils.json_encode import unicode_unescape_text, unicode_unescape_text_fields
+    from rag.prompts.financial_nav import (
+        detect_note_table_intent,
+        format_chunk_navigation,
+        format_cross_ref_line,
+    )
+    doc_rows = DocumentService.get_by_ids([get_value(ck, "doc_id", "document_id") for ck in kbinfos["chunks"][:chunks_num]])
+    doc_nav = {}
     toc_map = {}
-    for d in docs:
-        if hasattr(d, 'tree') and d.tree and isinstance(d.tree, dict):
-            toc_text = unicode_unescape_text(d.tree.get("toc", ""))
-            if toc_text:
-                toc_map[d.id] = toc_text
-    docs = {d.id: d.meta_fields for d in docs}
+    for d in doc_rows:
+        tree = d.tree if hasattr(d, "tree") and d.tree and isinstance(d.tree, dict) else {}
+        toc_index = tree.get("toc_index") or []
+        cross_ref = getattr(d, "tree_cross_ref", None) or tree.get("cross_ref")
+        if cross_ref:
+            cross_ref = unicode_unescape_text_fields(cross_ref)
+        doc_nav[d.id] = {
+            "toc_index": toc_index,
+            "cross_ref": cross_ref,
+        }
+        toc_text = unicode_unescape_text(tree.get("toc", ""))
+        if toc_text:
+            toc_map[d.id] = toc_text
+    docs = {d.id: d.meta_fields for d in doc_rows}
 
     toc_seen = set()
+    cross_ref_seen = set()
     def draw_node(k, line):
         if line is not None and not isinstance(line, str):
             line = str(line)
@@ -148,9 +163,19 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
         doc_id = get_value(ck, "doc_id", "document_id")
         cnt = "\nID: {}".format(i if not hash_id else hash_str2int(get_value(ck, "id", "chunk_id"), 500))
         cnt += draw_node("Title", get_value(ck, "docnm_kwd", "document_name"))
-        if doc_id in toc_map and doc_id not in toc_seen:
+        nav_meta = doc_nav.get(doc_id, {})
+        nav_text = format_chunk_navigation(ck.get("parent_chain"), nav_meta.get("toc_index"))
+        if nav_text:
+            cnt += nav_text
+        elif doc_id in toc_map and doc_id not in toc_seen:
             toc_seen.add(doc_id)
             cnt += "\n└── TOC:\n" + re.sub(r"^", "│  ", toc_map[doc_id], flags=re.MULTILINE)
+        cross_ref = nav_meta.get("cross_ref")
+        if cross_ref and doc_id not in cross_ref_seen and detect_note_table_intent(ck, cross_ref):
+            cref_line = format_cross_ref_line(cross_ref)
+            if cref_line:
+                cnt += draw_node("CrossRef", cref_line)
+                cross_ref_seen.add(doc_id)
         cnt += draw_node("URL", ck['url']) if "url" in ck else ""
         for k, v in docs.get(get_value(ck, "doc_id", "document_id"), {}).items():
             cnt += draw_node(k, v)

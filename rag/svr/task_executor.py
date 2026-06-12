@@ -128,8 +128,8 @@ FAILED_TASKS = 0
 
 CURRENT_TASKS = {}
 
-MAX_CONCURRENT_TASKS = int(os.environ.get('MAX_CONCURRENT_TASKS', "5"))
-MAX_CONCURRENT_CHUNK_BUILDERS = int(os.environ.get('MAX_CONCURRENT_CHUNK_BUILDERS', "5"))
+MAX_CONCURRENT_TASKS = int(os.environ.get('MAX_CONCURRENT_TASKS', "12"))
+MAX_CONCURRENT_CHUNK_BUILDERS = int(os.environ.get('MAX_CONCURRENT_CHUNK_BUILDERS', "12"))
 MAX_CONCURRENT_MINIO = int(os.environ.get('MAX_CONCURRENT_MINIO', '10'))
 task_limiter = asyncio.Semaphore(MAX_CONCURRENT_TASKS)
 chunk_limiter = asyncio.Semaphore(MAX_CONCURRENT_CHUNK_BUILDERS)
@@ -581,8 +581,12 @@ async def build_chunks(task, progress_callback):
             raise
         logging.info("MINIO PUT({}) batch {}/{} cost {:.3f} s".format(task["name"], batch_idx + 1, len(batch_ranges), timer() - st))
 
+        all_llm_tasks = []
+        metadata_docs = []
+
         if task["parser_config"].get("auto_keywords", 0):
             chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+            topn = task["parser_config"]["auto_keywords"]
 
             async def doc_keyword_extraction(chat_mdl, d, topn):
                 cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "keywords", {"topn": topn})
@@ -598,18 +602,12 @@ async def build_chunks(task, progress_callback):
                     d["important_tks"] = rag_tokenizer.tokenize(" ".join(d["important_kwd"]))
                 return
 
-            tasks = [asyncio.create_task(doc_keyword_extraction(chat_mdl, d, task["parser_config"]["auto_keywords"])) for d in batch_docs]
-            try:
-                await asyncio.gather(*tasks, return_exceptions=False)
-            except Exception as e:
-                logging.error("Error in doc_keyword_extraction: {}".format(e))
-                for t in tasks:
-                    t.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                raise
+            for d in batch_docs:
+                all_llm_tasks.append(asyncio.create_task(doc_keyword_extraction(chat_mdl, d, topn)))
 
         if task["parser_config"].get("auto_questions", 0):
             chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
+            topn = task["parser_config"]["auto_questions"]
 
             async def doc_question_proposal(chat_mdl, d, topn):
                 cached = get_llm_cache(chat_mdl.llm_name, d["content_with_weight"], "question", {"topn": topn})
@@ -624,15 +622,8 @@ async def build_chunks(task, progress_callback):
                     d["question_kwd"] = cached.split("\n")
                     d["question_tks"] = rag_tokenizer.tokenize("\n".join(d["question_kwd"]))
 
-            tasks = [asyncio.create_task(doc_question_proposal(chat_mdl, d, task["parser_config"]["auto_questions"])) for d in batch_docs]
-            try:
-                await asyncio.gather(*tasks, return_exceptions=False)
-            except Exception as e:
-                logging.error("Error in doc_question_proposal", exc_info=e)
-                for t in tasks:
-                    t.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                raise
+            for d in batch_docs:
+                all_llm_tasks.append(asyncio.create_task(doc_question_proposal(chat_mdl, d, topn)))
 
         if task["parser_config"].get("enable_metadata", False) and task["parser_config"].get("metadata"):
             chat_mdl = LLMBundle(task["tenant_id"], LLMType.CHAT, llm_name=task["llm_id"], lang=task["language"])
@@ -653,26 +644,9 @@ async def build_chunks(task, progress_callback):
                 if cached:
                     d["metadata_obj"] = cached
 
-            tasks = [asyncio.create_task(gen_metadata_task(chat_mdl, d)) for d in batch_docs]
-            try:
-                await asyncio.gather(*tasks, return_exceptions=False)
-            except Exception as e:
-                logging.error("Error in doc_question_proposal", exc_info=e)
-                for t in tasks:
-                    t.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
-                raise
-            metadata = {}
             for d in batch_docs:
-                metadata = update_metadata_to(metadata, d["metadata_obj"])
-                del d["metadata_obj"]
-            if metadata:
-                e, doc = DocumentService.get_by_id(task["doc_id"])
-                if e:
-                    if isinstance(doc.meta_fields, str):
-                        doc.meta_fields = json.loads(doc.meta_fields)
-                    metadata = update_metadata_to(metadata, doc.meta_fields)
-                    DocumentService.update_by_id(task["doc_id"], {"meta_fields": metadata})
+                all_llm_tasks.append(asyncio.create_task(gen_metadata_task(chat_mdl, d)))
+            metadata_docs = batch_docs
 
         if task["kb_parser_config"].get("tag_kb_ids", []):
             kb_ids = task["kb_parser_config"]["tag_kb_ids"]
@@ -724,15 +698,31 @@ async def build_chunks(task, progress_callback):
                     set_llm_cache(chat_mdl.llm_name, d["content_with_weight"], cached, all_tags, {"topn": topn_tags})
                     d[TAG_FLD] = json.loads(cached)
 
-            tasks = [asyncio.create_task(doc_content_tagging(chat_mdl, d, topn_tags)) for d in docs_to_tag]
+            for d in docs_to_tag:
+                all_llm_tasks.append(asyncio.create_task(doc_content_tagging(chat_mdl, d, topn_tags)))
+
+        if all_llm_tasks:
             try:
-                await asyncio.gather(*tasks, return_exceptions=False)
+                await asyncio.gather(*all_llm_tasks, return_exceptions=False)
             except Exception as e:
-                logging.error("Error tagging docs: {}".format(e))
-                for t in tasks:
+                logging.error("Error in parallel LLM tasks: {}".format(e))
+                for t in all_llm_tasks:
                     t.cancel()
-                await asyncio.gather(*tasks, return_exceptions=True)
+                await asyncio.gather(*all_llm_tasks, return_exceptions=True)
                 raise
+
+        if metadata_docs:
+            metadata = {}
+            for d in metadata_docs:
+                metadata = update_metadata_to(metadata, d["metadata_obj"])
+                del d["metadata_obj"]
+            if metadata:
+                e, doc = DocumentService.get_by_id(task["doc_id"])
+                if e:
+                    if isinstance(doc.meta_fields, str):
+                        doc.meta_fields = json.loads(doc.meta_fields)
+                    metadata = update_metadata_to(metadata, doc.meta_fields)
+                    DocumentService.update_by_id(task["doc_id"], {"meta_fields": metadata})
 
         yield batch_docs
 
@@ -1062,6 +1052,35 @@ async def delete_image(kb_id, chunk_id):
         raise
 
 
+def _mineru_es_id_mappings_from_chunks(chunks):
+    mappings = []
+    for ck in chunks:
+        if ck.get("available_int") == 0:
+            continue
+        es_id = ck.get("id")
+        mids = ck.get("mineru_section_chunk_ids")
+        if not es_id or not mids:
+            continue
+        if isinstance(mids, str):
+            mids = [mids]
+        mappings.append({"es_id": str(es_id), "mineru_chunk_ids": list(mids)})
+    return mappings
+
+
+async def _sync_mineru_section_es_ids_async(doc_id, mappings):
+    if not doc_id or not mappings:
+        return
+    try:
+        await asyncio.to_thread(
+            DocumentService.apply_mineru_section_es_id_mappings,
+            doc_id,
+            mappings,
+        )
+        await asyncio.to_thread(DocumentService.enrich_tree_cross_ref_es_ids, doc_id)
+    except Exception:
+        logging.exception("Failed to sync mineru_section es_id doc_id=%s", doc_id)
+
+
 async def insert_es(task_id, task_tenant_id, task_dataset_id, chunks, progress_callback):
     mothers = []
     mother_ids = set([])
@@ -1127,6 +1146,10 @@ async def insert_es(task_id, task_tenant_id, task_dataset_id, chunks, progress_c
                 raise
             progress_callback(-1, msg=f"Chunk updates failed since task {task_id} is unknown.")
             return False
+    doc_id = chunks[0].get("doc_id") if chunks else None
+    mappings = _mineru_es_id_mappings_from_chunks(chunks)
+    if doc_id and mappings:
+        asyncio.create_task(_sync_mineru_section_es_ids_async(doc_id, mappings))
     return True
 
 

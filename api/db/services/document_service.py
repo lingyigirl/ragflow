@@ -411,6 +411,125 @@ class DocumentService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def apply_mineru_section_es_id_mappings(cls, doc_id, mappings):
+        if not doc_id or not mappings:
+            return 0
+        try:
+            from api.db.db_models import MineruSection
+            if not MineruSection.table_exists():
+                return 0
+            doc_id = str(doc_id).strip()
+            total = 0
+            for item in mappings:
+                es_id = str(item.get("es_id") or "").strip()
+                mineru_chunk_ids = item.get("mineru_chunk_ids") or []
+                if not es_id or not mineru_chunk_ids:
+                    continue
+                ids = [str(x).strip() for x in mineru_chunk_ids if x and str(x).strip()]
+                if not ids:
+                    continue
+                total += MineruSection.update(es_id=es_id).where(
+                    (MineruSection.doc_id == doc_id) & (MineruSection.chunk_id.in_(ids))
+                ).execute()
+            return total
+        except Exception:
+            logging.exception("apply_mineru_section_es_id_mappings failed doc_id=%s", doc_id)
+            return 0
+
+    @classmethod
+    @DB.connection_context()
+    def enrich_tree_cross_ref_es_ids(cls, doc_id):
+        if not doc_id:
+            return False
+        try:
+            from api.db.db_models import Document, MineruSection
+
+            doc = Document.get_or_none(Document.id == str(doc_id).strip())
+            if not doc or not doc.tree_cross_ref:
+                return False
+            if not MineruSection.table_exists():
+                return False
+            cross_ref = doc.tree_cross_ref
+            if isinstance(cross_ref, str):
+                cross_ref = json.loads(cross_ref)
+            rows = list(
+                MineruSection.select(
+                    MineruSection.es_id,
+                    MineruSection.parent_chain,
+                ).where(MineruSection.doc_id == str(doc_id).strip())
+            )
+            es_id_chains = {}
+            for row in rows:
+                es_id = str(row.es_id or "").strip()
+                if not es_id:
+                    continue
+                chain = row.parent_chain or []
+                if isinstance(chain, str):
+                    try:
+                        chain = json.loads(chain)
+                    except Exception:
+                        chain = []
+                if not isinstance(chain, list):
+                    chain = []
+                if es_id not in es_id_chains or len(chain) > len(es_id_chains[es_id]):
+                    es_id_chains[es_id] = chain
+
+            def _chain_has_title(chain, title):
+                if not chain or not title:
+                    return False
+                title = str(title).strip()
+                for seg in chain:
+                    seg = str(seg).strip()
+                    if not seg:
+                        continue
+                    if title in seg or seg in title:
+                        return True
+                return False
+
+            table_title_to_es_id = {}
+            main_tables = cross_ref.get("main_tables") or []
+            for item in main_tables:
+                if not isinstance(item, dict):
+                    continue
+                title = (item.get("title") or "").strip()
+                if not title:
+                    continue
+                for es_id, chain in es_id_chains.items():
+                    if _chain_has_title(chain, title):
+                        table_title_to_es_id[title] = es_id
+                        item["es_id"] = es_id
+                        break
+
+            note_to_es_id = {}
+            for note_title in (cross_ref.get("note_to_table_mapping") or {}).keys():
+                ids = []
+                for es_id, chain in es_id_chains.items():
+                    if _chain_has_title(chain, note_title):
+                        ids.append(es_id)
+                if ids:
+                    note_to_es_id[note_title] = list(dict.fromkeys(ids))
+
+            note_to_table_es_id = {}
+            for note_title, table_names in (cross_ref.get("note_to_table_mapping") or {}).items():
+                es_ids = [
+                    table_title_to_es_id[t]
+                    for t in table_names
+                    if t in table_title_to_es_id
+                ]
+                if es_ids:
+                    note_to_table_es_id[note_title] = list(dict.fromkeys(es_ids))
+
+            cross_ref["table_title_to_es_id"] = table_title_to_es_id
+            cross_ref["note_to_es_id"] = note_to_es_id
+            cross_ref["note_to_table_es_id"] = note_to_table_es_id
+            Document.update(tree_cross_ref=cross_ref).where(Document.id == str(doc_id).strip()).execute()
+            return True
+        except Exception:
+            logging.exception("enrich_tree_cross_ref_es_ids failed doc_id=%s", doc_id)
+            return False
+
+    @classmethod
+    @DB.connection_context()
     def list_mineru_sections_page(cls, kb_id, doc_id, offset=0, limit=500):
         if not kb_id or not doc_id:
             return []

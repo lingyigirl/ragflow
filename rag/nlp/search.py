@@ -700,9 +700,16 @@ class Dealer:
 
         return sorted(chunks, key=lambda x: x["similarity"] * -1)
 
-    def retrieval_by_financial_cross_ref(self, chunks: list[dict], tenant_ids: list[str]):
+    def retrieval_by_financial_cross_ref(self, chunks: list[dict], tenant_ids: list[str], question=None):
         if not chunks:
             return chunks
+        try:
+            from common import settings
+            if settings.FINANCIAL_RETRIEVAL_V2:
+                from rag.nlp.financial_retrieval import expand_financial_chunks_v2
+                return expand_financial_chunks_v2(self, chunks, tenant_ids, question=question)
+        except Exception:
+            pass
 
         idx_nms = [index_name(tid) for tid in tenant_ids]
         doc_ids = list(set(ck["doc_id"] for ck in chunks))
@@ -717,8 +724,12 @@ class Dealer:
                 docs = DocumentService.query(id=doc_id)
                 if docs:
                     from api.utils.json_encode import unicode_unescape_text_fields
-                    tree = docs[0].tree or {}
-                    cross_ref = unicode_unescape_text_fields(tree.get("cross_ref", None))
+                    doc_row = docs[0]
+                    if getattr(doc_row, "tree_cross_ref", None):
+                        cross_ref = unicode_unescape_text_fields(doc_row.tree_cross_ref)
+                    else:
+                        tree = doc_row.tree or {}
+                        cross_ref = unicode_unescape_text_fields(tree.get("cross_ref", None))
             except Exception:
                 pass
 

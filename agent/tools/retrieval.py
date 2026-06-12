@@ -208,7 +208,7 @@ class Retrieval(ToolBase, ABC):
             kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"],
                                                                          [kb.tenant_id for kb in kbs])
             kbinfos["chunks"] = settings.retriever.retrieval_by_financial_cross_ref(kbinfos["chunks"],
-                                                                                     [kb.tenant_id for kb in kbs])
+                                                                                     [kb.tenant_id for kb in kbs], query)
             if self._param.use_kg:
                 ck = await settings.kg_retriever.retrieval(query,
                                                      [kb.tenant_id for kb in kbs],

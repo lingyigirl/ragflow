@@ -789,6 +789,7 @@ class Document(DataBaseModel):
     process_duration = FloatField(default=0)
     meta_fields = JSONField(null=True, default={})
     tree = JSONField(null=True, default=None)
+    tree_cross_ref = JSONField(null=True, default=None)
     suffix = CharField(max_length=32, null=False, help_text="The real file extension suffix", index=True)
     voucher_type = CharField(max_length=64, null=True, help_text="voucher type classified by llm", index=True)
     llm_classify_success = BooleanField(null=False, default=False, help_text="llm classify call success and valid label")
@@ -866,6 +867,7 @@ class MineruSection(DataBaseModel):
     sub_type = CharField(max_length=50, null=True)
     list_items = JSONField(null=True)
     parent_chain = JSONField(null=True)
+    es_id = CharField(max_length=64, null=True, index=True)
 
     class Meta:
         db_table = "mineru_section"
@@ -1425,6 +1427,10 @@ def migrate_db():
     except Exception:
         pass
     try:
+        migrate(migrator.add_column("document", "tree_cross_ref", JSONField(null=True, default=None)))
+    except Exception:
+        pass
+    try:
         migrate(migrator.add_column("knowledgebase", "graphrag_task_id", CharField(max_length=32, null=True, help_text="Gragh RAG task ID", index=True)))
     except Exception:
         pass
@@ -1504,6 +1510,10 @@ def migrate_db():
         pass
     try:
         migrate(migrator.add_column("mineru_section", "parent_chain", JSONField(null=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("mineru_section", "es_id", CharField(max_length=64, null=True, index=True)))
     except Exception:
         pass
 

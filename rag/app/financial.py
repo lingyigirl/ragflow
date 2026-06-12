@@ -1,4 +1,3 @@
-import asyncio
 import copy
 import re
 import os
@@ -474,14 +473,49 @@ def _apply_induced_dynamic_levels(mineru_sections, toc_start_idx, body_start_idx
     return updated, level_map, True
 
 
-def _tree_nodes_for_storage(toc_root):
+def _tree_display_title(node):
+    title = (node.title or "").strip()
+    if title and title not in ("root", "__leaf_root__"):
+        return title
+    label = node.label
+    if label:
+        return str(label).strip()
+    return ""
+
+
+def _tree_outline_lines(node, outline_depth=0):
+    lines = []
+    display = _tree_display_title(node)
+    if node.title != "root" and display:
+        suffix = " [表格]" if node.contains_table else ""
+        if outline_depth == 0:
+            lines.append(f"{display}{suffix}")
+        else:
+            indent = "    " * outline_depth
+            lines.append(f"{indent}{display}{suffix}")
+    is_chapter = node.title != "root" and outline_depth == 0
+    for child in node.children:
+        lines.extend(_tree_outline_lines(child, outline_depth + 1))
+    if is_chapter and node.children:
+        lines.append("")
+    return lines
+
+
+def _tree_to_outline_text(toc_root):
+    lines = []
+    for child in toc_root.children:
+        lines.extend(_tree_outline_lines(child, 0))
+    while lines and not lines[-1].strip():
+        lines.pop()
+    return lines
+
+
+def _tree_nodes_for_level_map(toc_root):
     nodes = []
 
     def walk(node):
         if node.title != "root":
             nodes.append({
-                "title": node.title,
-                "label": node.label,
                 "depth": node.depth,
                 "mineru_index": node.mineru_index_start,
             })
@@ -837,47 +871,40 @@ def _fix_toc_with_inline_titles(toc_root, mineru_sections):
     return toc_root
 
 
-def _tree_to_text(node, depth=1):
-    lines = []
-    indent = "    " * (depth - 1)
-    if node.title != "root":
-        suffix = " [表格]" if node.contains_table else ""
-        lines.append(f"{indent}{node.title}{suffix}")
-    for child in node.children:
-        lines.extend(_tree_to_text(child, depth + 1))
-    return lines
+_MAIN_TABLE_TITLE_RULES = (
+    ("合并资产负债表", "合并资产负债表"),
+    ("合并利润表", "合并利润表"),
+    ("合并现金流量表", "合并现金流量表"),
+    ("资产负债表", "资产负债表"),
+    ("利润表", "利润表"),
+    ("现金流量表", "现金流量表"),
+)
+_NOTE_TITLE_KEYWORDS = ("附注", "注释")
 
 
-def _generate_cross_ref_with_llm(toc_items, llm_bundle):
-    prompt = f"""Analyze this financial report table of contents. Identify:
-1. main_tables: nodes that are the three main financial statements (balance sheet, income statement, cash flow statement)
-2. note_to_table_mapping: for each notes parent node, which main tables does it correspond to
-
-TOC items:
-{json.dumps(toc_items, ensure_ascii=False)}
-
-Output ONLY valid JSON:
-{{
-  "main_tables": [{{"title": "...", "index": N}}],
-  "note_to_table_mapping": {{"notes_node_title": ["table_title_1", "table_title_2"]}}
-}}"""
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        answer, _ = loop.run_until_complete(
-            llm_bundle.async_chat("", [{"role": "user", "content": prompt}], {"temperature": 0.0}))
-    finally:
-        loop.close()
-    try:
-        answer = answer.strip()
-        if answer.startswith("```"):
-            answer = re.sub(r'^```\w*\n?', '', answer)
-            answer = re.sub(r'\n?```$', '', answer)
-        return json.loads(answer)
-    except Exception:
-        logging.warning("Failed to parse cross_ref LLM response as JSON")
-        return {"main_tables": [], "note_to_table_mapping": {}}
+def _build_cross_ref_from_toc_items(toc_items):
+    if not toc_items:
+        return None
+    main_tables = []
+    note_titles = []
+    seen_tables = set()
+    for i, item in enumerate(toc_items):
+        title = (item.get("title") or "").strip()
+        if not title:
+            continue
+        if any(kw in title for kw in _NOTE_TITLE_KEYWORDS):
+            note_titles.append(title)
+            continue
+        for pattern, canonical in _MAIN_TABLE_TITLE_RULES:
+            if pattern in title and canonical not in seen_tables:
+                seen_tables.add(canonical)
+                main_tables.append({"title": canonical, "index": i})
+                break
+    if not main_tables and not note_titles:
+        return None
+    table_names = [t["title"] for t in main_tables]
+    note_to_table_mapping = {note: list(table_names) for note in note_titles} if table_names else {}
+    return {"main_tables": main_tables, "note_to_table_mapping": note_to_table_mapping}
 
 
 def _is_noise_section(text):
@@ -1749,8 +1776,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     _fix_toc_with_inline_titles(toc_root, mineru_sections)
 
-    tree_nodes = _tree_nodes_for_storage(toc_root)
-    tree_level_by_index = _tree_level_by_index_from_nodes(tree_nodes)
+    tree_level_nodes = _tree_nodes_for_level_map(toc_root)
+    tree_level_by_index = _tree_level_by_index_from_nodes(tree_level_nodes)
     mineru_sections = _apply_tree_levels_to_sections(
         mineru_sections, tree_level_by_index, level_map, toc_start_idx, body_start_idx,
     )
@@ -1769,31 +1796,26 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             preview,
         )
 
-    cross_ref = None
-    if toc_items and tenant_id:
-        try:
-            from api.db.services.llm_service import LLMBundle
-            from common.constants import LLMType
-            chat_bundle = LLMBundle(tenant_id, LLMType.CHAT)
-            cross_ref = _generate_cross_ref_with_llm(toc_items, chat_bundle)
-        except Exception:
-            logging.exception("Failed to generate cross_ref (Financial).")
+    cross_ref = _build_cross_ref_from_toc_items(toc_items)
 
-    toc_text_output = '\n'.join(_tree_to_text(toc_root))
-    tree_data = {
-        "source": "induced",
-        "toc": toc_text_output,
-        "nodes": tree_nodes,
-    }
-    if cross_ref:
-        tree_data["cross_ref"] = cross_ref
+    toc_text_output = '\n'.join(_tree_to_outline_text(toc_root))
+    toc_index = [
+        {"title": (item.get("title") or "").strip(), "depth": int(item.get("induced_depth") or 1)}
+        for item in toc_items
+        if (item.get("title") or "").strip()
+    ]
+    tree_data = {"toc": toc_text_output, "toc_index": toc_index}
     toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
-    logging.info("入库存储的目录结构树内容：\n[Financial] tree_data source=%s nodes=%s toc_len=%s cross_ref=%s toc_preview=%s",
-                 tree_data["source"], len(tree_nodes), len(toc_text_output), bool(cross_ref), toc_preview)
+    logging.info(
+        "[Financial] tree toc_len=%s cross_ref=%s toc_preview=%s",
+        len(toc_text_output),
+        bool(cross_ref),
+        toc_preview,
+    )
     if doc_id and tenant_id:
         try:
             from api.db.services.document_service import DocumentService
-            DocumentService.update_by_id(doc_id, {"tree": tree_data})
+            DocumentService.update_by_id(doc_id, {"tree": tree_data, "tree_cross_ref": cross_ref})
         except Exception:
             logging.exception("Failed to save tree to document (Financial).")
 
@@ -1848,6 +1870,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunk_positions = []
     chunk_chains = []
     chunk_mineru_indices = []
+    chunk_mineru_chunk_ids = []
 
     for chunk_raw in chunks_raw:
         ck_content = chunk_raw["content"]
@@ -1856,6 +1879,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         mineru_indices_in_chunk = set()
         poss_list = []
+        sec_ids = []
         for line_idx in range(mineru_start, mineru_end):
             if 0 <= line_idx < len(sections):
                 section_item = sections[line_idx]
@@ -1863,6 +1887,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                     mineru_indices_in_chunk.add(section_item[1])
                 if len(section_item) > 2 and section_item[2]:
                     poss_list.extend(section_item[2])
+                if len(section_item) > 4 and section_item[4]:
+                    sec_ids.append(section_item[4])
 
         if mineru_indices_in_chunk:
             chunk_mineru_indices.append({
@@ -1875,6 +1901,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         chunks.append(ck_content)
         chunk_positions.append(poss_list)
         chunk_chains.append(ck_chain)
+        chunk_mineru_chunk_ids.append(sec_ids)
 
     from api.utils.json_encode import normalize_parent_chain_for_storage
     chunk_chains = [normalize_parent_chain_for_storage(c) for c in chunk_chains]
@@ -1882,29 +1909,33 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if doc_id and tenant_id and chunk_chains and sections:
         try:
             from api.db.db_models import MineruSection, DB
+            from peewee import Case
             if MineruSection.table_exists():
                 with DB.connection_context():
-                    total_sec_updated = 0
-                    total_chain_count = len(chunk_chains)
-                    logging.info("输出chunk块对应的父子连关系：")
+                    accumulated = {}
                     for ci in range(len(chunk_chains)):
                         pchain = chunk_chains[ci] if ci < len(chunk_chains) else []
                         if not pchain:
-                            logging.info("[Financial] mineru_parent_chain chunk=%s/%s chain=[] skipped", ci + 1, total_chain_count)
                             continue
                         ms, me = chunks_raw[ci].get("mineru_range", (0, 0)) if ci < len(chunks_raw) else (0, 0)
-                        # sections 元组为 (text, idx, poss, title_level, chunk_id)，chunk_id 在索引 4
                         sec_ids = [
                             sections[li][4]
                             for li in range(ms, me)
                             if 0 <= li < len(sections) and len(sections[li]) > 4 and sections[li][4]
                         ]
-                        if sec_ids:
-                            MineruSection.update(parent_chain=pchain).where(MineruSection.chunk_id.in_(sec_ids)).execute()
-                            updated_count = len(sec_ids)
-                            total_sec_updated += updated_count
-                            logging.info("[Financial] mineru_parent_chain chunk=%s/%s chain=%s sec_count=%s updated=%s", ci + 1, total_chain_count, pchain, updated_count, updated_count)
-                    logging.info("[Financial] mineru_parent_chain done total_chunks=%s total_sections_updated=%s", total_chain_count, total_sec_updated)
+                        for sid in sec_ids:
+                            if sid:
+                                accumulated[sid] = pchain
+                    if accumulated:
+                        chunk_ids = list(accumulated.keys())
+                        case_expr = Case(
+                            None,
+                            [(MineruSection.chunk_id == cid, accumulated[cid]) for cid in chunk_ids],
+                        )
+                        MineruSection.update(parent_chain=case_expr).where(
+                            MineruSection.chunk_id.in_(chunk_ids)
+                        ).execute()
+                    logging.info("[Financial] mineru_parent_chain done total_chunks=%s total_sections_updated=%s", len(chunk_chains), len(accumulated))
         except Exception:
             logging.exception("Failed to update mineru_section parent_chain (Financial).")
 
@@ -1973,21 +2004,27 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 list(pos) if isinstance(pos, tuple) else pos
                 for pos in chunk_doc["position_int"]
             ]
+        if i < len(chunk_mineru_chunk_ids) and chunk_mineru_chunk_ids[i]:
+            chunk_doc["mineru_section_chunk_ids"] = chunk_mineru_chunk_ids[i]
 
     chunks_len = len(chunk_docs)
     positions_len = len(chunk_positions)
     indices_len = len(chunk_mineru_indices)
     chains_len = len(chunk_chains)
-    if chunks_len != positions_len or chunks_len != indices_len or chunks_len != chains_len:
+    chunk_ids_len = len(chunk_mineru_chunk_ids)
+    if chunks_len != positions_len or chunks_len != indices_len or chunks_len != chains_len or chunks_len != chunk_ids_len:
         while len(chunk_positions) < chunks_len:
             chunk_positions.append([])
         while len(chunk_mineru_indices) < chunks_len:
             chunk_mineru_indices.append({'min': -1, 'max': -1})
         while len(chunk_chains) < chunks_len:
             chunk_chains.append([])
+        while len(chunk_mineru_chunk_ids) < chunks_len:
+            chunk_mineru_chunk_ids.append([])
         chunk_positions = chunk_positions[:chunks_len]
         chunk_mineru_indices = chunk_mineru_indices[:chunks_len]
         chunk_chains = chunk_chains[:chunks_len]
+        chunk_mineru_chunk_ids = chunk_mineru_chunk_ids[:chunks_len]
 
     all_elements = []
     for i, chunk_doc in enumerate(chunk_docs):

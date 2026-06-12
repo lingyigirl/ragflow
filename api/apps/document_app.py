@@ -2747,9 +2747,7 @@ _DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET = frozenset(
 
 
 def _normalize_direct_upload_chunk_method(raw: str | None) -> tuple[str | None, str | None]:
-    text = (raw or "general").strip().lower()
-    if text == "general":
-        text = "naive"
+    text = (raw or "hichunk").strip().lower()
     if text not in _DIRECT_UPLOAD_PARSE_CHUNK_METHOD_SET:
         return f"`chunk_method` {raw!r} doesn't exist", None
     return None, text
@@ -3122,7 +3120,7 @@ async def _collect_prompt_context_by_retrieval(
             rank_feature=label_question(question, kbs),
         )
         kbinfos["chunks"] = settings.retriever.retrieval_by_children(kbinfos["chunks"], tenant_ids)
-        kbinfos["chunks"] = settings.retriever.retrieval_by_financial_cross_ref(kbinfos["chunks"], tenant_ids)
+        kbinfos["chunks"] = settings.retriever.retrieval_by_financial_cross_ref(kbinfos["chunks"], tenant_ids, question)
     if not kbinfos.get("chunks"):
         return True, "", "", [], {}
     used_chunks = kb_prompt_truncate_chunk_list(kbinfos, max_prompt_tokens)

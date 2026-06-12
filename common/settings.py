@@ -86,6 +86,7 @@ msgStoreConn = None
 
 retriever = None
 kg_retriever = None
+FINANCIAL_RETRIEVAL_V2 = False
 
 # user registration switch
 REGISTER_ENABLED = 1
@@ -306,7 +307,8 @@ def init_settings():
     else:
         STORAGE_IMPL = storage_impl
 
-    global retriever, kg_retriever
+    global retriever, kg_retriever, FINANCIAL_RETRIEVAL_V2
+    FINANCIAL_RETRIEVAL_V2 = os.getenv("FINANCIAL_RETRIEVAL_V2", "false").lower() in ("true", "1", "yes")
     retriever = search.Dealer(docStoreConn)
     from graphrag import search as kg_search
 
