@@ -1862,7 +1862,7 @@ async def mineru_download(file_type):
                 code=RetCode.ARGUMENT_ERROR
             )
 
-        valid_file_types = ["json", "markdown", "pdf"]
+        valid_file_types = ["json", "markdown", "pdf", "original"]
         if file_type not in valid_file_types:
             return get_json_result(
                 data=False,
@@ -1899,6 +1899,15 @@ async def mineru_download(file_type):
                     if key.lower().endswith(".pdf"):
                         file_location = key
                         break
+            elif file_type == "original":
+                for key in keys:
+                    name = key[len(doc_id)+1:]
+                    if name == "content_list.json" or name.startswith("images/"):
+                        continue
+                    if name.lower().endswith((".md", ".pdf")):
+                        continue
+                    file_location = key
+                    break
 
         if not file_location:
             return get_json_result(

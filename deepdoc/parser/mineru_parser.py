@@ -1843,6 +1843,15 @@ class MinerUParser(RAGFlowPdfParser):
                     self.logger.info(f"[MinerU] 已上传Excel转化PDF文件: bucket={kb_id}, location={pdf_location}")
                 except Exception as e:
                     self.logger.warning(f"[MinerU] 上传Excel转化PDF文件失败: {e}")
+                try:
+                    original_filename = file_path.name
+                    original_location = f"{doc_id}/{original_filename}"
+                    result = settings.STORAGE_IMPL.put(kb_id, original_location, raw)
+                    if result is None:
+                        raise RuntimeError("MinIO put returned None")
+                    self.logger.info(f"[MinerU] 已上传原始Excel文件: bucket={kb_id}, location={original_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传原始Excel文件失败: {e}")
             return self.parse_pdf(
                 filepath=pdf_virtual_path,
                 binary=pdf_bytes,
@@ -1899,6 +1908,15 @@ class MinerUParser(RAGFlowPdfParser):
                     self.logger.info(f"[MinerU] 已上传Word转化PDF文件: bucket={kb_id}, location={pdf_location}")
                 except Exception as e:
                     self.logger.warning(f"[MinerU] 上传Word转化PDF文件失败: {e}")
+                try:
+                    original_filename = file_path.name
+                    original_location = f"{doc_id}/{original_filename}"
+                    result = settings.STORAGE_IMPL.put(kb_id, original_location, raw)
+                    if result is None:
+                        raise RuntimeError("MinIO put returned None")
+                    self.logger.info(f"[MinerU] 已上传原始Word文件: bucket={kb_id}, location={original_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传原始Word文件失败: {e}")
             return self.parse_pdf(
                 filepath=pdf_virtual_path,
                 binary=pdf_bytes,
@@ -1955,6 +1973,15 @@ class MinerUParser(RAGFlowPdfParser):
                     self.logger.info(f"[MinerU] 已上传图片转化PDF文件: bucket={kb_id}, location={pdf_location}")
                 except Exception as e:
                     self.logger.warning(f"[MinerU] 上传图片转化PDF文件失败: {e}")
+                try:
+                    original_filename = file_path.name
+                    original_location = f"{doc_id}/{original_filename}"
+                    result = settings.STORAGE_IMPL.put(kb_id, original_location, raw)
+                    if result is None:
+                        raise RuntimeError("MinIO put returned None")
+                    self.logger.info(f"[MinerU] 已上传原始图片文件: bucket={kb_id}, location={original_location}")
+                except Exception as e:
+                    self.logger.warning(f"[MinerU] 上传原始图片文件失败: {e}")
             return self.parse_pdf(
                 filepath=pdf_virtual_path,
                 binary=pdf_bytes,
