@@ -1067,6 +1067,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     res = chunk_docs
 
     if callback:
-        callback(1.0, "Finish chunking.")
+        callback(0.65, "Finish chunking.")
 
     return res

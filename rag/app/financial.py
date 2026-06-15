@@ -2087,6 +2087,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     res = [elem['doc'] for elem in all_elements]
 
     if callback:
-        callback(1.0, "Financial chunking done.")
+        callback(0.65, "Financial chunking done.")
 
     return res

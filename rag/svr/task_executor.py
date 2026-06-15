@@ -1341,10 +1341,13 @@ async def do_handle_task(task):
                 logging.exception(error_message)
         logging.info("Build document {}: {:.2f}s".format(task_document_name, timer() - start_ts))
         if not chunks:
+            post_tasks = []
             if should_try_voucher_classify:
-                asyncio.create_task(classify_voucher_type_with_fallback_async(task, []))
+                post_tasks.append(asyncio.create_task(classify_voucher_type_with_fallback_async(task, [])))
             if should_try_auto_standard_filename:
-                asyncio.create_task(auto_standard_filename_with_fallback_async(task, []))
+                post_tasks.append(asyncio.create_task(auto_standard_filename_with_fallback_async(task, [])))
+            if post_tasks:
+                await asyncio.gather(*post_tasks, return_exceptions=False)
             progress_callback(1., msg=f"No chunk built from {task_document_name}")
             return
         progress_callback(msg="Generate {} chunks".format(len(chunks)))
@@ -1389,11 +1392,15 @@ async def do_handle_task(task):
             return
 
 
+        post_tasks = []
         if should_try_voucher_classify:
-            asyncio.create_task(classify_voucher_type_with_fallback_async(task, chunks))
+            post_tasks.append(asyncio.create_task(classify_voucher_type_with_fallback_async(task, chunks)))
 
         if should_try_auto_standard_filename:
-            asyncio.create_task(auto_standard_filename_with_fallback_async(task, chunks))
+            post_tasks.append(asyncio.create_task(auto_standard_filename_with_fallback_async(task, chunks)))
+
+        if post_tasks:
+            await asyncio.gather(*post_tasks, return_exceptions=False)
 
         task_time_cost = timer() - task_start_ts
         progress_callback(prog=1.0, msg="Task done ({:.2f}s)".format(task_time_cost))
