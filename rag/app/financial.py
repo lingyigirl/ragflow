@@ -1945,39 +1945,6 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     from api.utils.json_encode import normalize_parent_chain_for_storage
     chunk_chains = [normalize_parent_chain_for_storage(c) for c in chunk_chains]
 
-    if doc_id and tenant_id and chunk_chains and sections:
-        try:
-            from api.db.db_models import MineruSection, DB
-            from peewee import Case
-            if MineruSection.table_exists():
-                with DB.connection_context():
-                    accumulated = {}
-                    for ci in range(len(chunk_chains)):
-                        pchain = chunk_chains[ci] if ci < len(chunk_chains) else []
-                        if not pchain:
-                            continue
-                        ms, me = chunks_raw[ci].get("mineru_range", (0, 0)) if ci < len(chunks_raw) else (0, 0)
-                        sec_ids = [
-                            sections[li][4]
-                            for li in range(ms, me)
-                            if 0 <= li < len(sections) and len(sections[li]) > 4 and sections[li][4]
-                        ]
-                        for sid in sec_ids:
-                            if sid:
-                                accumulated[sid] = pchain
-                    if accumulated:
-                        chunk_ids = list(accumulated.keys())
-                        case_expr = Case(
-                            None,
-                            [(MineruSection.chunk_id == cid, accumulated[cid]) for cid in chunk_ids],
-                        )
-                        MineruSection.update(parent_chain=case_expr).where(
-                            MineruSection.chunk_id.in_(chunk_ids)
-                        ).execute()
-                    logging.info("[Financial] mineru_parent_chain done total_chunks=%s total_sections_updated=%s", len(chunk_chains), len(accumulated))
-        except Exception:
-            logging.exception("Failed to update mineru_section parent_chain (Financial).")
-
     if doc_id and tenant_id and tab_text_map:
         try:
             from api.db.db_models import MineruSection as _MS, DB as _DB

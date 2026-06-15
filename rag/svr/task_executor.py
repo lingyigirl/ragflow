@@ -1063,7 +1063,11 @@ def _mineru_es_id_mappings_from_chunks(chunks):
             continue
         if isinstance(mids, str):
             mids = [mids]
-        mappings.append({"es_id": str(es_id), "mineru_chunk_ids": list(mids)})
+        entry = {"es_id": str(es_id), "mineru_chunk_ids": list(mids)}
+        parent_chain = ck.get("parent_chain")
+        if parent_chain:
+            entry["parent_chain"] = parent_chain
+        mappings.append(entry)
     return mappings
 
 

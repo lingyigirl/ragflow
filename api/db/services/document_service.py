@@ -428,7 +428,14 @@ class DocumentService(CommonService):
                 ids = [str(x).strip() for x in mineru_chunk_ids if x and str(x).strip()]
                 if not ids:
                     continue
-                total += MineruSection.update(es_id=es_id).where(
+                update_data = {"es_id": es_id}
+                parent_chain = item.get("parent_chain")
+                if parent_chain:
+                    from api.utils.json_encode import normalize_parent_chain_for_storage
+                    parent_chain = normalize_parent_chain_for_storage(parent_chain)
+                    if parent_chain:
+                        update_data["parent_chain"] = parent_chain
+                total += MineruSection.update(**update_data).where(
                     (MineruSection.doc_id == doc_id) & (MineruSection.chunk_id.in_(ids))
                 ).execute()
             return total
