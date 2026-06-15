@@ -868,6 +868,8 @@ class MineruSection(DataBaseModel):
     list_items = JSONField(null=True)
     parent_chain = JSONField(null=True)
     es_id = CharField(max_length=64, null=True, index=True)
+    es_tab2text = LongTextField(null=True)
+    llm_tab2text = LongTextField(null=True)
 
     class Meta:
         db_table = "mineru_section"

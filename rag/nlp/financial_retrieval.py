@@ -224,6 +224,7 @@ def _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, target_e
     kb_ids = [kb_id] if isinstance(kb_id, str) else list(kb_id)
     field_list = [
         "content_with_weight",
+        "content_llm",
         "doc_type_kwd",
         "docnm_kwd",
         "important_kwd",
@@ -255,6 +256,7 @@ def _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, target_e
                 "chunk_id": es_id,
                 "content_ltks": content,
                 "content_with_weight": content,
+                "content_llm": fields.get("content_llm", ""),
                 "doc_id": doc_id,
                 "docnm_kwd": fields.get("docnm_kwd", ""),
                 "kb_id": kb_id,

@@ -180,7 +180,7 @@ def kb_prompt(kbinfos, max_tokens, hash_id=False):
         for k, v in docs.get(get_value(ck, "doc_id", "document_id"), {}).items():
             cnt += draw_node(k, v)
         cnt += "\n└── Content:\n"
-        cnt += get_value(ck, "content", "content_with_weight")
+        cnt += (ck.get("content_llm") or get_value(ck, "content", "content_with_weight"))
         knowledges.append(cnt)
 
     return knowledges

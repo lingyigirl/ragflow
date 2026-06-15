@@ -8,6 +8,7 @@ from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_position
 
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
 from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env, normalize_mineru_checkbox_latex
+from rag.utils.html_table_parser import convert_html_table
 
 load_dotenv()
 
@@ -1095,7 +1096,7 @@ def _join_sections_range(mineru_sections, start, end):
 
 
 def _titles_in_index_range(mineru_sections, start, end):
-    titles = []
+    stack = []
     for idx in range(start, end):
         if idx < 0 or idx >= len(mineru_sections):
             continue
@@ -1104,11 +1105,15 @@ def _titles_in_index_range(mineru_sections, start, end):
         if _is_noise_section(text):
             continue
         level = _section_title_level(item)
-        if level > 0:
-            stripped = text.strip()
-            if stripped:
-                titles.append(stripped)
-    return titles
+        if level <= 0:
+            continue
+        stripped = text.strip()
+        if not stripped:
+            continue
+        while stack and stack[-1][1] >= level:
+            stack.pop()
+        stack.append((stripped, level))
+    return [t[0] for t in stack]
 
 
 def _collect_logical_units(
@@ -1269,12 +1274,13 @@ def _unit_parent_chain(mineru_sections, unit_start, chunk_end_exclusive, chain_s
     return _titles_in_index_range(mineru_sections, start, chunk_end_exclusive)
 
 
-def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token_budget, unit_type, chain_start=None):
+def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token_budget, unit_type, chain_start=None, tab_text_map=None):
     from common.token_utils import num_tokens_from_string, split_text_by_token_budget
 
     if unit_start >= unit_end:
         return []
 
+    _tab_map = tab_text_map or {}
     pieces = []
     for idx in range(unit_start, unit_end):
         item = mineru_sections[idx]
@@ -1285,7 +1291,8 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
         if not body:
             continue
         if is_html_table(body):
-            pieces.append({"indices": [idx], "text": body, "tokens": num_tokens_from_string(body), "atomic": True})
+            es_text, llm_text = _tab_map.get(idx, (body, body))
+            pieces.append({"indices": [idx], "text": es_text, "tokens": num_tokens_from_string(es_text), "atomic": True, "llm_text": llm_text})
             continue
         tokens = num_tokens_from_string(body)
         if tokens <= token_budget:
@@ -1305,11 +1312,13 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
 
     chunks = []
     buf_texts = []
+    buf_llm_texts = []
     buf_indices = set()
     buf_tokens = 0
+    buf_has_table = False
 
     def _flush_buffer():
-        nonlocal buf_texts, buf_indices, buf_tokens
+        nonlocal buf_texts, buf_llm_texts, buf_indices, buf_tokens, buf_has_table
         if not buf_texts:
             return
         chunk_start = min(buf_indices)
@@ -1317,14 +1326,22 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
         chain = [] if unit_type == "toc" else _unit_parent_chain(
             mineru_sections, unit_start, chunk_end, chain_start=chain_start,
         )
+        table_prefix = ""
+        if buf_has_table and chain and unit_type != "toc":
+            leaf_title = chain[-1] if chain else ""
+            if leaf_title:
+                table_prefix = f"[{leaf_title}]\n"
         chunks.append({
-            "content": "\n".join(buf_texts),
+            "content": table_prefix + "\n".join(buf_texts),
             "parent_chain": chain,
             "mineru_range": (chunk_start, chunk_end),
+            "llm_content": "\n".join(buf_llm_texts) if buf_llm_texts else "",
         })
         buf_texts = []
+        buf_llm_texts = []
         buf_indices = set()
         buf_tokens = 0
+        buf_has_table = False
 
     for piece in pieces:
         piece_tokens = piece["tokens"]
@@ -1337,11 +1354,21 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
         if not buf_texts and piece_tokens > token_budget:
             buf_texts.append(piece["text"])
             buf_indices.update(piece["indices"])
+            if piece.get("llm_text"):
+                buf_llm_texts.append(piece["llm_text"])
+                buf_has_table = True
+            else:
+                buf_llm_texts.append(piece["text"])
             _flush_buffer()
             continue
 
         buf_texts.append(piece["text"])
         buf_indices.update(piece["indices"])
+        if piece.get("llm_text"):
+            buf_llm_texts.append(piece["llm_text"])
+            buf_has_table = True
+        else:
+            buf_llm_texts.append(piece["text"])
         buf_tokens += piece_tokens + join_cost
 
     _flush_buffer()
@@ -1350,7 +1377,7 @@ def _split_logical_unit_into_chunks(mineru_sections, unit_start, unit_end, token
 
 def _scan_merge_range(
     mineru_sections, range_start, range_end, token_budget,
-    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None,
+    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None, tab_text_map=None,
 ):
     chunks = []
     units = _collect_logical_units(
@@ -1365,13 +1392,14 @@ def _scan_merge_range(
             token_budget,
             unit["type"],
             chain_start=chain_start,
+            tab_text_map=tab_text_map,
         ))
     return chunks
 
 
 def _build_chunks_from_labeled_sections(
     mineru_sections, toc_start_idx, body_start_idx, token_budget,
-    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None,
+    unit_stop_depth=1, use_toc_unit_stop=False, toc_kind_depth=None, tab_text_map=None,
 ):
     n = len(mineru_sections)
     chunks = []
@@ -1384,11 +1412,11 @@ def _build_chunks_from_labeled_sections(
             chunks.extend(_scan_merge_range(mineru_sections, toc_start_idx, toc_end, token_budget))
         if toc_end < n:
             chunks.extend(_scan_merge_range(
-                mineru_sections, toc_end, n, token_budget, unit_stop_depth, use_toc_unit_stop, toc_kind_depth,
+                mineru_sections, toc_end, n, token_budget, unit_stop_depth, use_toc_unit_stop, toc_kind_depth, tab_text_map=tab_text_map,
             ))
     else:
         chunks.extend(_scan_merge_range(
-            mineru_sections, 0, n, token_budget, unit_stop_depth, False, None,
+            mineru_sections, 0, n, token_budget, unit_stop_depth, False, None, tab_text_map=tab_text_map,
         ))
 
     chunks.sort(key=lambda cr: cr.get("mineru_range", (0, 0))[0])
@@ -1822,6 +1850,14 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if callback:
         callback(0.3, "Building chunks (Financial)...")
 
+    tab_text_map = {}
+    for idx, item in enumerate(mineru_sections):
+        text = _section_text(item)
+        if is_html_table(text):
+            es_text, llm_text = convert_html_table(text)
+            if es_text or llm_text:
+                tab_text_map[idx] = (es_text, llm_text)
+
     from common.token_utils import embedding_token_budget
     token_budget = embedding_token_budget(8192)
     if tenant_id:
@@ -1838,7 +1874,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     )
     chunks_raw = _build_chunks_from_labeled_sections(
         mineru_sections, toc_start_idx, body_start_idx, token_budget,
-        unit_stop_depth, use_toc_unit_stop, toc_kind_depth,
+        unit_stop_depth, use_toc_unit_stop, toc_kind_depth, tab_text_map=tab_text_map,
     )
     if not _assert_text_coverage(mineru_sections, chunks_raw):
         logging.warning("Financial chunk coverage assertion failed, fallback to single chunk.")
@@ -1871,10 +1907,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     chunk_chains = []
     chunk_mineru_indices = []
     chunk_mineru_chunk_ids = []
+    llm_chunks = []
 
     for chunk_raw in chunks_raw:
         ck_content = chunk_raw["content"]
         ck_chain = chunk_raw.get("parent_chain", [])
+        ck_llm = chunk_raw.get("llm_content", "")
         mineru_start, mineru_end = chunk_raw.get("mineru_range", (0, 0))
 
         mineru_indices_in_chunk = set()
@@ -1899,6 +1937,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             chunk_mineru_indices.append({'min': mineru_start, 'max': mineru_end})
 
         chunks.append(ck_content)
+        llm_chunks.append(ck_llm if ck_llm else ck_content)
         chunk_positions.append(poss_list)
         chunk_chains.append(ck_chain)
         chunk_mineru_chunk_ids.append(sec_ids)
@@ -1938,6 +1977,30 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                     logging.info("[Financial] mineru_parent_chain done total_chunks=%s total_sections_updated=%s", len(chunk_chains), len(accumulated))
         except Exception:
             logging.exception("Failed to update mineru_section parent_chain (Financial).")
+
+    if doc_id and tenant_id and tab_text_map:
+        try:
+            from api.db.db_models import MineruSection as _MS, DB as _DB
+            if _MS.table_exists():
+                chunk_id_to_es = {}
+                chunk_id_to_llm = {}
+                for idx, (es_text, llm_text) in tab_text_map.items():
+                    if idx < len(mineru_sections) and len(mineru_sections[idx]) >= 4:
+                        cid = mineru_sections[idx][3]
+                        if cid:
+                            chunk_id_to_es[cid] = es_text
+                            chunk_id_to_llm[cid] = llm_text
+                if chunk_id_to_es:
+                    with _DB.connection_context():
+                        for cid, es_text in chunk_id_to_es.items():
+                            llm_text = chunk_id_to_llm.get(cid, "")
+                            _MS.update(
+                                es_tab2text=es_text,
+                                llm_tab2text=llm_text,
+                            ).where(_MS.chunk_id == cid).execute()
+                    logging.info("[Financial] mineru_tab2text done total_sections_updated=%s", len(chunk_id_to_es))
+        except Exception:
+            logging.exception("Failed to update mineru_section es_tab2text/llm_tab2text (Financial).")
 
     if not chunks:
         return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial chunking produced empty result.")
@@ -1987,6 +2050,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     for i, chunk_doc in enumerate(chunk_docs):
         if i < len(chunk_chains):
             chunk_doc["parent_chain"] = chunk_chains[i]
+        if i < len(llm_chunks) and llm_chunks[i]:
+            if i >= len(chunks) or llm_chunks[i] != chunks[i]:
+                chunk_doc["content_llm"] = llm_chunks[i]
         if i < len(chunk_positions):
             if chunk_positions[i]:
                 add_positions(chunk_doc, chunk_positions[i])
@@ -2012,7 +2078,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     indices_len = len(chunk_mineru_indices)
     chains_len = len(chunk_chains)
     chunk_ids_len = len(chunk_mineru_chunk_ids)
-    if chunks_len != positions_len or chunks_len != indices_len or chunks_len != chains_len or chunks_len != chunk_ids_len:
+    llm_len = len(llm_chunks)
+    if chunks_len != positions_len or chunks_len != indices_len or chunks_len != chains_len or chunks_len != chunk_ids_len or chunks_len != llm_len:
         while len(chunk_positions) < chunks_len:
             chunk_positions.append([])
         while len(chunk_mineru_indices) < chunks_len:
@@ -2021,10 +2088,13 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             chunk_chains.append([])
         while len(chunk_mineru_chunk_ids) < chunks_len:
             chunk_mineru_chunk_ids.append([])
+        while len(llm_chunks) < chunks_len:
+            llm_chunks.append("")
         chunk_positions = chunk_positions[:chunks_len]
         chunk_mineru_indices = chunk_mineru_indices[:chunks_len]
         chunk_chains = chunk_chains[:chunks_len]
         chunk_mineru_chunk_ids = chunk_mineru_chunk_ids[:chunks_len]
+        llm_chunks = llm_chunks[:chunks_len]
 
     all_elements = []
     for i, chunk_doc in enumerate(chunk_docs):
