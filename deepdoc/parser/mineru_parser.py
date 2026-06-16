@@ -24,6 +24,7 @@ import sys
 import tempfile
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import zipfile
 from dataclasses import dataclass
 from io import BytesIO
@@ -1514,6 +1515,17 @@ class MinerUParser(RAGFlowPdfParser):
             img_path_to_minio_url: dict[str, str] = {}
             _IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
 
+            files_by_name = {}
+            image_files_in_dir = []
+            md_files_in_dir = []
+            for f in output_dir.rglob("*"):
+                if f.is_file():
+                    files_by_name.setdefault(f.name, []).append(f)
+                    if f.suffix.lower() in image_extensions:
+                        image_files_in_dir.append(f)
+                    if f.suffix.lower() == ".md":
+                        md_files_in_dir.append(f)
+
             def _collect_img_paths(obj: Any):
                 if isinstance(obj, dict):
                     for k in list(obj.keys()):
@@ -1533,12 +1545,9 @@ class MinerUParser(RAGFlowPdfParser):
                     img_path = (output_dir / raw_str) if not os.path.isabs(raw_str) else Path(raw_str)
                     if not img_path.exists():
                         img_filename = Path(raw_str).name
-                        found_img = None
-                        for possible_img in output_dir.rglob(img_filename):
-                            found_img = possible_img
-                            break
-                        if found_img:
-                            img_path = found_img
+                        candidates = files_by_name.get(img_filename)
+                        if candidates:
+                            img_path = candidates[0]
                     if img_path.exists() and img_path.is_file() and img_path.suffix.lower() in image_extensions:
                         try:
                             img_relative_path = str(img_path.relative_to(output_dir))
@@ -1557,19 +1566,18 @@ class MinerUParser(RAGFlowPdfParser):
                         except ValueError:
                             self.logger.warning(f"[MinerU] 图片路径不在输出目录内，跳过: {img_path}")
 
-            for img_file in output_dir.rglob("*"):
-                if img_file.is_file() and img_file.suffix.lower() in image_extensions:
-                    img_relative_path = str(img_file.relative_to(output_dir))
-                    if img_relative_path not in processed_image_paths:
-                        processed_image_paths.add(img_relative_path)
-                        image_files_to_upload.append({"path": img_file, "relative_path": img_relative_path})
-                        filename = img_file.name
-                        minio_key = f"{base_prefix}/images/{filename}"
-                        ext = img_file.suffix.lstrip(".") or "jpg"
-                        key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
-                        download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
-                        img_path_to_minio_url[img_relative_path] = download_url
-                        img_path_to_minio_url[filename] = download_url
+            for img_file in image_files_in_dir:
+                img_relative_path = str(img_file.relative_to(output_dir))
+                if img_relative_path not in processed_image_paths:
+                    processed_image_paths.add(img_relative_path)
+                    image_files_to_upload.append({"path": img_file, "relative_path": img_relative_path})
+                    filename = img_file.name
+                    minio_key = f"{base_prefix}/images/{filename}"
+                    ext = img_file.suffix.lstrip(".") or "jpg"
+                    key_b64 = base64.urlsafe_b64encode(minio_key.encode("utf-8")).decode("utf-8").rstrip("=")
+                    download_url = f"{DOCUMENT_PUBLIC_DOWNLOAD_PREFIX}/{key_b64}?ext={ext}&bucket={kb_id}"
+                    img_path_to_minio_url[img_relative_path] = download_url
+                    img_path_to_minio_url[filename] = download_url
 
             IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
             _IMG_KEY_SET = {k.lower() for k in IMG_KEYS}
@@ -1644,7 +1652,7 @@ class MinerUParser(RAGFlowPdfParser):
 
             markdown_uploaded = False
             try:
-                markdown_files = list(output_dir.rglob("*.md"))
+                markdown_files = md_files_in_dir
                 if markdown_files:
                     md_file = markdown_files[0]
                     with open(md_file, "r", encoding="utf-8") as f:
@@ -1660,18 +1668,28 @@ class MinerUParser(RAGFlowPdfParser):
                 self.logger.warning(f"[MinerU] 上传Markdown文件失败: {e}")
 
             uploaded_image_count = 0
-            for img_info in image_files_to_upload:
-                img_path = img_info["path"]
-                img_filename = img_path.name
-                try:
+            if image_files_to_upload:
+
+                def _upload_one(img_info):
+                    img_path = img_info["path"]
+                    img_filename = img_path.name
                     with open(img_path, "rb") as img_file:
                         img_data = img_file.read()
                     img_location = f"{base_prefix}/images/{img_filename}"
                     settings.STORAGE_IMPL.put(kb_id, img_location, img_data)
-                    uploaded_image_count += 1
-                    self.logger.debug(f"[MinerU] 已上传图片: bucket={kb_id}, location={img_location}")
-                except Exception as e:
-                    self.logger.warning(f"[MinerU] 上传图片失败 {img_filename}: {e}")
+                    return img_filename
+
+                max_workers = min(8, len(image_files_to_upload))
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    future_to_img = {executor.submit(_upload_one, info): info for info in image_files_to_upload}
+                    for future in as_completed(future_to_img):
+                        img_info = future_to_img[future]
+                        try:
+                            img_filename = future.result()
+                            uploaded_image_count += 1
+                            self.logger.debug(f"[MinerU] 已上传图片: bucket={kb_id}, location={base_prefix}/images/{img_filename}")
+                        except Exception as e:
+                            self.logger.warning(f"[MinerU] 上传图片失败 {img_info['path'].name}: {e}")
 
             if uploaded_image_count > 0:
                 self.logger.info(f"[MinerU] 已上传 {uploaded_image_count} 张图片到MinIO (bucket: {kb_id}, prefix: {base_prefix})")
@@ -2148,13 +2166,14 @@ class MinerUParser(RAGFlowPdfParser):
                         doc_id,
                     )
                 else:
-                    self._save_sections_to_db(
-                        outputs,
-                        kb_id,
-                        doc_id,
-                        callback=callback,
-                        progress_after_chunk=False,
+                    self._mineru_db_thread = threading.Thread(
+                        target=self._save_sections_to_db,
+                        args=(outputs, kb_id, doc_id),
+                        kwargs={'callback': callback, 'progress_after_chunk': False},
+                        name=f"mineru_db_{str(doc_id)[:8]}",
+                        daemon=False,
                     )
+                    self._mineru_db_thread.start()
             else:
                 logging.warning(
                     "[MinerU][mineru_section] 未触发入库（kb_id/doc_id 为空）outputs=%s",

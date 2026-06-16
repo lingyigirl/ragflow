@@ -661,20 +661,44 @@ def _find_title_in_sections(title, sections, start_idx=0):
 
 
 def _fix_toc_with_inline_titles(toc_root, mineru_sections):
-    def _walk_start(node, start_search_idx):
-        if node.title != "root":
-            idx = _find_title_in_sections(node.title, mineru_sections, start_search_idx)
-            if idx >= 0:
-                node.mineru_index_start = idx
-            # else: leave as -1 — a fake start is more dangerous than a missing one
+    _flat_nodes = []
+    def _flatten_toc(node, parent_flat_idx):
+        if node.title == "root":
+            for child in node.children:
+                _flatten_toc(child, -1)
+        else:
+            my_idx = len(_flat_nodes)
+            _flat_nodes.append((node, parent_flat_idx))
+            for child in node.children:
+                _flatten_toc(child, my_idx)
+    _flatten_toc(toc_root, -1)
 
-        next_start = node.mineru_index_start if node.mineru_index_start >= 0 else start_search_idx
-        for child in node.children:
-            _walk_start(child, next_start)
-            if child.mineru_index_start >= 0:
-                next_start = child.mineru_index_start
-
-    _walk_start(toc_root, 0)
+    if _flat_nodes:
+        cursor = 0
+        n_flat = len(_flat_nodes)
+        n_sec = len(mineru_sections)
+        for i in range(n_sec):
+            item = mineru_sections[i]
+            text = (item[0] if len(item) >= 1 else "").strip()
+            if not text:
+                continue
+            if cursor >= n_flat:
+                break
+            for j in range(cursor, n_flat):
+                node, parent_idx = _flat_nodes[j]
+                if node.mineru_index_start >= 0:
+                    if j == cursor:
+                        cursor = j + 1
+                    continue
+                if parent_idx >= 0 and _flat_nodes[parent_idx][0].mineru_index_start < 0:
+                    continue
+                if _fuzzy_match_title(node.title, text):
+                    node.mineru_index_start = i
+                    if j == cursor:
+                        cursor = j + 1
+                        while cursor < n_flat and _flat_nodes[cursor][0].mineru_index_start >= 0:
+                            cursor += 1
+                    break
 
     def _fill_inline_children(node):
         if node.children:
@@ -1950,6 +1974,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     if doc_id and tenant_id and (tab_text_map or indie_tab_records):
         def _store_tab2text():
+            db_thread = getattr(mineru_parser, '_mineru_db_thread', None)
+            if db_thread is not None and db_thread.is_alive():
+                db_thread.join()
             try:
                 from api.db.db_models import MineruSection as _MS, DB as _DB
                 if not _MS.table_exists():
