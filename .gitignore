@@ -133,6 +133,7 @@ web_modules/
 .yarn-integrity
 
 # dotenv environment variable files
+docker/.env
 .env
 .env.development.local
 .env.test.local
