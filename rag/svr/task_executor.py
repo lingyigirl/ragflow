@@ -780,7 +780,7 @@ def init_kb(row, vector_size: int):
     return settings.docStoreConn.create_idx(idxnm, row.get("kb_id", ""), vector_size)
 
 
-async def embedding(docs, mdl, parser_config=None, callback=None):
+async def embedding(docs, mdl, parser_config=None, callback=None, fast_batch=False):
     if parser_config is None:
         parser_config = {}
     tts, cnts = [], []
@@ -800,23 +800,33 @@ async def embedding(docs, mdl, parser_config=None, callback=None):
         tts = np.tile(vts[0], (len(cnts), 1))
         tk_count += c
 
-    @timeout(60)
-    def batch_encode(txts):
-        nonlocal mdl
-        return encode_texts_respecting_length(mdl, txts)
+    if fast_batch:
+        @timeout(120)
+        def _fast_encode(txts):
+            return mdl.encode(txts)
 
-    cnts_ = np.array([])
-    for i in range(0, len(cnts), settings.EMBEDDING_BATCH_SIZE):
         async with embed_limiter:
-            vts, c = await asyncio.to_thread(batch_encode, cnts[i: i + settings.EMBEDDING_BATCH_SIZE])
-        if len(cnts_) == 0:
-            cnts_ = vts
-        else:
-            cnts_ = np.concatenate((cnts_, vts), axis=0)
+            cnts_, c = await asyncio.to_thread(_fast_encode, cnts)
         tk_count += c
-        callback(prog=0.7 + 0.2 * (i + 1) / len(cnts), msg="")
+        callback(prog=0.8, msg="")
+    else:
+        @timeout(60)
+        def batch_encode(txts):
+            nonlocal mdl
+            return encode_texts_respecting_length(mdl, txts)
+
+        cnts_ = np.array([])
+        for i in range(0, len(cnts), settings.EMBEDDING_BATCH_SIZE):
+            async with embed_limiter:
+                vts, c = await asyncio.to_thread(batch_encode, cnts[i: i + settings.EMBEDDING_BATCH_SIZE])
+            if len(cnts_) == 0:
+                cnts_ = vts
+            else:
+                cnts_ = np.concatenate((cnts_, vts), axis=0)
+            tk_count += c
+            callback(prog=0.7 + 0.2 * (i + 1) / len(cnts), msg="")
     cnts = cnts_
-    filename_embd_weight = parser_config.get("filename_embd_weight", 0.1)  # due to the db support none value
+    filename_embd_weight = parser_config.get("filename_embd_weight", 0.1)
     if not filename_embd_weight:
         filename_embd_weight = 0.1
     title_w = float(filename_embd_weight)
@@ -1330,10 +1340,20 @@ async def do_handle_task(task):
         chunks = []
         token_count = 0
         vector_size = 0
+        is_financial = task["parser_id"].lower() == "financial"
         async for batch_docs in build_chunks(task, progress_callback):
             chunks.extend(batch_docs)
+            if not is_financial:
+                try:
+                    batch_tk, vector_size = await embedding(batch_docs, embedding_model, task_parser_config, progress_callback)
+                    token_count += batch_tk
+                except Exception as e:
+                    error_message = "Generate embedding error:{}".format(str(e))
+                    progress_callback(-1, error_message)
+                    logging.exception(error_message)
+        if is_financial and chunks:
             try:
-                batch_tk, vector_size = await embedding(batch_docs, embedding_model, task_parser_config, progress_callback)
+                batch_tk, vector_size = await embedding(chunks, embedding_model, task_parser_config, progress_callback, fast_batch=True)
                 token_count += batch_tk
             except Exception as e:
                 error_message = "Generate embedding error:{}".format(str(e))

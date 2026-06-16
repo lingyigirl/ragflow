@@ -10,6 +10,7 @@ from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_position
 from deepdoc.parser.figure_parser import vision_figure_parser_pdf_wrapper
 from deepdoc.parser.mineru_parser import MinerUParser, resolve_mineru_api_from_env, normalize_mineru_checkbox_latex
 from rag.utils.html_table_parser import convert_html_table
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 load_dotenv()
 
@@ -1878,13 +1879,27 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     tab_text_map = {}
     tab_original_html = {}
+    html_table_items = []
     for idx, item in enumerate(mineru_sections):
         text = _section_text(item)
         if is_html_table(text):
+            html_table_items.append((idx, text))
+
+    if html_table_items:
+
+        def _convert_one(idx_text):
+            idx, text = idx_text
             es_text, llm_text = convert_html_table(text)
-            if es_text or llm_text:
-                tab_text_map[idx] = (es_text, llm_text)
-                tab_original_html[idx] = text
+            return idx, text, es_text, llm_text
+
+        max_workers = min(8, len(html_table_items))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_idx = {executor.submit(_convert_one, item): item[0] for item in html_table_items}
+            for future in as_completed(future_to_idx):
+                idx, text, es_text, llm_text = future.result()
+                if es_text or llm_text:
+                    tab_text_map[idx] = (es_text, llm_text)
+                    tab_original_html[idx] = text
 
     from common.token_utils import embedding_token_budget
     token_budget = embedding_token_budget(8192)
@@ -2070,7 +2085,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if i < len(table_llm_texts) and table_llm_texts[i]:
             td["content_llm"] = table_llm_texts[i]
             td["es_tab2text"] = td["content_with_weight"]
-    chunk_docs = tokenize_chunks(chunks, doc, eng)
+    chunk_docs = tokenize_chunks(chunks, doc, eng, parallel=True)
 
     for i, chunk_doc in enumerate(chunk_docs):
         if i < len(chunk_chains):

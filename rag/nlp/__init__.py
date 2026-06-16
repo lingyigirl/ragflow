@@ -17,6 +17,7 @@
 import logging
 import random
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from common.token_utils import num_tokens_from_string
 import re
@@ -288,13 +289,39 @@ def split_with_pattern(d, pattern: str, content: str, eng) -> list:
     return docs
 
 
-def tokenize_chunks(chunks, doc, eng, pdf_parser=None, child_delimiters_pattern=None):
+def tokenize_chunks(chunks, doc, eng, pdf_parser=None, child_delimiters_pattern=None, parallel=False):
     res = []
-    # wrap up as es documents
-    for ii, ck in enumerate(chunks):
-        if len(ck.strip()) == 0:
-            continue
-        logging.debug("-- {}".format(ck))
+    if not parallel:
+        for ii, ck in enumerate(chunks):
+            if len(ck.strip()) == 0:
+                continue
+            logging.debug("-- {}".format(ck))
+            d = copy.deepcopy(doc)
+            if pdf_parser:
+                try:
+                    d["image"], poss = pdf_parser.crop(ck, need_position=True)
+                    add_positions(d, poss)
+                    ck = pdf_parser.remove_tag(ck)
+                except NotImplementedError:
+                    pass
+            else:
+                add_positions(d, [[ii] * 5])
+
+            if child_delimiters_pattern:
+                d["mom_with_weight"] = ck
+                res.extend(split_with_pattern(d, child_delimiters_pattern, ck, eng))
+                continue
+
+            tokenize(d, ck, eng)
+            res.append(d)
+        return res
+
+    items = [(ii, ck) for ii, ck in enumerate(chunks) if len(ck.strip()) > 0]
+    if not items:
+        return res
+
+    def _tokenize_one(ii_ck):
+        ii, ck = ii_ck
         d = copy.deepcopy(doc)
         if pdf_parser:
             try:
@@ -305,14 +332,21 @@ def tokenize_chunks(chunks, doc, eng, pdf_parser=None, child_delimiters_pattern=
                 pass
         else:
             add_positions(d, [[ii] * 5])
-
         if child_delimiters_pattern:
             d["mom_with_weight"] = ck
-            res.extend(split_with_pattern(d, child_delimiters_pattern, ck, eng))
-            continue
-
+            return ii, split_with_pattern(d, child_delimiters_pattern, ck, eng)
         tokenize(d, ck, eng)
-        res.append(d)
+        return ii, [d]
+
+    max_workers = min(8, len(items))
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_ii = {executor.submit(_tokenize_one, item): item[0] for item in items}
+        for future in as_completed(future_to_ii):
+            ii, sub_docs = future.result()
+            results[ii] = sub_docs
+    for ii in sorted(results):
+        res.extend(results[ii])
     return res
 
 

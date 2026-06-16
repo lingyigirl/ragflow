@@ -449,10 +449,14 @@ class MinerUParser(RAGFlowPdfParser):
             return
 
         if not getattr(self, "page_images", None):
-            self.logger.warning("[MinerU] crop called without page images; skipping image generation.")
-            if need_position:
-                return None, None
-            return
+            _pdf_path = getattr(self, "_pdf_path", None)
+            if _pdf_path and _pdf_path.exists():
+                self.__images__(_pdf_path, zoomin=1)
+            else:
+                self.logger.warning("[MinerU] crop called without page images; skipping image generation.")
+                if need_position:
+                    return None, None
+                return
 
         page_count = len(self.page_images)
 
@@ -2042,7 +2046,7 @@ class MinerUParser(RAGFlowPdfParser):
         self.logger.info(f"[MinerU] Output directory: {out_dir} backend={backend} api={self.mineru_api} server_url={server_url or self.mineru_server_url}")
         self._emit_callback(callback, 0.15, f"[MinerU] Output directory: {out_dir}")
 
-        self.__images__(pdf, zoomin=1)
+        self._pdf_path = pdf
 
         self._mineru_outputs_for_db = None
 
