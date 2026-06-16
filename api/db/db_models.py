@@ -1518,5 +1518,13 @@ def migrate_db():
         migrate(migrator.add_column("mineru_section", "es_id", CharField(max_length=64, null=True, index=True)))
     except Exception:
         pass
+    try:
+        migrate(migrator.add_column("mineru_section", "es_tab2text", LongTextField(null=True)))
+    except Exception:
+        pass
+    try:
+        migrate(migrator.add_column("mineru_section", "llm_tab2text", LongTextField(null=True)))
+    except Exception:
+        pass
 
     logging.disable(logging.NOTSET)
