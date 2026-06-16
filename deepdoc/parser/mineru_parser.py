@@ -1769,7 +1769,7 @@ class MinerUParser(RAGFlowPdfParser):
         _kb_mineru_backend = parser_cfg.get("mineru_backend")
         if _kb_mineru_backend not in (None, ""):
             backend = str(_kb_mineru_backend).strip()
-        lang = parser_cfg.get('mineru_lang') or kwargs.get('lang', 'English')
+        lang = parser_cfg.get('mineru_lang') or kwargs.get('lang', 'Chinese')
         mineru_lang_code = LANGUAGE_TO_MINERU_MAP.get(lang, 'ch') 
         mineru_method_raw_str = parser_cfg.get('mineru_parse_method', 'auto')
         enable_formula = parser_cfg.get('mineru_formula_enable', True)

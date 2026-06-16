@@ -612,6 +612,16 @@ class DocumentService(CommonService):
         target_field = type_to_field[req_type]
         col = getattr(MineruSection, target_field)
         update_kwargs = {col: text}
+        if req_type == "table_body" and text and isinstance(text, str) and ("<table" in text.lower()) and ("<tr" in text.lower() or "<td" in text.lower()):
+            try:
+                from rag.utils.html_table_parser import convert_html_table
+                es_text, llm_text = convert_html_table(text)
+                if es_text:
+                    update_kwargs[MineruSection.es_tab2text] = es_text
+                if llm_text:
+                    update_kwargs[MineruSection.llm_tab2text] = llm_text
+            except Exception:
+                pass
         updated = MineruSection.update(update_kwargs).where(MineruSection.id == section.id).execute()
         if not updated:
             return False, "update failed", {}
@@ -657,19 +667,27 @@ class DocumentService(CommonService):
                 return ""
             mtype = (getattr(msec, "type", None) or "").strip().lower()
             if mtype == "table":
-                t = (
-                    str(getattr(msec, "table_body", None) or "")
-                    + "\n"
-                    + _unescape_db_text(getattr(msec, "table_caption", None))
-                    + "\n"
-                    + _unescape_db_text(getattr(msec, "table_footnote", None))
-                ).strip()
+                es_txt = str(getattr(msec, "es_tab2text", None) or "").strip()
+                if es_txt:
+                    t = es_txt
+                else:
+                    t = (
+                        str(getattr(msec, "table_body", None) or "")
+                        + "\n"
+                        + _unescape_db_text(getattr(msec, "table_caption", None))
+                        + "\n"
+                        + _unescape_db_text(getattr(msec, "table_footnote", None))
+                    ).strip()
             elif mtype == "table_caption":
                 t = _unescape_db_text(getattr(msec, "table_caption", None))
             elif mtype == "table_footnote":
                 t = _unescape_db_text(getattr(msec, "table_footnote", None))
             elif mtype == "table_body":
-                t = str(getattr(msec, "table_body", None) or "")
+                es_txt = str(getattr(msec, "es_tab2text", None) or "").strip()
+                if es_txt:
+                    t = es_txt
+                else:
+                    t = str(getattr(msec, "table_body", None) or "")
             else:
                 t = str(getattr(msec, "text", None) or "")
             return t if t else ""
