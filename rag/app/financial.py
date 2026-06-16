@@ -1686,10 +1686,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
     mineru_sections = mineru_sections_with_level
     title_levels_display = [_display_title_level_tag(item) for item in mineru_sections]
-    logging.info(
-        "[Financial][静态标题] 标题层级序列（0=正文 1~4=标题 tab=表格 空=空行，非分块 depth）: %s",
-        title_levels_display,
-    )
+    # logging.info(
+    #     "[Financial][静态标题] 标题层级序列（0=正文 1~4=标题 tab=表格 空=空行，非分块 depth）: %s",
+    #     title_levels_display,
+    # )
 #
     def _normalize_pos_list(poss):
         norm = []
@@ -1783,9 +1783,9 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         toc_text = '\n'.join(toc_lines)
     if toc_text:
         lines = toc_text.splitlines()
-        logging.info("[Financial] 目录页文本 toc_start_idx=%s lines=%s", toc_start_idx, len(lines))
-        for idx, line in enumerate(lines):
-            logging.info("  [%d] %s", idx, line)
+        # logging.info("[Financial] 目录页文本 toc_start_idx=%s lines=%s", toc_start_idx, len(lines))
+        # for idx, line in enumerate(lines):
+        #     logging.info("  [%d] %s", idx, line)
     else:
         logging.info("[Financial] toc_start_idx=%s, toc_text=\"no TOC found\"", toc_start_idx)
 
@@ -1795,11 +1795,12 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     )
     sections = _sync_sections_title_levels(sections, mineru_sections)
     if induced:
-        depths_induced = [_display_depth_tag(item) for item in mineru_sections]
-        logging.info(
-            "[Financial][诱导depth] 按出现顺序诱导后: %s",
-            depths_induced,
-        )
+        pass
+        # depths_induced = [_display_depth_tag(item) for item in mineru_sections]
+        # logging.info(
+        #     "[Financial][诱导depth] 按出现顺序诱导后: %s",
+        #     depths_induced,
+        # )
 
     inline_patterns = _scan_inline_enum_patterns(mineru_sections, scan_start, len(mineru_sections))
     mineru_sections, level_map = _demote_inline_enum_titles_for_tree(
@@ -1835,19 +1836,19 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         mineru_sections, tree_level_by_index, level_map, toc_start_idx, body_start_idx,
     )
     sections = _sync_sections_title_levels(sections, mineru_sections)
-    depths_display = [_display_depth_tag(item) for item in mineru_sections]
-    logging.info(
-        "[Financial][树depth] 块合并采用的目录树 depth（-1=目录 0=正文 1~=标题深度）: %s",
-        depths_display,
-    )
-    for idx, sec in enumerate(mineru_sections):
-        preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
-        logging.info(
-            "[Financial][打标] [%d] depth=%s text=%s",
-            idx,
-            depths_display[idx] if idx < len(depths_display) else "?",
-            preview,
-        )
+    # depths_display = [_display_depth_tag(item) for item in mineru_sections]
+    # logging.info(
+    #     "[Financial][树depth] 块合并采用的目录树 depth（-1=目录 0=正文 1~=标题深度）: %s",
+    #     depths_display,
+    # )
+    # for idx, sec in enumerate(mineru_sections):
+    #     preview = (_section_text(sec) or "").replace("\n", " ").replace("\r", " ")[:150]
+    #     logging.info(
+    #         "[Financial][打标] [%d] depth=%s text=%s",
+    #         idx,
+    #         depths_display[idx] if idx < len(depths_display) else "?",
+    #         preview,
+    #     )
 
     cross_ref = _build_cross_ref_from_toc_items(toc_items)
 
@@ -1858,13 +1859,13 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if (item.get("title") or "").strip()
     ]
     tree_data = {"toc": toc_text_output, "toc_index": toc_index}
-    toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
-    logging.info(
-        "[Financial] tree toc_len=%s cross_ref=%s toc_preview=%s",
-        len(toc_text_output),
-        bool(cross_ref),
-        toc_preview,
-    )
+    # toc_preview = toc_text_output[:] if toc_text_output else "(empty)"
+    # logging.info(
+    #     "[Financial] tree toc_len=%s cross_ref=%s toc_preview=%s",
+    #     len(toc_text_output),
+    #     bool(cross_ref),
+    #     toc_preview,
+    # )
     if doc_id and tenant_id:
         try:
             from api.db.services.document_service import DocumentService
@@ -1911,20 +1912,20 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     if not chunks_raw:
         return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial merge produced no chunks.")
 
-    for ci, chunk_raw in enumerate(chunks_raw):
-        ms, me = chunk_raw.get("mineru_range", (0, 0))
-        depth_seq = _depths_display_for_range(mineru_sections, ms, me)
-        content_preview = (chunk_raw.get("content") or "").replace("\n", " ")[:100]
-        logging.info(
-            "[Financial][分块] chunk=%d/%d range=[%d,%d) depths=%s parent_chain=%s preview=%s",
-            ci + 1,
-            len(chunks_raw),
-            ms,
-            me,
-            depth_seq,
-            chunk_raw.get("parent_chain", []),
-            content_preview,
-        )
+    # for ci, chunk_raw in enumerate(chunks_raw):
+    #     ms, me = chunk_raw.get("mineru_range", (0, 0))
+    #     depth_seq = _depths_display_for_range(mineru_sections, ms, me)
+    #     content_preview = (chunk_raw.get("content") or "").replace("\n", " ")[:100]
+    #     logging.info(
+    #         "[Financial][分块] chunk=%d/%d range=[%d,%d) depths=%s parent_chain=%s preview=%s",
+    #         ci + 1,
+    #         len(chunks_raw),
+    #         ms,
+    #         me,
+    #         depth_seq,
+    #         chunk_raw.get("parent_chain", []),
+    #         content_preview,
+    #     )
 
     if callback:
         callback(0.5, "Building chunks (Financial)...")
