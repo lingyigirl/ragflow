@@ -284,12 +284,12 @@ def grid_to_llm_tab2text(grid):
                 continue
             col_header = col_headers[c] if c < len(col_headers) else ""
             if col_header:
-                value_parts.append(f"{col_header} {val}")
+                value_parts.append(f"{col_header}={val}")
             else:
                 value_parts.append(val)
 
         if value_parts:
-            lines.append(f"{row_label}：" + "，".join(value_parts))
+            lines.append(f"{row_label}：" + " | ".join(value_parts))
 
     return "\n".join(lines)
 

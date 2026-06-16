@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from collections import defaultdict
 
 from rag.nlp.search import index_name
@@ -225,6 +226,7 @@ def _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, target_e
     field_list = [
         "content_with_weight",
         "content_llm",
+        "es_tab2text",
         "doc_type_kwd",
         "docnm_kwd",
         "important_kwd",
@@ -257,6 +259,7 @@ def _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, target_e
                 "content_ltks": content,
                 "content_with_weight": content,
                 "content_llm": fields.get("content_llm", ""),
+                "es_tab2text": fields.get("es_tab2text", ""),
                 "doc_id": doc_id,
                 "docnm_kwd": fields.get("docnm_kwd", ""),
                 "kb_id": kb_id,
@@ -275,6 +278,57 @@ def _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, target_e
     return chunks
 
 
+def _note_to_main_table_es_ids(doc_chunks, cross_ref, es_id_to_chain):
+    targets = set()
+    cref = cross_ref or {}
+    note_to_table = cref.get("note_to_table_mapping", {})
+    if not note_to_table:
+        return targets
+    for ck in doc_chunks:
+        chain = _parse_chain(ck.get("parent_chain"))
+        if not chain:
+            continue
+        for note_title, table_names in note_to_table.items():
+            if not _chain_has_title(chain, note_title):
+                continue
+            for table_name in table_names:
+                if not table_name:
+                    continue
+                for es_id, table_chain in es_id_to_chain.items():
+                    if _chain_has_title(table_chain, table_name):
+                        targets.add(es_id)
+    return targets
+
+
+def _main_table_to_note_es_ids(doc_chunks, cross_ref, es_id_to_chain):
+    targets = set()
+    cref = cross_ref or {}
+    note_to_table = cref.get("note_to_table_mapping", {})
+    main_tables = cref.get("main_tables", [])
+    if not note_to_table or not main_tables:
+        return targets
+    main_table_names = [t.get("title", "") for t in main_tables if isinstance(t, dict) and t.get("title")]
+    if not main_table_names:
+        return targets
+    for ck in doc_chunks:
+        chain = _parse_chain(ck.get("parent_chain"))
+        if not chain:
+            continue
+        matched_main = None
+        for mt_name in main_table_names:
+            if _chain_has_title(chain, mt_name):
+                matched_main = mt_name
+                break
+        if not matched_main:
+            continue
+        for note_title, table_list in note_to_table.items():
+            if matched_main in table_list:
+                for es_id, note_chain in es_id_to_chain.items():
+                    if _chain_has_title(note_chain, note_title):
+                        targets.add(es_id)
+    return targets
+
+
 def expand_financial_chunks_v2(dealer, chunks, tenant_ids, question=None):
     if not chunks:
         return chunks
@@ -286,12 +340,19 @@ def expand_financial_chunks_v2(dealer, chunks, tenant_ids, question=None):
         kb_id = doc_chunks[0].get("kb_id")
         cross_ref, toc_index = _load_doc_cross_ref(doc_id)
         es_id_to_chain, chain_prefix_to_es_ids, ordered_es_ids = _load_doc_es_index(doc_id)
+        for ck in doc_chunks:
+            if not ck.get("parent_chain"):
+                cid = ck.get("chunk_id")
+                if cid and cid in es_id_to_chain:
+                    ck["parent_chain"] = es_id_to_chain[cid]
         has_note, has_table, note_titles, table_titles, hit_chains = _detect_intent(doc_chunks, cross_ref)
         targets = set()
         if has_note or has_table:
             targets.update(_cross_ref_target_es_ids(has_note, has_table, cross_ref, note_titles, table_titles))
             targets.update(_parent_chain_target_es_ids(hit_chains, chain_prefix_to_es_ids))
         targets.update(_toc_target_es_ids(question, toc_index, es_id_to_chain, chain_prefix_to_es_ids))
+        targets.update(_note_to_main_table_es_ids(doc_chunks, cross_ref, es_id_to_chain))
+        targets.update(_main_table_to_note_es_ids(doc_chunks, cross_ref, es_id_to_chain))
         if not targets:
             continue
         targets.update(_adjacent_es_ids(targets, ordered_es_ids))
@@ -300,4 +361,75 @@ def expand_financial_chunks_v2(dealer, chunks, tenant_ids, question=None):
             if cid:
                 targets.add(cid)
         chunks = _fetch_and_append_chunks(dealer, chunks, doc_id, kb_id, tenant_ids, targets, doc_chunks)
+        chunks = _toc_structure_boost(chunks, toc_index, question)
+    if question and chunks:
+        chunks = _bm25_rerank(chunks, question)
+    return chunks
+
+
+def _keyword_score(query, content):
+    if not query or not content:
+        return 0.0
+    terms = re.findall(r'[一-鿿]{2,}|[a-zA-Z]{2,}', query)
+    if not terms:
+        return 0.0
+    content_lower = content.lower()
+    hits = 0
+    for term in terms:
+        hits += content_lower.count(term.lower())
+    return min(hits / max(len(content), 1) * 200, 1.0)
+
+
+def _toc_match_score(toc_title, q_terms):
+    if not toc_title or not q_terms:
+        return 0.0
+    title_lower = toc_title.lower()
+    matched = 0
+    for term in q_terms:
+        if term.lower() in title_lower:
+            matched += 1
+    return matched / len(q_terms)
+
+
+def _toc_structure_boost(chunks, toc_index, question):
+    if not question or not toc_index or not chunks:
+        return chunks
+    q_terms = re.findall(r'[一-鿿]{2,}|[a-zA-Z]{2,}', question)
+    if not q_terms:
+        return chunks
+    toc_matches = {}
+    for node in toc_index:
+        title = (node.get("title") or "").strip()
+        if not title or len(title) < 2:
+            continue
+        score = _toc_match_score(title, q_terms)
+        if score > 0:
+            depth = max(1, int(node.get("depth") or 1))
+            toc_matches[title] = (score, depth)
+    if not toc_matches:
+        return chunks
+    for ck in chunks:
+        chain = _parse_chain(ck.get("parent_chain"))
+        if not chain:
+            continue
+        max_boost = 0.0
+        for toc_title, (score, depth) in toc_matches.items():
+            if _chain_has_title(chain, toc_title):
+                depth_factor = min(depth / 3.0, 1.0)
+                boost = score * depth_factor * 0.20
+                if boost > max_boost:
+                    max_boost = boost
+        if max_boost > 0:
+            ck["_toc_boost"] = max_boost
+    return chunks
+
+
+def _bm25_rerank(chunks, question):
+    for ck in chunks:
+        content = ck.get("es_tab2text") or ck.get("content_with_weight", "")
+        kw_score = _keyword_score(question, content)
+        vec_sim = ck.get("similarity", 0.3)
+        toc_boost = ck.pop("_toc_boost", 0.0) if isinstance(ck, dict) else 0.0
+        ck["similarity"] = vec_sim * 0.60 + kw_score * 0.20 + toc_boost
+    chunks.sort(key=lambda x: x.get("similarity", 0), reverse=True)
     return chunks

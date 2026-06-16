@@ -3,6 +3,7 @@ import re
 import os
 import json
 import logging
+import threading
 from dotenv import load_dotenv
 from rag.nlp import rag_tokenizer, tokenize_table, tokenize_chunks, add_positions
 
@@ -1407,9 +1408,9 @@ def _build_chunks_from_labeled_sections(
     if toc_start_idx >= 0:
         toc_end = min(max(body_start_idx, toc_start_idx + 1), n)
         if toc_start_idx > 0:
-            chunks.extend(_scan_merge_range(mineru_sections, 0, toc_start_idx, token_budget))
+            chunks.extend(_scan_merge_range(mineru_sections, 0, toc_start_idx, token_budget, tab_text_map=tab_text_map))
         if toc_start_idx < toc_end:
-            chunks.extend(_scan_merge_range(mineru_sections, toc_start_idx, toc_end, token_budget))
+            chunks.extend(_scan_merge_range(mineru_sections, toc_start_idx, toc_end, token_budget, tab_text_map=tab_text_map))
         if toc_end < n:
             chunks.extend(_scan_merge_range(
                 mineru_sections, toc_end, n, token_budget, unit_stop_depth, use_toc_unit_stop, toc_kind_depth, tab_text_map=tab_text_map,
@@ -1851,12 +1852,14 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         callback(0.3, "Building chunks (Financial)...")
 
     tab_text_map = {}
+    tab_original_html = {}
     for idx, item in enumerate(mineru_sections):
         text = _section_text(item)
         if is_html_table(text):
             es_text, llm_text = convert_html_table(text)
             if es_text or llm_text:
                 tab_text_map[idx] = (es_text, llm_text)
+                tab_original_html[idx] = text
 
     from common.token_utils import embedding_token_budget
     token_budget = embedding_token_budget(8192)
@@ -1945,29 +1948,41 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
     from api.utils.json_encode import normalize_parent_chain_for_storage
     chunk_chains = [normalize_parent_chain_for_storage(c) for c in chunk_chains]
 
-    if doc_id and tenant_id and tab_text_map:
-        try:
-            from api.db.db_models import MineruSection as _MS, DB as _DB
-            if _MS.table_exists():
-                chunk_id_to_es = {}
-                chunk_id_to_llm = {}
-                for idx, (es_text, llm_text) in tab_text_map.items():
-                    if idx < len(mineru_sections) and len(mineru_sections[idx]) >= 4:
-                        cid = mineru_sections[idx][3]
-                        if cid:
-                            chunk_id_to_es[cid] = es_text
-                            chunk_id_to_llm[cid] = llm_text
-                if chunk_id_to_es:
-                    with _DB.connection_context():
-                        for cid, es_text in chunk_id_to_es.items():
-                            llm_text = chunk_id_to_llm.get(cid, "")
-                            _MS.update(
+    if doc_id and tenant_id and (tab_text_map or indie_tab_records):
+        def _store_tab2text():
+            try:
+                from api.db.db_models import MineruSection as _MS, DB as _DB
+                if not _MS.table_exists():
+                    return
+                with _DB.connection_context():
+                    for idx, (es_text, _) in tab_text_map.items():
+                        if idx < len(mineru_sections) and len(mineru_sections[idx]) >= 4:
+                            cid = mineru_sections[idx][3]
+                            original = tab_original_html.get(idx, "")
+                            if cid and es_text:
+                                _MS.update(
+                                    es_tab2text=es_text,
+                                    llm_tab2text=original,
+                                ).where(_MS.chunk_id == cid).execute()
+                    for original_html, es_text in indie_tab_records:
+                        if es_text and original_html:
+                            rows_updated = _MS.update(
                                 es_tab2text=es_text,
-                                llm_tab2text=llm_text,
-                            ).where(_MS.chunk_id == cid).execute()
-                    logging.info("[Financial] mineru_tab2text done total_sections_updated=%s", len(chunk_id_to_es))
-        except Exception:
-            logging.exception("Failed to update mineru_section es_tab2text/llm_tab2text (Financial).")
+                                llm_tab2text=original_html,
+                            ).where(_MS.doc_id == doc_id, _MS.text == original_html).execute()
+                            if rows_updated == 0:
+                                _MS.update(
+                                    es_tab2text=es_text,
+                                    llm_tab2text=original_html,
+                                ).where(_MS.doc_id == doc_id, _MS.table_body == original_html).execute()
+                    logging.info(
+                        "[Financial] tab2text async done sections=%s indie=%s",
+                        len(tab_text_map), len(indie_tab_records),
+                    )
+            except Exception:
+                logging.exception("Failed async mineru_section es_tab2text/llm_tab2text (Financial).")
+
+        threading.Thread(target=_store_tab2text, daemon=True).start()
 
     if not chunks:
         return _fallback_general_docs(filename, binary, lang, callback, kwargs, "Financial chunking produced empty result.")
@@ -1986,6 +2001,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
     sanitized_tbls = []
     table_doc_orders = []
+    table_llm_texts = []
+    indie_tab_records = []
     for table_item in tbls:
         if not isinstance(table_item, (list, tuple)) or len(table_item) < 1:
             continue
@@ -1998,9 +2015,10 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
             table_text = table_payload
         if table_text is None:
             continue
-        table_text = str(table_text).strip()
-        if not table_text:
+        original_table_html = str(table_text).strip()
+        if not original_table_html:
             continue
+        table_text = original_table_html
         table_sort_idx = 999999
         if table_pos:
             try:
@@ -2008,10 +2026,22 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 table_sort_idx = p0[0][0] if isinstance(p0[0], list) else p0[0]
             except Exception:
                 pass
+        table_llm = None
+        if is_html_table(table_text):
+            es_text, llm_text = convert_html_table(table_text)
+            if es_text:
+                indie_tab_records.append((original_table_html, es_text))
+                table_text = es_text
+                table_llm = llm_text if llm_text else None
         sanitized_tbls.append(((None, table_text), table_pos if table_pos else []))
         table_doc_orders.append(table_sort_idx)
+        table_llm_texts.append(table_llm)
 
     table_docs = tokenize_table(sanitized_tbls, doc, eng)
+    for i, td in enumerate(table_docs):
+        if i < len(table_llm_texts) and table_llm_texts[i]:
+            td["content_llm"] = table_llm_texts[i]
+            td["es_tab2text"] = td["content_with_weight"]
     chunk_docs = tokenize_chunks(chunks, doc, eng)
 
     for i, chunk_doc in enumerate(chunk_docs):
@@ -2020,6 +2050,7 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
         if i < len(llm_chunks) and llm_chunks[i]:
             if i >= len(chunks) or llm_chunks[i] != chunks[i]:
                 chunk_doc["content_llm"] = llm_chunks[i]
+                chunk_doc["es_tab2text"] = chunk_doc["content_with_weight"]
         if i < len(chunk_positions):
             if chunk_positions[i]:
                 add_positions(chunk_doc, chunk_positions[i])

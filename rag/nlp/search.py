@@ -93,7 +93,7 @@ class Dealer:
                       ["docnm_kwd", "content_ltks", "kb_id", "img_id", "title_tks", "important_kwd", "position_int",
                        "doc_id", "page_num_int", "top_int", "create_timestamp_flt", "knowledge_graph_kwd",
                        "question_kwd", "question_tks", "doc_type_kwd",
-                       "available_int", "content_with_weight", "content_llm", "parent_chain", "mom_id", PAGERANK_FLD, TAG_FLD])
+                       "available_int", "content_with_weight", "content_llm", "es_tab2text", "parent_chain", "mom_id", PAGERANK_FLD, TAG_FLD])
         kwds = set([])
 
         qst = req.get("question", "")
@@ -464,6 +464,7 @@ class Dealer:
                 "content_ltks": chunk["content_ltks"],
                 "content_with_weight": chunk["content_with_weight"],
                 "content_llm": chunk.get("content_llm", ""),
+                "es_tab2text": chunk.get("es_tab2text", ""),
                 "parent_chain": chunk.get("parent_chain", []),
                 "doc_id": did,
                 "docnm_kwd": dnm,
