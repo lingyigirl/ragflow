@@ -965,7 +965,7 @@ class UserCanvas(DataBaseModel):
     agent_type = CharField(max_length=32, null=True, help_text="none|personal|enterprise", index=True)
     agent_type_cn = CharField(max_length=255, null=True, help_text="agent type display name in Chinese")
     agent_type_en = CharField(max_length=255, null=True, help_text="agent type display name in English")
-    params = JSONField(null=True, default=dict, help_text="parameter settings array")
+    params = JSONField(null=True, default=list, help_text="parameter settings array")
     dsl = JSONField(null=True, default={})
 
     class Meta:
@@ -1414,7 +1414,7 @@ def migrate_db():
     except Exception:
         pass
     try:
-        migrate(migrator.add_column("user_canvas", "params", JSONField(null=True, default=dict, help_text="parameter settings array")))
+        migrate(migrator.add_column("user_canvas", "params", JSONField(null=True, default=list, help_text="parameter settings array")))
     except Exception:
         pass
     try:

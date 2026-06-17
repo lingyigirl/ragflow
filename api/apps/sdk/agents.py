@@ -80,8 +80,8 @@ async def create_agent(tenant_id: str):
             break
     if begin_node:
         begin_form = begin_node.get("data", {}).get("form", {})
-        if "params" in begin_form and not req.get("params"):
-            req["params"] = begin_form["params"]
+        if not req.get("params"):
+            req["params"] = begin_form.get("params", [])
 
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
@@ -125,8 +125,8 @@ async def update_agent(tenant_id: str, agent_id: str):
             break
     if begin_node:
         begin_form = begin_node.get("data", {}).get("form", {})
-        if "params" in begin_form and not req.get("params"):
-            req["params"] = begin_form["params"]
+        if not req.get("params"):
+            req["params"] = begin_form.get("params", [])
 
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
