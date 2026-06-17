@@ -46,10 +46,16 @@ export const BeginFormSchema = z.object({
       }),
     )
     .optional(),
-  param_chinese_name: z.string().optional(),
-  param_english_name: z.string().optional(),
-  param_default_value: z.string().optional(),
-  param_type: z.enum(['string', 'file']).optional(),
+  params: z
+    .array(
+      z.object({
+        name_cn: z.string(),
+        name_en: z.string(),
+        default_value: z.string().optional(),
+        param_type: z.string(),
+      }),
+    )
+    .optional(),
   methods: z.array(z.string()).optional(),
   content_types: z.string().optional(),
   security: z

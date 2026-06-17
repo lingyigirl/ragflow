@@ -80,9 +80,8 @@ async def create_agent(tenant_id: str):
             break
     if begin_node:
         begin_form = begin_node.get("data", {}).get("form", {})
-        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
-            if field in begin_form and not req.get(field):
-                req[field] = begin_form[field]
+        if "params" in begin_form and not req.get("params"):
+            req["params"] = begin_form["params"]
 
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
@@ -126,9 +125,8 @@ async def update_agent(tenant_id: str, agent_id: str):
             break
     if begin_node:
         begin_form = begin_node.get("data", {}).get("form", {})
-        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
-            if field in begin_form and not req.get(field):
-                req[field] = begin_form[field]
+        if "params" in begin_form and not req.get("params"):
+            req["params"] = begin_form["params"]
 
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
@@ -958,10 +956,7 @@ async def list_user_agent_id_and_title(tenant_id: str):
         UserCanvasService.model.agent_type.alias("type"),
         UserCanvasService.model.agent_type_cn,
         UserCanvasService.model.agent_type_en,
-        UserCanvasService.model.param_chinese_name,
-        UserCanvasService.model.param_english_name,
-        UserCanvasService.model.param_default_value,
-        UserCanvasService.model.param_type,
+        UserCanvasService.model.params,
     ).where(
         UserCanvasService.model.user_id == tenant_id,
         UserCanvasService.model.canvas_category == CanvasCategory.Agent,

@@ -95,9 +95,8 @@ async def save():
             break
     if begin_node:
         begin_form = begin_node.get("data", {}).get("form", {})
-        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
-            if field in begin_form and not req.get(field):
-                req[field] = begin_form[field]
+        if "params" in begin_form and not req.get("params"):
+            req["params"] = begin_form["params"]
 
     if "id" not in req:
         req["user_id"] = current_user.id

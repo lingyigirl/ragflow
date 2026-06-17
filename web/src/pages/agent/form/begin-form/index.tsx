@@ -8,19 +8,22 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
-import { Input } from '@/components/ui/input';
 import { RAGFlowSelect } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { FormTooltip } from '@/components/ui/tooltip';
+import { useSetModalState } from '@/hooks/common-hooks';
+import { useSetSelectedRecord } from '@/hooks/logic-hooks';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { t } from 'i18next';
 import { Plus } from 'lucide-react';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { AgentDialogueMode } from '../../constant';
-import { INextOperatorForm } from '../../interface';
+import { INextOperatorForm, ParamSetting } from '../../interface';
+import { ParamSettingsDialog } from './param-settings-dialog';
+import { ParamSettingsTable } from './param-settings-table';
 import { ParameterDialog } from './parameter-dialog';
 import { QueryTable } from './query-table';
 import { BeginFormSchema } from './schema';
@@ -34,11 +37,6 @@ const ModeOptions = [
   { value: AgentDialogueMode.Conversational, label: t('flow.conversational') },
   { value: AgentDialogueMode.Task, label: t('flow.task') },
   { value: AgentDialogueMode.Webhook, label: t('flow.webhook.name') },
-];
-
-const ParamTypeOptions = [
-  { value: 'string', label: '字符串' },
-  { value: 'file', label: '文件' },
 ];
 
 function BeginForm({ node }: INextOperatorForm) {
@@ -88,6 +86,51 @@ function BeginForm({ node }: INextOperatorForm) {
     form,
     node,
   });
+
+  const {
+    visible: paramVisible,
+    hideModal: hideParamModal,
+    showModal: showParamModal,
+  } = useSetModalState();
+  const { setRecord: setParamRecord, currentRecord: currentParamRecord } =
+    useSetSelectedRecord<ParamSetting>();
+  const [paramIndex, setParamIndex] = useState(-1);
+
+  const params: ParamSetting[] = useWatch({
+    control: form.control,
+    name: 'params',
+  });
+
+  const handleShowParamModal = useCallback(
+    (idx?: number, record?: ParamSetting) => {
+      setParamIndex(idx ?? -1);
+      setParamRecord(record ?? ({} as ParamSetting));
+      showParamModal();
+    },
+    [setParamRecord, showParamModal],
+  );
+
+  const handleEditParamRecord = useCallback(
+    (record: ParamSetting) => {
+      const params: ParamSetting[] = form?.getValues('params') || [];
+      const nextParams =
+        paramIndex > -1
+          ? params.toSpliced(paramIndex, 1, record)
+          : [...params, record];
+      form.setValue('params', nextParams);
+      hideParamModal();
+    },
+    [form, hideParamModal, paramIndex],
+  );
+
+  const handleDeleteParamRecord = useCallback(
+    (idx: number) => {
+      const params = form?.getValues('params') || [];
+      const nextParams = params.filter((_, index) => index !== idx);
+      form.setValue('params', nextParams);
+    },
+    [form],
+  );
 
   return (
     <section className="px-5 space-y-5 pb-4">
@@ -200,66 +243,38 @@ function BeginForm({ node }: INextOperatorForm) {
             )}
           </>
         )}
-        <Collapse title={<div>参数设置</div>}>
-          <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name={'param_chinese_name'}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>参数中文名称</FormLabel>
-                  <FormControl>
-                    <Input placeholder="请输入参数中文名称" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name={'param_english_name'}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>参数英文名称</FormLabel>
-                  <FormControl>
-                    <Input placeholder="请输入参数英文名称" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name={'param_default_value'}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>参数默认值</FormLabel>
-                  <FormControl>
-                    <Input placeholder="请输入参数默认值" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name={'param_type'}
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>参数类型</FormLabel>
-                  <FormControl>
-                    <RAGFlowSelect
-                      placeholder="请选择参数类型"
-                      options={ParamTypeOptions}
-                      {...field}
-                    ></RAGFlowSelect>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-          </div>
+        <FormField
+          control={form.control}
+          name={'params'}
+          render={() => <div></div>}
+        />
+        <Collapse
+          title={<div>参数设置</div>}
+          rightContent={
+            <Button
+              variant={'ghost'}
+              onClick={(e) => {
+                e.preventDefault();
+                handleShowParamModal();
+              }}
+            >
+              <Plus />
+            </Button>
+          }
+        >
+          <ParamSettingsTable
+            data={params}
+            showModal={handleShowParamModal}
+            deleteRecord={handleDeleteParamRecord}
+          ></ParamSettingsTable>
         </Collapse>
+        {paramVisible && (
+          <ParamSettingsDialog
+            hideModal={hideParamModal}
+            initialValue={currentParamRecord}
+            submit={handleEditParamRecord}
+          ></ParamSettingsDialog>
+        )}
       </Form>
     </section>
   );

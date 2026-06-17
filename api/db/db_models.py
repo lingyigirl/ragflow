@@ -965,10 +965,7 @@ class UserCanvas(DataBaseModel):
     agent_type = CharField(max_length=32, null=True, help_text="none|personal|enterprise", index=True)
     agent_type_cn = CharField(max_length=255, null=True, help_text="agent type display name in Chinese")
     agent_type_en = CharField(max_length=255, null=True, help_text="agent type display name in English")
-    param_chinese_name = CharField(max_length=100, null=True, help_text="parameter Chinese name")
-    param_english_name = CharField(max_length=100, null=True, help_text="parameter English name")
-    param_default_value = CharField(max_length=500, null=True, help_text="parameter default value")
-    param_type = CharField(max_length=32, null=True, help_text="parameter type: string|file")
+    params = JSONField(null=True, default=dict, help_text="parameter settings array")
     dsl = JSONField(null=True, default={})
 
     class Meta:
@@ -1417,19 +1414,7 @@ def migrate_db():
     except Exception:
         pass
     try:
-        migrate(migrator.add_column("user_canvas", "param_chinese_name", CharField(max_length=100, null=True, help_text="parameter Chinese name")))
-    except Exception:
-        pass
-    try:
-        migrate(migrator.add_column("user_canvas", "param_english_name", CharField(max_length=100, null=True, help_text="parameter English name")))
-    except Exception:
-        pass
-    try:
-        migrate(migrator.add_column("user_canvas", "param_default_value", CharField(max_length=500, null=True, help_text="parameter default value")))
-    except Exception:
-        pass
-    try:
-        migrate(migrator.add_column("user_canvas", "param_type", CharField(max_length=32, null=True, help_text="parameter type: string|file")))
+        migrate(migrator.add_column("user_canvas", "params", JSONField(null=True, default=dict, help_text="parameter settings array")))
     except Exception:
         pass
     try:

@@ -34,17 +34,24 @@ export interface BeginQuery {
   options: (number | string | boolean)[];
   parse_method?: string;
   mineru_backend?: 'pipeline' | 'vlm-vllm-async-engine' | 'hybrid-auto-engine';
-  mineru_parse_method?: 'auto' | 'txt' | 'ocr'; 
-  mineru_formula_enable?: boolean; 
-  mineru_table_enable?: boolean; 
-  mineru_lang?: string; 
-  tcadp_table_result_type?: string; 
-  tcadp_markdown_image_response_type?: string; 
-  lang?: string; 
-  chunk_token_num?: number; 
-  delimiter?: string; 
-  enable_children?: boolean; 
-  children_delimiter?: string; 
+  mineru_parse_method?: 'auto' | 'txt' | 'ocr';
+  mineru_formula_enable?: boolean;
+  mineru_table_enable?: boolean;
+  mineru_lang?: string;
+  tcadp_table_result_type?: string;
+  tcadp_markdown_image_response_type?: string;
+  lang?: string;
+  chunk_token_num?: number;
+  delimiter?: string;
+  enable_children?: boolean;
+  children_delimiter?: string;
+}
+
+export interface ParamSetting {
+  name_cn: string;
+  name_en: string;
+  default_value: string;
+  param_type: string;
 }
 
 export type IInputs = {
