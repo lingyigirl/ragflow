@@ -958,6 +958,10 @@ async def list_user_agent_id_and_title(tenant_id: str):
         UserCanvasService.model.agent_type.alias("type"),
         UserCanvasService.model.agent_type_cn,
         UserCanvasService.model.agent_type_en,
+        UserCanvasService.model.param_chinese_name,
+        UserCanvasService.model.param_english_name,
+        UserCanvasService.model.param_default_value,
+        UserCanvasService.model.param_type,
     ).where(
         UserCanvasService.model.user_id == tenant_id,
         UserCanvasService.model.canvas_category == CanvasCategory.Agent,
