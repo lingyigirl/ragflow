@@ -399,7 +399,7 @@ function BeginPdfParserOptions() {
   useEffect(() => {
     if (parserType === 'mineru') {
       if (!form.getValues('mineru_backend')) {
-        form.setValue('mineru_backend', 'pipeline', {
+        form.setValue('mineru_backend', 'hybrid-auto-engine', {
           shouldValidate: true,
           shouldDirty: true,
         });
@@ -494,7 +494,7 @@ function BeginPdfParserOptions() {
                       </FormLabel>
                       <FormControl>
                         <RAGFlowSelect
-                          value={field.value || 'pipeline'}
+                          value={field.value || 'hybrid-auto-engine'}
                           onChange={field.onChange}
                           options={MINERU_KB_BACKEND_VALUES.map((v) => ({
                             label: v,

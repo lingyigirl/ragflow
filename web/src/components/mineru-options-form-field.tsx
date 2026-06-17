@@ -14,9 +14,7 @@ export const MINERU_KB_BACKEND_VALUES = [
 
 export type MineruKbBackend = (typeof MINERU_KB_BACKEND_VALUES)[number];
 
-const kbBackendOptions = buildOptions([
-  ...MINERU_KB_BACKEND_VALUES,
-]);
+const kbBackendOptions = buildOptions([...MINERU_KB_BACKEND_VALUES]);
 
 const parseMethodOptions = buildOptions(['auto', 'txt', 'ocr']);
 const languageOptions = buildOptions([
@@ -83,7 +81,7 @@ export function MinerUOptionsFormField({
       >
         {(field) => (
           <RAGFlowSelect
-            value={field.value || 'pipeline'}
+            value={field.value || 'hybrid-auto-engine'}
             onChange={field.onChange}
             options={kbBackendOptions}
             placeholder={t('common.selectPlaceholder', 'Select value')}
@@ -121,7 +119,7 @@ export function MinerUOptionsFormField({
       >
         {(field) => (
           <RAGFlowSelect
-            value={field.value || 'English'}
+            value={field.value || 'Chinese'}
             onChange={field.onChange}
             options={languageOptions}
             placeholder={t('common.selectPlaceholder', 'Select value')}
