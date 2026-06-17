@@ -88,6 +88,17 @@ async def save():
             agent_type_en = globals_.get("agent.party_type_name_en")
             if agent_type_en:
                 req["agent_type_en"] = agent_type_en
+    begin_node = None
+    for node in (req.get("dsl") or {}).get("graph", {}).get("nodes", []):
+        if node.get("data", {}).get("label") == "Begin":
+            begin_node = node
+            break
+    if begin_node:
+        begin_form = begin_node.get("data", {}).get("form", {})
+        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
+            if field in begin_form and not req.get(field):
+                req[field] = begin_form[field]
+
     if "id" not in req:
         req["user_id"] = current_user.id
         if UserCanvasService.query(user_id=current_user.id, title=req["title"].strip(), canvas_category=cate):

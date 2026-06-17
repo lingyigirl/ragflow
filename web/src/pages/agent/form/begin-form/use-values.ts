@@ -14,6 +14,10 @@ export function useValues(node?: RAGFlowNodeType) {
       prologue: t('chat.setAnOpenerInitial'),
       mode: AgentDialogueMode.Conversational,
       inputs: [],
+      param_chinese_name: '',
+      param_english_name: '',
+      param_default_value: '',
+      param_type: 'string',
     }),
     [t],
   );

@@ -73,6 +73,17 @@ async def create_agent(tenant_id: str):
     else:
         return get_json_result(data=False, message="No DSL data in request.", code=RetCode.ARGUMENT_ERROR)
 
+    begin_node = None
+    for node in (req.get("dsl") or {}).get("graph", {}).get("nodes", []):
+        if node.get("data", {}).get("label") == "Begin":
+            begin_node = node
+            break
+    if begin_node:
+        begin_form = begin_node.get("data", {}).get("form", {})
+        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
+            if field in begin_form and not req.get(field):
+                req[field] = begin_form[field]
+
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
     else:
@@ -107,6 +118,17 @@ async def update_agent(tenant_id: str, agent_id: str):
             req["dsl"] = json.dumps(req["dsl"], ensure_ascii=False)
 
         req["dsl"] = json.loads(req["dsl"])
+
+    begin_node = None
+    for node in (req.get("dsl") or {}).get("graph", {}).get("nodes", []):
+        if node.get("data", {}).get("label") == "Begin":
+            begin_node = node
+            break
+    if begin_node:
+        begin_form = begin_node.get("data", {}).get("form", {})
+        for field in ["param_chinese_name", "param_english_name", "param_default_value", "param_type"]:
+            if field in begin_form and not req.get(field):
+                req[field] = begin_form[field]
 
     if req.get("title") is not None:
         req["title"] = req["title"].strip()

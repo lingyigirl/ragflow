@@ -8,6 +8,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
 import { RAGFlowSelect } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -33,6 +34,11 @@ const ModeOptions = [
   { value: AgentDialogueMode.Conversational, label: t('flow.conversational') },
   { value: AgentDialogueMode.Task, label: t('flow.task') },
   { value: AgentDialogueMode.Webhook, label: t('flow.webhook.name') },
+];
+
+const ParamTypeOptions = [
+  { value: 'string', label: '字符串' },
+  { value: 'file', label: '文件' },
 ];
 
 function BeginForm({ node }: INextOperatorForm) {
@@ -194,6 +200,66 @@ function BeginForm({ node }: INextOperatorForm) {
             )}
           </>
         )}
+        <Collapse title={<div>参数设置</div>}>
+          <div className="space-y-4">
+            <FormField
+              control={form.control}
+              name={'param_chinese_name'}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>参数中文名称</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入参数中文名称" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={'param_english_name'}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>参数英文名称</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入参数英文名称" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={'param_default_value'}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>参数默认值</FormLabel>
+                  <FormControl>
+                    <Input placeholder="请输入参数默认值" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name={'param_type'}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>参数类型</FormLabel>
+                  <FormControl>
+                    <RAGFlowSelect
+                      placeholder="请选择参数类型"
+                      options={ParamTypeOptions}
+                      {...field}
+                    ></RAGFlowSelect>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </Collapse>
       </Form>
     </section>
   );

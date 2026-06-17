@@ -114,6 +114,10 @@ class UserCanvasService(CommonService):
                 cls.model.agent_type,
                 cls.model.agent_type_cn,
                 cls.model.agent_type_en,
+                cls.model.param_chinese_name,
+                cls.model.param_english_name,
+                cls.model.param_default_value,
+                cls.model.param_type,
                 User.nickname,
                 User.avatar.alias('tenant_avatar'),
             ]
@@ -161,6 +165,10 @@ class UserCanvasService(CommonService):
             cls.model.agent_type,
             cls.model.agent_type_cn,
             cls.model.agent_type_en,
+            cls.model.param_chinese_name,
+            cls.model.param_english_name,
+            cls.model.param_default_value,
+            cls.model.param_type,
         ]
         if keywords:
             agents = cls.model.select(*fields).join(User, on=(cls.model.user_id == User.id)).where(

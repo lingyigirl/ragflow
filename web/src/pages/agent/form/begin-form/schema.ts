@@ -20,7 +20,7 @@ export const BeginFormSchema = z.object({
       z.object({
         key: z.string(),
         type: FieldTypeSchema,
-        value: z.union([z.string(), z.record(z.any()), z.array(z.any())]), // 支持字符串、对象或数组（用于文件类型）
+        value: z.union([z.string(), z.record(z.any()), z.array(z.any())]),
         optional: z.boolean(),
         name: z.string(),
         options: z.array(z.union([z.number(), z.string(), z.boolean()])),
@@ -46,6 +46,10 @@ export const BeginFormSchema = z.object({
       }),
     )
     .optional(),
+  param_chinese_name: z.string().optional(),
+  param_english_name: z.string().optional(),
+  param_default_value: z.string().optional(),
+  param_type: z.enum(['string', 'file']).optional(),
   methods: z.array(z.string()).optional(),
   content_types: z.string().optional(),
   security: z
