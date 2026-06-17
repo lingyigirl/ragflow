@@ -32,19 +32,19 @@ type ModalFormProps = {
 
 const FormId = 'ParamSettingForm';
 
+const FormSchema = z.object({
+  name_cn: z.string().trim().min(1),
+  name_en: z.string().trim().min(1),
+  default_value: z.string().optional(),
+  param_type: z.string(),
+});
+
 const ParamTypeOptions = [
   { value: 'string', label: '字符串' },
   { value: 'file', label: '文件' },
 ];
 
 function ParamSettingForm({ initialValue, submit }: ModalFormProps) {
-  const FormSchema = z.object({
-    name_cn: z.string().trim().min(1),
-    name_en: z.string().trim().min(1),
-    default_value: z.string().optional(),
-    param_type: z.string(),
-  });
-
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     mode: 'onChange',

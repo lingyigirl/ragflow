@@ -28,7 +28,7 @@ export function useValues(node?: RAGFlowNodeType) {
 
     const inputs = buildBeginInputListFromObject(formData?.inputs);
 
-    return { ...(formData || {}), inputs };
+    return { ...(formData || {}), inputs, params: formData?.params ?? [] };
   }, [defaultValues, node?.data?.form]);
 
   return values;

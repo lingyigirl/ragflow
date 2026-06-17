@@ -263,8 +263,8 @@ function BeginForm({ node }: INextOperatorForm) {
           }
         >
           <ParamSettingsTable
-            data={params}
-            showModal={handleShowParamModal}
+            data={params ?? []}
+            onEdit={handleShowParamModal}
             deleteRecord={handleDeleteParamRecord}
           ></ParamSettingsTable>
         </Collapse>
