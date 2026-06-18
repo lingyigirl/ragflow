@@ -22,7 +22,7 @@ from functools import partial
 from quart import request, Response, make_response
 from agent.component import LLM
 from api.db import CanvasCategory
-from api.db.services.canvas_service import CanvasTemplateService, UserCanvasService, API4ConversationService
+from api.db.services.canvas_service import CanvasTemplateService, UserCanvasService, UserCanvasParamsService, API4ConversationService
 from api.db.services.document_service import DocumentService
 from api.db.services.file_service import FileService
 from api.db.services.pipeline_operation_log_service import PipelineOperationLogService
@@ -61,6 +61,7 @@ async def rm():
             return get_json_result(
                 data=False, message='Only owner of canvas authorized for this operation.',
                 code=RetCode.OPERATING_ERROR)
+        UserCanvasParamsService.delete_by_canvas_id(i)
         UserCanvasService.delete_by_id(i)
     return get_json_result(data=True)
 
@@ -98,6 +99,8 @@ async def save():
         if not req.get("params"):
             req["params"] = begin_form.get("params", [])
 
+    params = req.pop("params", [])
+
     if "id" not in req:
         req["user_id"] = current_user.id
         if UserCanvasService.query(user_id=current_user.id, title=req["title"].strip(), canvas_category=cate):
@@ -111,6 +114,9 @@ async def save():
                 data=False, message='Only owner of canvas authorized for this operation.',
                 code=RetCode.OPERATING_ERROR)
         UserCanvasService.update_by_id(req["id"], req)
+
+    UserCanvasParamsService.sync_params(req["id"], params)
+    req["params"] = params
     # save version
     UserCanvasVersionService.insert(user_canvas_id=req["id"], dsl=req["dsl"], title="{0}_{1}".format(req["title"], time.strftime("%Y_%m_%d_%H_%M_%S")))
     UserCanvasVersionService.delete_all_versions(req["id"])

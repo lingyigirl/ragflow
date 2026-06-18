@@ -24,7 +24,7 @@ from copy import deepcopy
 from io import BytesIO
 
 import xxhash
-from quart import request, send_file
+from quart import request, send_file, jsonify
 from peewee import OperationalError
 from pydantic import BaseModel, Field, validator
 
@@ -2472,3 +2472,30 @@ def set_document_meta(tenant_id: str, dataset_id: str, document_id: str):
 
     except Exception as e:
         return server_error_response(e)
+
+
+@manager.route("/datasets/Appd_AbListDocs", methods=["POST"])
+@token_required
+async def Appd_AbListDocs(tenant_id):
+    data = await get_request_json()
+    dataset_id = data.get("dataset_id")
+    doc_id_list = data.get("doc_id_list", [])
+
+    if not dataset_id or not isinstance(doc_id_list, list):
+        return get_error_data_result(message="Missing or invalid parameters: dataset_id, doc_id_list")
+
+    if not KnowledgebaseService.accessible(kb_id=dataset_id, user_id=tenant_id):
+        return get_error_data_result(message=f"You don't own the dataset {dataset_id}.")
+
+    docs, _ = DocumentService.get_list(kb_id=dataset_id, page_number=1, items_per_page=99999, orderby="create_time", \
+                                       desc=True, keywords="", id=None, name=None)
+    docs = [d for d in docs if d.get("id") in doc_id_list]
+
+    total_docs = len(docs)
+    done_docs = sum(1 for d in docs if str(d.get("run")) == "3")
+    percentage = int(done_docs / total_docs * 100) if total_docs else 100
+
+    result = {
+        "percentage": percentage
+    }
+    return jsonify(result)

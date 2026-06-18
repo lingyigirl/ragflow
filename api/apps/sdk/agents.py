@@ -28,7 +28,7 @@ import jwt
 
 from agent.canvas import Canvas
 from api.db import CanvasCategory
-from api.db.services.canvas_service import UserCanvasService
+from api.db.services.canvas_service import UserCanvasService, UserCanvasParamsService
 from api.db.services.file_service import FileService
 from api.db.services.user_canvas_version import UserCanvasVersionService
 from common.constants import RetCode
@@ -83,6 +83,8 @@ async def create_agent(tenant_id: str):
         if not req.get("params"):
             req["params"] = begin_form.get("params", [])
 
+    params = req.pop("params", [])
+
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
     else:
@@ -96,6 +98,8 @@ async def create_agent(tenant_id: str):
 
     if not UserCanvasService.save(**req):
         return get_data_error_result(message="Fail to create agent.")
+
+    UserCanvasParamsService.sync_params(agent_id, params)
 
     UserCanvasVersionService.insert(
         user_canvas_id=agent_id,
@@ -128,6 +132,8 @@ async def update_agent(tenant_id: str, agent_id: str):
         if not req.get("params"):
             req["params"] = begin_form.get("params", [])
 
+    params = req.pop("params", [])
+
     if req.get("title") is not None:
         req["title"] = req["title"].strip()
 
@@ -137,6 +143,8 @@ async def update_agent(tenant_id: str, agent_id: str):
             code=RetCode.OPERATING_ERROR)
 
     UserCanvasService.update_by_id(agent_id, req)
+
+    UserCanvasParamsService.sync_params(agent_id, params)
 
     if req.get("dsl") is not None:
         UserCanvasVersionService.insert(
@@ -158,6 +166,7 @@ def delete_agent(tenant_id: str, agent_id: str):
             data=False, message="Only owner of canvas authorized for this operation.",
             code=RetCode.OPERATING_ERROR)
 
+    UserCanvasParamsService.delete_by_canvas_id(agent_id)
     UserCanvasService.delete_by_id(agent_id)
     return get_json_result(data=True)
 
@@ -956,7 +965,6 @@ async def list_user_agent_id_and_title(tenant_id: str):
         UserCanvasService.model.agent_type.alias("type"),
         UserCanvasService.model.agent_type_cn,
         UserCanvasService.model.agent_type_en,
-        UserCanvasService.model.params,
     ).where(
         UserCanvasService.model.user_id == tenant_id,
         UserCanvasService.model.canvas_category == CanvasCategory.Agent,
@@ -983,7 +991,16 @@ async def list_user_agent_id_and_title(tenant_id: str):
             UserCanvasService.model.agent_type_en == str(agent_type_en).strip()
         )
     q = q.order_by(UserCanvasService.model.update_time.desc())
-    return get_result(data=list(q.dicts()))
+    result = list(q.dicts())
+    canvas_ids = [r["id"] for r in result]
+    if canvas_ids:
+        params_map = UserCanvasParamsService.get_params_by_canvas_ids(canvas_ids)
+        for r in result:
+            r["params"] = params_map.get(r["id"], [])
+    else:
+        for r in result:
+            r["params"] = []
+    return get_result(data=result)
 
 
 @manager.route("/agents/agent_type", methods=["POST"])

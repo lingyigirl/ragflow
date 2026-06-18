@@ -976,6 +976,18 @@ class UserCanvas(DataBaseModel):
         db_table = "user_canvas"
 
 
+class UserCanvasParams(DataBaseModel):
+    id = BigAutoField(primary_key=True)
+    canvas_id = CharField(max_length=32, null=False, index=True, help_text="user_canvas id")
+    name_cn = CharField(max_length=100, null=True, help_text="参数中文名称")
+    name_en = CharField(max_length=100, null=True, help_text="参数英文名称")
+    default_value = CharField(max_length=500, null=True, help_text="参数默认值")
+    param_type = CharField(max_length=32, null=False, default="string", help_text="参数类型（string|file）")
+
+    class Meta:
+        db_table = "user_canvas_params"
+
+
 class CanvasTemplate(DataBaseModel):
     id = CharField(max_length=32, primary_key=True)
     avatar = TextField(null=True, help_text="avatar base64 string")

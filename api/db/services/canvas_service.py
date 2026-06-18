@@ -19,7 +19,7 @@ import time
 from uuid import uuid4
 from agent.canvas import Canvas
 from api.db import CanvasCategory, TenantPermission
-from api.db.db_models import DB, CanvasTemplate, User, UserCanvas, API4Conversation
+from api.db.db_models import DB, CanvasTemplate, User, UserCanvas, UserCanvasParams, API4Conversation
 from api.db.services.api_service import API4ConversationService
 from api.db.services.common_service import CommonService
 from common.misc_utils import get_uuid
@@ -114,15 +114,15 @@ class UserCanvasService(CommonService):
                 cls.model.agent_type,
                 cls.model.agent_type_cn,
                 cls.model.agent_type_en,
-                cls.model.params,
                 User.nickname,
                 User.avatar.alias('tenant_avatar'),
             ]
             agents = cls.model.select(*fields) \
             .join(User, on=(cls.model.user_id == User.id)) \
             .where(cls.model.id == pid)
-            # obj = cls.model.query(id=pid)[0]
-            return True, agents.dicts()[0]
+            result = agents.dicts()[0]
+            result["params"] = UserCanvasParamsService.get_params(pid)
+            return True, result
         except Exception as e:
             logging.exception(e)
             return False, None
@@ -162,7 +162,6 @@ class UserCanvasService(CommonService):
             cls.model.agent_type,
             cls.model.agent_type_cn,
             cls.model.agent_type_en,
-            cls.model.params,
         ]
         if keywords:
             agents = cls.model.select(*fields).join(User, on=(cls.model.user_id == User.id)).where(
@@ -200,7 +199,16 @@ class UserCanvasService(CommonService):
         count = agents.count()
         if page_number and items_per_page:
             agents = agents.paginate(page_number, items_per_page)
-        return list(agents.dicts()), count
+        result = list(agents.dicts())
+        canvas_ids = [r["id"] for r in result]
+        if canvas_ids:
+            params_map = UserCanvasParamsService.get_params_by_canvas_ids(canvas_ids)
+            for r in result:
+                r["params"] = params_map.get(r["id"], [])
+        else:
+            for r in result:
+                r["params"] = []
+        return result, count
 
     @classmethod
     @DB.connection_context()
@@ -214,6 +222,51 @@ class UserCanvasService(CommonService):
         if c["user_id"] != canvas_id and c["user_id"]  not in tids:
             return False
         return True
+
+
+class UserCanvasParamsService(CommonService):
+    model = UserCanvasParams
+
+    @classmethod
+    @DB.connection_context()
+    def sync_params(cls, canvas_id, params_list):
+        cls.model.delete().where(cls.model.canvas_id == canvas_id).execute()
+        if params_list:
+            records = [
+                {
+                    "canvas_id": canvas_id,
+                    "name_cn": p.get("name_cn", ""),
+                    "name_en": p.get("name_en", ""),
+                    "default_value": p.get("default_value", ""),
+                    "param_type": p.get("param_type", "string"),
+                }
+                for p in params_list
+            ]
+            for r in records:
+                cls.save(**r)
+
+    @classmethod
+    @DB.connection_context()
+    def get_params(cls, canvas_id):
+        return list(cls.model.select().where(cls.model.canvas_id == canvas_id).dicts())
+
+    @classmethod
+    @DB.connection_context()
+    def get_params_by_canvas_ids(cls, canvas_ids):
+        records = list(cls.model.select().where(cls.model.canvas_id.in_(canvas_ids)).dicts())
+        result = {}
+        for r in records:
+            cid = r.pop("canvas_id")
+            r.pop("id", None)
+            if cid not in result:
+                result[cid] = []
+            result[cid].append(r)
+        return result
+
+    @classmethod
+    @DB.connection_context()
+    def delete_by_canvas_id(cls, canvas_id):
+        return cls.model.delete().where(cls.model.canvas_id == canvas_id).execute()
 
 
 async def completion(tenant_id, agent_id, session_id=None, **kwargs):
