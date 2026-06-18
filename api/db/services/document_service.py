@@ -1123,6 +1123,16 @@ class DocumentService(CommonService):
 
     @classmethod
     @DB.connection_context()
+    def query_by_sha256_hash(cls, sha256_hash, kb_id=None):
+        if not sha256_hash:
+            return []
+        query = cls.model.select().where(cls.model.sha256_hash == sha256_hash)
+        if kb_id:
+            query = query.where(cls.model.kb_id == kb_id)
+        return list(query.dicts())
+
+    @classmethod
+    @DB.connection_context()
     def get_meta_by_kbs(cls, kb_ids):
         """
         Legacy metadata aggregator (backward-compatible).

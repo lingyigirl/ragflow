@@ -14,10 +14,13 @@
 #  limitations under the License.
 #
 import datetime
+import hashlib
 import json
 import logging
 import pathlib
 import re
+import unicodedata
+from copy import deepcopy
 from io import BytesIO
 
 import xxhash
@@ -38,15 +41,256 @@ from api.db.services.task_service import TaskService, queue_tasks, cancel_all_ta
 from common.metadata_utils import meta_filter, convert_conditions
 from api.utils.api_utils import check_duplicate_ids, construct_json_result, get_error_data_result, get_parser_config, get_result, server_error_response, token_required, \
     get_request_json
+from api.utils.file_utils import filename_type
 from rag.app.qa import beAdoc, rmPrefix
 from rag.app.tag import label_question
 from rag.nlp import rag_tokenizer, search
 from rag.prompts.generator import cross_languages, keyword_extraction
 from common.string_utils import remove_redundant_spaces
+from common.token_utils import num_tokens_from_string
 from common.constants import RetCode, LLMType, ParserType, TaskStatus, FileSource
 from common import settings
 
 MAXIMUM_OF_UPLOADING_FILES = 256
+
+_INVISIBLE_RE = re.compile(r"[​-‏⁠﻿ ]")
+
+VALID_CHUNK_METHODS = {
+    "naive",
+    "manual",
+    "qa",
+    "table",
+    "paper",
+    "book",
+    "laws",
+    "presentation",
+    "picture",
+    "one",
+    "knowledge_graph",
+    "email",
+    "tag",
+    "hichunk",
+}
+
+BASIC_PDF_PARSERS = {"DeepDOC", "Plain Text"}
+EXTENDED_PDF_PARSERS = {"MinerU", "Docling", "TCADP Parser"}
+
+PDF_PARSER_CANONICAL_MAP = {
+    "deepdoc": "DeepDOC",
+    "plain text": "Plain Text",
+    "plaintext": "Plain Text",
+    "plain_text": "Plain Text",
+    "mineru": "MinerU",
+    "docling": "Docling",
+    "tcadp parser": "TCADP Parser",
+    "tcadp": "TCADP Parser",
+}
+
+DOC_TYPE_MAP = [
+    ("financing_loan_details", "融资借款明细"),
+    ("company_charter", "公司章程"),
+    ("contract", "合同"),
+    ("tax_payment_certificate", "完税凭证"),
+    ("hydroelectricity_invoice", "水电发票"),
+    ("executive_resume", "高管简历"),
+    ("audit_report", "审计报告"),
+    ("footnote", "附注"),
+    ("financial_statements", "财务报表"),
+    ("guarantor_enterprise_note", "担保企业附注"),
+    ("bank_transaction_history", "银行交易流水"),
+    ("credit_investigation_of_loan_applicant", "借款申请人征信"),
+    ("credit_investigation_of_legal_representative", "法人代表征信"),
+    ("credit_investigation_of_major_shareholders", "主要股东征信"),
+    ("other", "其他"),
+]
+
+
+def compute_sha256_stream(file_obj):
+    sha256_hash = hashlib.sha256()
+    while chunk := file_obj.read(4096):
+        sha256_hash.update(chunk)
+    file_obj.seek(0)
+    return sha256_hash.hexdigest()
+
+
+def _classify_document(chat_mdl, content_sample, filename):
+    types_text = "\n".join([f"- {cn} - {en}" for en, cn in DOC_TYPE_MAP])
+    system = "你是一个专业的文档分类助手，只返回JSON格式的结果，不要有任何其他内容。"
+    prompt_template = f"""你是一个文档分类专家。请根据以下文档内容，判断文档类型，从以下类型列表中选择最匹配的一项：
+
+类型列表(中文 - 英文):
+{types_text}
+
+请只返回一个JSON对象，格式如下：
+{{"cn": "中文类型", "en": "english_type"}}
+
+文档名称：{filename}
+文档内容预览：
+"""
+    prompt_overhead = num_tokens_from_string(system) + num_tokens_from_string(prompt_template) + 500
+    max_content_tokens = max(chat_mdl.max_length - prompt_overhead, 500)
+    content_tokens = num_tokens_from_string(content_sample)
+    if content_tokens > max_content_tokens:
+        content_sample = content_sample[:int(max_content_tokens * 4)]
+    prompt = prompt_template + content_sample
+    history = [{"role": "user", "content": prompt}]
+    response = chat_mdl.chat(system, history)
+    try:
+        json_match = re.search(r'\{[^{}]*\}', response)
+        if json_match:
+            result = json.loads(json_match.group())
+            return result.get("en", "other"), result.get("cn", "其他")
+    except (json.JSONDecodeError, AttributeError):
+        pass
+    return "other", "其他"
+
+
+def _normalize_chunk_method(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("`chunk_method` must be a string value.")
+    method = _INVISIBLE_RE.sub("", value.strip())
+    method = unicodedata.normalize("NFKC", method).strip().lower()
+    if not method:
+        raise ValueError("`chunk_method` must be a non-empty string.")
+    if method not in VALID_CHUNK_METHODS:
+        raise ValueError(f"`chunk_method` {value} doesn't exist")
+    return method
+
+
+def _coerce_chunk_method_for_validation(value):
+    if value is None:
+        return "naive"
+    method_raw = str(value).strip()
+    if len(method_raw) >= 2 and method_raw[0] == method_raw[-1] and method_raw[0] in {"'", '"', "`"}:
+        method_raw = method_raw[1:-1].strip()
+    method_raw = unicodedata.normalize("NFKC", _INVISIBLE_RE.sub("", method_raw)).strip()
+    if not method_raw:
+        return "naive"
+    try:
+        return _normalize_chunk_method(method_raw)
+    except ValueError:
+        return method_raw.lower()
+
+
+def _normalize_pdf_parser(value):
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("`pdf_parser` must be a string value.")
+    normalized = value.strip()
+    if len(normalized) >= 2 and normalized[0] == normalized[-1] and normalized[0] in {"'", '"', "`"}:
+        normalized = normalized[1:-1].strip()
+    normalized = re.sub(r"[​-‏⁠﻿ ]", "", normalized)
+    normalized = normalized.rstrip(".。")
+    normalized = unicodedata.normalize("NFKC", normalized)
+    if not normalized:
+        raise ValueError("`pdf_parser` must be a non-empty string.")
+    lower_key = normalized.lower()
+    if lower_key in PDF_PARSER_CANONICAL_MAP:
+        return PDF_PARSER_CANONICAL_MAP[lower_key]
+    slug = re.sub(r"[^a-z0-9]+", "", lower_key)
+    slug_aliases = {
+        "mineru": "MinerU",
+        "deepdoc": "DeepDOC",
+        "plaintext": "Plain Text",
+        "docling": "Docling",
+        "tcadpparser": "TCADP Parser",
+        "tcadp": "TCADP Parser",
+    }
+    if slug in slug_aliases:
+        return slug_aliases[slug]
+    return normalized
+
+
+def _validate_chunk_method_for_file(method, filename):
+    if not method:
+        return
+    suffix = pathlib.Path(filename).suffix.lower().lstrip(".")
+    file_type = filename_type(filename)
+    if method in {"manual", "paper"}:
+        if file_type != FileType.PDF.value:
+            raise ValueError(f"`chunk_method` {method} supports only PDF files.")
+    elif method == "qa":
+        allowed_suffixes = {"pdf", "docx", "csv", "xls", "xlsx", "txt", "md", "markdown"}
+        if file_type == FileType.PDF.value:
+            return
+        if suffix not in allowed_suffixes - {"pdf"}:
+            raise ValueError("`chunk_method` qa supports PDF, DOCX, Markdown, TXT, CSV or Excel files.")
+    elif method == "table":
+        if suffix not in {"xls", "xlsx", "csv"}:
+            raise ValueError("`chunk_method` table supports only Excel or CSV files.")
+    elif method == "book":
+        if file_type not in {FileType.PDF.value, FileType.DOC.value}:
+            raise ValueError("`chunk_method` book supports PDF or document files.")
+    elif method == "laws":
+        if file_type not in {FileType.PDF.value, FileType.DOC.value}:
+            raise ValueError("`chunk_method` laws supports PDF or document files.")
+    elif method == "presentation":
+        if file_type == FileType.PDF.value:
+            return
+        if suffix not in {"ppt", "pptx"}:
+            raise ValueError("`chunk_method` presentation supports PDF or PPT/PPTX files.")
+    elif method == "picture":
+        if file_type != FileType.VISUAL.value:
+            raise ValueError("`chunk_method` picture supports only image files.")
+    elif method == "one":
+        if file_type not in {FileType.PDF.value, FileType.DOC.value, FileType.VISUAL.value} and suffix not in {"xls", "xlsx", "csv"}:
+            raise ValueError("`chunk_method` one supports PDF, document, image or Excel files.")
+    elif method == "knowledge_graph":
+        if file_type not in {FileType.PDF.value, FileType.DOC.value}:
+            raise ValueError("`chunk_method` knowledge_graph supports PDF or document files.")
+    elif method == "email":
+        if suffix not in {"eml", "msg"}:
+            raise ValueError("`chunk_method` email supports only EML or MSG files.")
+    elif method == "tag":
+        if suffix not in {"xls", "xlsx", "csv", "txt"}:
+            raise ValueError("`chunk_method` tag supports CSV, TXT or Excel files.")
+
+
+def _validate_pdf_parser_choice(pdf_parser, effective_chunk_method, file_type, filename):
+    if not pdf_parser:
+        return None
+    canonical = _normalize_pdf_parser(pdf_parser)
+    if file_type != FileType.PDF.value:
+        suffix = pathlib.Path(filename).suffix.lower().lstrip(".")
+        if suffix in {"xls", "xlsx", "csv", "doc", "docx"}:
+            return canonical
+        raise ValueError("`pdf_parser` can only be applied to PDF/Excel/CSV/Word files.")
+    method = _coerce_chunk_method_for_validation(effective_chunk_method)
+    _eff_raw = unicodedata.normalize("NFKC", _INVISIBLE_RE.sub("", str(effective_chunk_method or "").strip())).lower()
+    _eff_slug = re.sub(r"[^a-z]+", "", _eff_raw)
+    if (
+        method in {"hichunk", "one"}
+        or _eff_raw in {"hichunk", "one"}
+        or _eff_slug in {"hichunk", "one"}
+    ):
+        return canonical
+    if method == "qa":
+        if canonical != "DeepDOC":
+            raise ValueError("`pdf_parser` DeepDOC is required when `chunk_method` is `qa`.")
+    elif method in {"manual", "paper", "book", "laws", "knowledge_graph"}:
+        if canonical not in BASIC_PDF_PARSERS:
+            raise ValueError(f"`pdf_parser` {canonical} is not supported with `chunk_method` {method}.")
+    elif method == "presentation":
+        if canonical in EXTENDED_PDF_PARSERS:
+            raise ValueError(f"`pdf_parser` {canonical} is not supported with `chunk_method` {method}.")
+    elif method == "naive":
+        pass
+    else:
+        if canonical not in BASIC_PDF_PARSERS:
+            raise ValueError(f"`pdf_parser` {canonical} is not supported with `chunk_method` {method}.")
+    return canonical
+
+
+def _resolve_word_chunk_method(method, filename, file_type):
+    if not method:
+        return method
+    suffix = pathlib.Path(filename).suffix.lower().lstrip(".")
+    if file_type == FileType.DOC.value and suffix in {"doc", "docx"}:
+        return "naive"
+    return method
 
 
 class Chunk(BaseModel):
@@ -73,7 +317,7 @@ class Chunk(BaseModel):
 @token_required
 async def upload(dataset_id, tenant_id):
     """
-    Upload documents to a dataset.
+    Upload documents to a dataset and optionally enqueue parsing tasks.
     ---
     tags:
       - Documents
@@ -99,6 +343,36 @@ async def upload(dataset_id, tenant_id):
         name: parent_path
         type: string
         description: Optional nested path under the parent folder. Uses '/' separators.
+      - in: formData
+        name: metadata
+        type: string
+        required: false
+        description: JSON object mapping filenames or `__default__` to metadata dicts.
+      - in: formData
+        name: tags
+        type: string
+        required: false
+        description: JSON object mapping filenames or `__default__` to tag lists.
+      - in: formData
+        name: chunk_method
+        type: string
+        required: false
+        description: JSON object mapping filenames or `__default__` to chunk methods.
+      - in: formData
+        name: pdf_parser
+        type: string
+        required: false
+        description: JSON object mapping filenames or `__default__` to PDF parser choices.
+      - in: formData
+        name: llm_analyse
+        type: string
+        required: false
+        description: Whether to use LLM to auto-classify document types ("true"/"false").
+      - in: formData
+        name: parse
+        type: string
+        required: false
+        description: Whether to immediately enqueue parsing ("true"/"false"). Defaults to "false".
     responses:
       200:
         description: Successfully uploaded documents.
@@ -142,42 +416,426 @@ async def upload(dataset_id, tenant_id):
             return get_result(message="No file selected!", code=RetCode.ARGUMENT_ERROR)
         if len(file_obj.filename.encode("utf-8")) > FILE_NAME_LEN_LIMIT:
             return get_result(message=f"File name must be {FILE_NAME_LEN_LIMIT} bytes or less.", code=RetCode.ARGUMENT_ERROR)
-    """
-    # total size
-    total_size = 0
-    for file_obj in file_objs:
-        file_obj.seek(0, os.SEEK_END)
-        total_size += file_obj.tell()
-        file_obj.seek(0)
-    MAX_TOTAL_FILE_SIZE = 10 * 1024 * 1024
-    if total_size > MAX_TOTAL_FILE_SIZE:
-        return get_result(
-            message=f"Total file size exceeds 10MB limit! ({total_size / (1024 * 1024):.2f} MB)",
-            code=RetCode.ARGUMENT_ERROR,
-        )
-    """
+
+    parent_path = form.get("parent_path")
+    metadata_payload = form.get("metadata")
+    tag_payload = form.get("tags")
+    chunk_method_payload = form.get("chunk_method")
+    pdf_parser_payload = form.get("pdf_parser")
+    llm_analyse_raw = form.get("llm_analyse", "false")
+    llm_analyse = llm_analyse_raw.lower() in ("true", "1", "yes")
+    parse_raw = form.get("parse", "false")
+    parse = parse_raw.lower() in ("true", "1", "yes")
+
+    use_old_flow = bool(metadata_payload or tag_payload or chunk_method_payload or pdf_parser_payload or llm_analyse or parse)
+
     e, kb = KnowledgebaseService.get_by_id(dataset_id)
     if not e:
         raise LookupError(f"Can't find the dataset with ID {dataset_id}!")
-    err, files = FileService.upload_document(kb, file_objs, tenant_id, parent_path=form.get("parent_path"))
+
+    if not use_old_flow:
+        err, files_result = FileService.upload_document(kb, file_objs, tenant_id, parent_path=parent_path)
+        if err:
+            return get_result(message="\n".join(err), code=RetCode.SERVER_ERROR)
+        renamed_doc_list = []
+        for file in files_result:
+            doc = file[0]
+            key_mapping = {
+                "chunk_num": "chunk_count",
+                "kb_id": "dataset_id",
+                "token_num": "token_count",
+                "parser_id": "chunk_method",
+            }
+            renamed_doc = {}
+            for key, value in doc.items():
+                new_key = key_mapping.get(key, key)
+                renamed_doc[new_key] = value
+            renamed_doc["run"] = "UNSTART"
+            renamed_doc_list.append(renamed_doc)
+        return get_result(data=renamed_doc_list)
+
+    def _load_mapping(raw_payload, mapping_name):
+        if not raw_payload:
+            return {}
+        try:
+            parsed = json.loads(raw_payload)
+        except json.JSONDecodeError:
+            raise ValueError(f"`{mapping_name}` must be a valid JSON object")
+        if not isinstance(parsed, dict):
+            raise ValueError(f"`{mapping_name}` must be a JSON object keyed by file names")
+        return parsed
+
+    def _lookup_per_file(mapping, filename):
+        if not mapping:
+            return None
+        if filename in mapping:
+            return mapping[filename]
+        stemmed = pathlib.Path(filename).name
+        if stemmed in mapping:
+            return mapping[stemmed]
+        return mapping.get("__default__")
+
+    try:
+        metadata_mapping = _load_mapping(metadata_payload, "metadata")
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+    try:
+        tags_mapping = _load_mapping(tag_payload, "tags")
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+    try:
+        raw_chunk_mapping = _load_mapping(chunk_method_payload, "chunk_method")
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+    try:
+        pdf_parser_mapping = _load_mapping(pdf_parser_payload, "pdf_parser")
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+
+    for key, value in metadata_mapping.items():
+        if key == "__default__" and value is None:
+            continue
+        if value is not None and not isinstance(value, dict):
+            return get_error_data_result(
+                message="Each metadata entry must be a JSON object (or null for unset).",
+                code=RetCode.ARGUMENT_ERROR,
+            )
+
+    def _validate_tags(tag_value):
+        if tag_value is None:
+            return None
+        if not isinstance(tag_value, list) or not all(isinstance(tag, str) for tag in tag_value):
+            raise ValueError("Each tags entry must be a list of strings")
+        return tag_value
+
+    try:
+        chunk_mapping = {k: _normalize_chunk_method(v) if v is not None else None for k, v in raw_chunk_mapping.items()}
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+    for key, value in pdf_parser_mapping.items():
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            return get_error_data_result(message="Each pdf_parser entry must be a string (or null for unset).", code=RetCode.ARGUMENT_ERROR)
+
+    try:
+        tags_mapping = {k: _validate_tags(v) for k, v in tags_mapping.items()}
+    except ValueError as exc:
+        return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+
+    dataset_default_chunk = (kb.parser_id or "naive").lower()
+    if dataset_default_chunk not in VALID_CHUNK_METHODS:
+        dataset_default_chunk = "naive"
+
+    upload_context = []
+    renamed_doc_list = []
+    duplicate_failures = []
+    parse_failures = []
+    key_mapping = {
+        "chunk_num": "chunk_count",
+        "kb_id": "dataset_id",
+        "token_num": "token_count",
+        "parser_id": "chunk_method",
+    }
+    non_duplicate_file_objs = []
+    for file_obj in file_objs:
+        sha256_hash = compute_sha256_stream(file_obj)
+
+        chunk_override = _lookup_per_file(chunk_mapping, file_obj.filename)
+        pdf_parser_choice = _lookup_per_file(pdf_parser_mapping, file_obj.filename)
+        meta_fields = deepcopy(_lookup_per_file(metadata_mapping, file_obj.filename))
+        tags = deepcopy(_lookup_per_file(tags_mapping, file_obj.filename))
+        file_type = filename_type(file_obj.filename)
+        effective_chunk_method = chunk_override or dataset_default_chunk
+        effective_chunk_method = _resolve_word_chunk_method(effective_chunk_method, file_obj.filename, file_type)
+        chunk_override = _resolve_word_chunk_method(chunk_override, file_obj.filename, file_type)
+        try:
+            _validate_chunk_method_for_file(chunk_override, file_obj.filename)
+        except ValueError as exc:
+            return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+        try:
+            _validate_chunk_method_for_file(effective_chunk_method, file_obj.filename)
+        except ValueError as exc:
+            return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+        try:
+            canonical_pdf_parser = _validate_pdf_parser_choice(pdf_parser_choice, effective_chunk_method, file_type, file_obj.filename)
+        except ValueError as exc:
+            return get_error_data_result(message=str(exc), code=RetCode.ARGUMENT_ERROR)
+        force_reparse = False
+
+        existing_docs = DocumentService.query_by_sha256_hash(sha256_hash, kb.id)
+
+        if existing_docs:
+            _, existing_doc = DocumentService.get_by_id(existing_docs[0]["id"])
+            existing_doc_dict = existing_doc.to_dict() if existing_doc else {}
+
+            old_chunk_method = existing_doc_dict.get("parser_id")
+            old_pdf_parser = (existing_doc_dict.get("parser_config") or {}).get("layout_recognize")
+            if (effective_chunk_method != old_chunk_method) or (canonical_pdf_parser and canonical_pdf_parser != old_pdf_parser):
+                force_reparse = True
+                logging.info(f"Detected config change for {file_obj.filename}, forcing re-parse.")
+
+            if not force_reparse:
+                meta_fields = meta_fields or {}
+                tags = tags or []
+                existing_meta = existing_doc_dict.get("meta_fields", {})
+                meta_fields = {**existing_meta, **meta_fields}
+                if tags:
+                    meta_fields["tags"] = list(set(existing_meta.get("tags", []) + tags))
+
+                DocumentService.update_meta_fields(existing_doc_dict["id"], meta_fields)
+
+                renamed_doc = {
+                    "id": existing_doc_dict["id"],
+                    "name": existing_doc_dict["name"],
+                    "chunk_count": existing_doc_dict["chunk_num"],
+                    "token_count": existing_doc_dict["token_num"],
+                    "dataset_id": existing_doc_dict["kb_id"],
+                    "chunk_method": existing_doc_dict["parser_id"],
+                    "run": existing_doc_dict["run"],
+                    "original_name": existing_doc_dict.get("name", file_obj.filename),
+                    "parser_config": existing_doc_dict.get("parser_config", {}),
+                    "pipeline_id": existing_doc_dict.get("pipeline_id", ""),
+                    "location": existing_doc_dict.get("location", ""),
+                    "size": existing_doc_dict.get("size", 0),
+                    "suffix": existing_doc_dict.get("suffix", ""),
+                    "thumbnail": existing_doc_dict.get("thumbnail", ""),
+                    "type": existing_doc_dict.get("type", "doc"),
+                    "meta_fields": meta_fields,
+                    "created_by": existing_doc_dict.get("created_by", tenant_id)
+                }
+                renamed_doc_list.append(renamed_doc)
+                duplicate_failures.append(f"Duplicate file {file_obj.filename} based on hash {sha256_hash}")
+                continue
+
+            if force_reparse:
+                logging.info(
+                    f"File {file_obj.filename} (Hash: {sha256_hash}) already exists, "
+                    f"but config changed (Parser: {old_chunk_method} -> {effective_chunk_method}). "
+                    f"but config changed (Parser: {old_pdf_parser} -> {canonical_pdf_parser}). "
+                    f"Re-parsing triggered in-place."
+                )
+                existing_meta = existing_doc_dict.get("meta_fields", {}) or {}
+                meta_fields = meta_fields or {}
+                tags = tags or []
+                merged_meta_fields = {**existing_meta, **meta_fields}
+                if tags:
+                    merged_meta_fields["tags"] = list(dict.fromkeys(list(existing_meta.get("tags", [])) + tags))
+                elif "tags" in merged_meta_fields and not merged_meta_fields["tags"]:
+                    del merged_meta_fields["tags"]
+                merged_meta_fields.setdefault("doc_id", existing_doc_dict["id"])
+                DocumentService.update_meta_fields(existing_doc_dict["id"], merged_meta_fields)
+
+                doc_type_en = None
+                cn_type = None
+                if llm_analyse:
+                    try:
+                        bucket, name = File2DocumentService.get_storage_address(doc_id=existing_doc_dict["id"])
+                        file_bin = settings.STORAGE_IMPL.get(bucket, name)
+                        content_sample = ""
+                        if file_bin:
+                            try:
+                                content_sample = file_bin.decode("utf-8")
+                            except (UnicodeDecodeError, AttributeError):
+                                content_sample = file_obj.filename
+                        chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
+                        en_type, cn_type = _classify_document(chat_mdl, content_sample, file_obj.filename)
+                        doc_type_en = en_type
+                        DocumentService.update_by_id(existing_doc_dict["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
+                    except Exception as exc:
+                        logging.exception("Failed to classify document %s", existing_doc_dict["id"])
+
+                if not chunk_override and doc_type_en:
+                    if doc_type_en in ("credit_investigation_of_loan_applicant", "credit_investigation_of_legal_representative", "credit_investigation_of_major_shareholders"):
+                        effective_chunk_method = "one"
+                    else:
+                        effective_chunk_method = "hichunk"
+
+                parser_config_source = deepcopy(existing_doc_dict.get("parser_config")) if isinstance(existing_doc_dict.get("parser_config"), dict) else {}
+                parser_config = get_parser_config(effective_chunk_method, deepcopy(parser_config_source) or None)
+                if parser_config is None:
+                    parser_config = {}
+                if canonical_pdf_parser:
+                    parser_config["layout_recognize"] = canonical_pdf_parser
+                elif doc_type_en:
+                    parser_config["layout_recognize"] = "MinerU"
+
+                doc_updates = {
+                    "parser_id": effective_chunk_method,
+                    "parser_config": parser_config,
+                    "run": TaskStatus.RUNNING.value,
+                    "progress": 0,
+                    "progress_msg": "",
+                    "chunk_num": 0,
+                    "token_num": 0,
+                    "sha256_hash": sha256_hash
+                }
+                DocumentService.update_by_id(existing_doc_dict["id"], doc_updates)
+
+                renamed_doc = {}
+                for key, value in existing_doc_dict.items():
+                    new_key = key_mapping.get(key, key)
+                    renamed_doc[new_key] = value
+                renamed_doc["meta_fields"] = merged_meta_fields
+                renamed_doc["original_name"] = file_obj.filename
+                renamed_doc["chunk_method"] = effective_chunk_method
+                renamed_doc["parser_config"] = parser_config
+                if canonical_pdf_parser:
+                    renamed_doc["pdf_parser"] = canonical_pdf_parser
+                elif doc_type_en:
+                    renamed_doc["pdf_parser"] = "MinerU"
+                if doc_type_en:
+                    renamed_doc["doc_type_en"] = doc_type_en
+                    renamed_doc["doc_type_cn"] = cn_type
+
+                current_run_label = TaskStatus.RUNNING.name
+                try:
+                    TaskService.filter_delete([Task.doc_id == existing_doc_dict["id"]])
+                    settings.docStoreConn.delete({"doc_id": existing_doc_dict["id"]}, search.index_name(kb.tenant_id), kb.id)
+                    e_refresh, refreshed_doc = DocumentService.get_by_id(existing_doc_dict["id"])
+                    if not e_refresh:
+                        raise LookupError(f"Document({existing_doc_dict['id']}) not found after update.")
+                    refreshed_doc_dict = refreshed_doc.to_dict()
+                    refreshed_doc_dict["tenant_id"] = tenant_id
+                    if refreshed_doc_dict.get("parser_config") is None:
+                        refreshed_doc_dict["parser_config"] = {}
+                    bucket, name = File2DocumentService.get_storage_address(doc_id=existing_doc_dict["id"])
+                    queue_tasks(refreshed_doc_dict, bucket, name, 0)
+                except Exception as exc:
+                    logging.exception("Failed to queue in-place parsing task for document %s", existing_doc_dict["id"])
+                    parse_failures.append(f"{existing_doc_dict.get('name', file_obj.filename)}: {exc}")
+                    DocumentService.update_by_id(existing_doc_dict["id"], {"run": TaskStatus.UNSTART.value})
+                    current_run_label = TaskStatus.UNSTART.name
+
+                renamed_doc["run"] = current_run_label
+                renamed_doc_list.append(renamed_doc)
+                continue
+
+        non_duplicate_file_objs.append(file_obj)
+
+        upload_context.append(
+            {
+                "original_name": file_obj.filename,
+                "meta_fields": meta_fields,
+                "tags": tags,
+                "chunk_method": chunk_override,
+                "pdf_parser": canonical_pdf_parser,
+                "sha256_hash": sha256_hash
+            }
+        )
+
+    err, files_result = FileService.upload_document(kb, non_duplicate_file_objs, tenant_id, parent_path=parent_path)
     if err:
         return get_result(message="\n".join(err), code=RetCode.SERVER_ERROR)
-    # rename key's name
-    renamed_doc_list = []
-    for file in files:
+    for index, file in enumerate(files_result):
         doc = file[0]
-        key_mapping = {
-            "chunk_num": "chunk_count",
-            "kb_id": "dataset_id",
-            "token_num": "token_count",
-            "parser_id": "chunk_method",
-        }
         renamed_doc = {}
         for key, value in doc.items():
             new_key = key_mapping.get(key, key)
             renamed_doc[new_key] = value
-        renamed_doc["run"] = "UNSTART"
+        context = upload_context[index] if index < len(upload_context) else {}
+        meta_fields = context.get("meta_fields") if context else None
+        tags = context.get("tags") if context else None
+        chunk_override = context.get("chunk_method")
+        pdf_parser_choice = context.get("pdf_parser")
+        sha256_hash = context.get("sha256_hash")
+
+        tags_from_request = tags or []
+        existing_tags = list((meta_fields or {}).get("tags", []))
+        merged = existing_tags or []
+        merged.extend(tags_from_request)
+        meta_fields = meta_fields or {}
+        if merged:
+            meta_fields["tags"] = list(dict.fromkeys(merged))
+        elif "tags" in meta_fields:
+            del meta_fields["tags"]
+        meta_fields.setdefault("doc_id", doc["id"])
+
+        if meta_fields:
+            DocumentService.update_meta_fields(doc["id"], meta_fields)
+            renamed_doc["meta_fields"] = meta_fields
+        renamed_doc["original_name"] = context.get("original_name") if context else doc.get("name")
+
+        doc_type_en = None
+        if llm_analyse:
+            try:
+                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                file_bin = settings.STORAGE_IMPL.get(bucket, name)
+                content_sample = ""
+                if file_bin:
+                    try:
+                        content_sample = file_bin.decode("utf-8")
+                    except (UnicodeDecodeError, AttributeError):
+                        content_sample = renamed_doc.get("name", "")
+                chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
+                en_type, cn_type = _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
+                doc_type_en = en_type
+                DocumentService.update_by_id(doc["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
+                renamed_doc["doc_type_en"] = en_type
+                renamed_doc["doc_type_cn"] = cn_type
+            except Exception as exc:
+                logging.exception("Failed to classify document %s", doc["id"])
+
+        doc_default_chunk = (doc.get("parser_id") or "naive").lower()
+        target_chunk_method = chunk_override or doc_default_chunk
+        if not chunk_override and doc_type_en:
+            if doc_type_en in ("credit_investigation_of_loan_applicant", "credit_investigation_of_legal_representative", "credit_investigation_of_major_shareholders"):
+                target_chunk_method = "one"
+            else:
+                target_chunk_method = "hichunk"
+        target_chunk_method = _resolve_word_chunk_method(target_chunk_method, renamed_doc.get("name", ""), renamed_doc.get("type"))
+
+        parser_config_source = deepcopy(doc.get("parser_config")) if isinstance(doc.get("parser_config"), dict) else {}
+        parser_config = get_parser_config(target_chunk_method, deepcopy(parser_config_source) or None)
+        if parser_config is None:
+            parser_config = {}
+        if pdf_parser_choice:
+            parser_config["layout_recognize"] = pdf_parser_choice
+        elif doc_type_en:
+            parser_config["layout_recognize"] = "MinerU"
+
+        doc_updates = {
+            "parser_id": target_chunk_method,
+            "parser_config": parser_config,
+            "run": TaskStatus.RUNNING.value,
+            "progress": 0,
+            "progress_msg": "",
+            "chunk_num": 0,
+            "token_num": 0,
+            "sha256_hash": sha256_hash
+        }
+        DocumentService.update_by_id(doc["id"], doc_updates)
+
+        current_run_label = TaskStatus.RUNNING.name
+        try:
+            TaskService.filter_delete([Task.doc_id == doc["id"]])
+            settings.docStoreConn.delete({"doc_id": doc["id"]}, search.index_name(kb.tenant_id), kb.id)
+            e_refresh, refreshed_doc = DocumentService.get_by_id(doc["id"])
+            if not e_refresh:
+                raise LookupError(f"Document({doc['id']}) not found after update.")
+            refreshed_doc_dict = refreshed_doc.to_dict()
+            refreshed_doc_dict["tenant_id"] = tenant_id
+            if refreshed_doc_dict.get("parser_config") is None:
+                refreshed_doc_dict["parser_config"] = {}
+            bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+            queue_tasks(refreshed_doc_dict, bucket, name, 0)
+        except Exception as exc:
+            logging.exception("Failed to queue parsing task for document %s", doc["id"])
+            parse_failures.append(f"{doc.get('name')}: {exc}")
+            DocumentService.update_by_id(doc["id"], {"run": TaskStatus.UNSTART.value})
+            current_run_label = TaskStatus.UNSTART.name
+
+        renamed_doc["chunk_method"] = target_chunk_method
+        renamed_doc["parser_config"] = parser_config
+        if pdf_parser_choice:
+            renamed_doc["pdf_parser"] = pdf_parser_choice
+        elif doc_type_en:
+            renamed_doc["pdf_parser"] = "MinerU"
+        renamed_doc["run"] = current_run_label
         renamed_doc_list.append(renamed_doc)
+
+    if parse_failures:
+        return get_result(message="\n".join(parse_failures), code=RetCode.SERVER_ERROR)
     return get_result(data=renamed_doc_list)
 
 

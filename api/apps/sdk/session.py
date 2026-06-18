@@ -1276,8 +1276,57 @@ async def mindmap():
     return get_json_result(data=mind_map)
 
 
+@manager.route("/agents/<agent_id>/Appd_AgentDataout", methods=["POST"])
+@token_required
+async def Appd_AgentDataout(tenant_id, agent_id):
+    req = await get_request_json()
+    req["stream"] = False
 
-# 移植江西版本接口：
+    try:
+        full_content = ""
+        reference = {}
+        final_ans = None
+
+        async for answer in agent_completion(tenant_id=tenant_id, agent_id=agent_id, **req):
+            try:
+                ans = json.loads(answer[5:]) if isinstance(answer, str) else answer
+            except Exception:
+                continue
+
+            if ans.get("event") == "message":
+                full_content += ans["data"]["content"]
+
+            if ans.get("data", {}).get("reference", None):
+                reference.update(ans["data"]["reference"])
+
+            final_ans = ans
+
+        if not full_content:
+            raise RuntimeError("No content generated")
+
+        if final_ans and "data" in final_ans:
+            final_ans["data"]["content"] = full_content
+            final_ans["data"]["reference"] = reference
+
+            deep = final_ans
+            try:
+                deep = deep["data"]["content"]
+            except (KeyError, TypeError):
+                deep = full_content
+
+            deep = re.sub(r'\[[^\]]*ID\s*[:：]\s*\d+[^\]]*\]', '', deep, flags=re.IGNORECASE)
+            deep = re.sub(r'\[ID:\d+\]', '', deep)
+            deep = re.sub(r'\(ID:\d+[、,，)\s]*', '', deep)
+            return jsonify({"status": 200, "content": deep})
+        else:
+            deep = ("**Warning**: No valid deep content found in agent response. "
+                        "Please check the prompt or the agent configuration.")
+            return jsonify({"status": 200, "content": deep})
+
+    except Exception as e:
+        return jsonify({"status": 500, "content": f"**ERROR**: {str(e)}"}), 500
+
+
 @manager.route("/agents/<agent_id>/ask", methods=["POST"])  # noqa: F821
 @token_required
 async def agent_ask(tenant_id, agent_id):
