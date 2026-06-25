@@ -65,6 +65,32 @@ def list_agents(tenant_id):
     return get_result(data=canvas)
 
 
+@manager.route('/all_agents', methods=['GET'])  # noqa: F821
+def list_all_agents():
+    id = request.args.get("id")
+    title = request.args.get("title")
+    page_number = int(request.args.get("page", 1))
+    items_per_page = int(request.args.get("page_size", 30))
+    order_by = request.args.get("orderby", "update_time")
+    if request.args.get("desc") == "False" or request.args.get("desc") == "false":
+        desc = False
+    else:
+        desc = True
+    agents = UserCanvasService.model.select().where(
+        UserCanvasService.model.canvas_category == CanvasCategory.Agent
+    )
+    if id:
+        agents = agents.where(UserCanvasService.model.id == id)
+    if title:
+        agents = agents.where(UserCanvasService.model.title == title)
+    if desc:
+        agents = agents.order_by(UserCanvasService.model.getter_by(order_by).desc())
+    else:
+        agents = agents.order_by(UserCanvasService.model.getter_by(order_by).asc())
+    agents = agents.paginate(page_number, items_per_page)
+    return get_result(data=list(agents.dicts()))
+
+
 @manager.route("/agents", methods=["POST"])  # noqa: F821
 @token_required
 async def create_agent(tenant_id: str):
