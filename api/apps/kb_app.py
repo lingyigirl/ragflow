@@ -920,7 +920,7 @@ async def check_embedding():
     emb_mdl = LLMBundle(tenant_id, LLMType.EMBEDDING, embd_id)
     samples = sample_random_chunks_with_vectors(settings.docStoreConn, tenant_id=tenant_id, kb_id=kb_id, n=n)
 
-    results, eff_sims = [], []
+    results, eff_sims, mode = [], [], "content_only"
     for ck in samples:
         title = ck.get("doc_name") or "Title"
         txt_in = "\n".join(ck.get("question_kwd") or []) or ck.get("content_with_weight") or ""
