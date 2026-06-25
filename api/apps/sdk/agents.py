@@ -88,7 +88,7 @@ def list_all_agents():
     else:
         agents = agents.order_by(UserCanvasService.model.getter_by(order_by).asc())
     agents = agents.paginate(page_number, items_per_page)
-    return get_result(data=list(agents.dicts()))
+    return get_result(data=[{"id": a.id, "title": a.title} for a in agents])
 
 
 @manager.route("/agents", methods=["POST"])  # noqa: F821
