@@ -69,8 +69,6 @@ def list_agents(tenant_id):
 def list_all_agents():
     id = request.args.get("id")
     title = request.args.get("title")
-    page_number = int(request.args.get("page", 1))
-    items_per_page = int(request.args.get("page_size", 30))
     order_by = request.args.get("orderby", "update_time")
     if request.args.get("desc") == "False" or request.args.get("desc") == "false":
         desc = False
@@ -87,7 +85,6 @@ def list_all_agents():
         agents = agents.order_by(UserCanvasService.model.getter_by(order_by).desc())
     else:
         agents = agents.order_by(UserCanvasService.model.getter_by(order_by).asc())
-    agents = agents.paginate(page_number, items_per_page)
     return get_result(data=[{"id": a.id, "title": a.title} for a in agents])
 
 
