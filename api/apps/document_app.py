@@ -1132,6 +1132,8 @@ async def get(doc_id):
 
         b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
         data = await asyncio.to_thread(settings.STORAGE_IMPL.get, b, n)
+        if data is None:
+            return get_json_result(data=False, message="File not found.", code=RetCode.NOT_FOUND)
         response = await make_response(data)
         logging.info("开始下载pdf....")
         ext = re.search(r"\.([^.]+)$", doc.name.lower())
