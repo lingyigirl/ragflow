@@ -438,19 +438,57 @@ async def upload(dataset_id, tenant_id):
         if err:
             return get_result(message="\n".join(err), code=RetCode.SERVER_ERROR)
         renamed_doc_list = []
+        key_mapping = {
+            "chunk_num": "chunk_count",
+            "kb_id": "dataset_id",
+            "token_num": "token_count",
+            "parser_id": "chunk_method",
+        }
         for file in files_result:
             doc = file[0]
-            key_mapping = {
-                "chunk_num": "chunk_count",
-                "kb_id": "dataset_id",
-                "token_num": "token_count",
-                "parser_id": "chunk_method",
-            }
             renamed_doc = {}
             for key, value in doc.items():
                 new_key = key_mapping.get(key, key)
                 renamed_doc[new_key] = value
             renamed_doc["run"] = "UNSTART"
+
+            doc_type_en = None
+            try:
+                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                file_bin = settings.STORAGE_IMPL.get(bucket, name)
+                content_sample = ""
+                if file_bin:
+                    try:
+                        content_sample = file_bin.decode("utf-8")
+                    except (UnicodeDecodeError, AttributeError):
+                        content_sample = doc.get("name", "")
+                chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
+                en_type, cn_type = _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
+                doc_type_en = en_type
+            except Exception:
+                logging.exception("Failed to classify document %s", doc["id"])
+
+            if doc_type_en:
+                DocumentService.update_by_id(doc["id"], {"doc_type_en": doc_type_en})
+                target_chunk_method = doc.get("parser_id", "naive")
+                if doc_type_en in ("credit_investigation_of_loan_applicant", "credit_investigation_of_legal_representative", "credit_investigation_of_major_shareholders"):
+                    target_chunk_method = "one"
+                else:
+                    target_chunk_method = "hichunk"
+                target_chunk_method = _resolve_word_chunk_method(target_chunk_method, renamed_doc.get("name", ""), renamed_doc.get("type"))
+
+                parser_config = get_parser_config(target_chunk_method, deepcopy(doc.get("parser_config")) or None)
+                if parser_config is None:
+                    parser_config = {}
+                parser_config["layout_recognize"] = "MinerU"
+
+                DocumentService.update_by_id(doc["id"], {
+                    "parser_id": target_chunk_method,
+                    "parser_config": parser_config,
+                })
+                renamed_doc["chunk_method"] = target_chunk_method
+                renamed_doc["parser_config"] = parser_config
+                renamed_doc["pdf_parser"] = "MinerU"
             renamed_doc_list.append(renamed_doc)
         return get_result(data=renamed_doc_list)
 
