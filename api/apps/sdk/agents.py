@@ -31,6 +31,7 @@ from api.db import CanvasCategory
 from api.db.services.canvas_service import UserCanvasService, UserCanvasParamsService
 from api.db.services.file_service import FileService
 from api.db.services.user_canvas_version import UserCanvasVersionService
+from api.db.services.user_service import UserTenantService
 from common.constants import RetCode
 from common.misc_utils import get_uuid
 from api.utils.api_utils import get_data_error_result, get_error_data_result, get_json_result, get_request_json, token_required
@@ -44,8 +45,13 @@ from rag.utils.redis_conn import REDIS_CONN
 def list_agents(tenant_id):
     id = request.args.get("id")
     title = request.args.get("title")
+    user_tenants = UserTenantService.query(tenant_id=tenant_id, role="owner")
+    user_id = user_tenants[0].user_id if user_tenants else tenant_id
     if id or title:
-        canvas = UserCanvasService.query(id=id, title=title, user_id=tenant_id)
+        if user_id and user_id != tenant_id:
+            canvas = UserCanvasService.query(id=id, title=title) or []
+        else:
+            canvas = UserCanvasService.query(id=id, title=title, user_id=tenant_id)
         if not canvas:
             return get_error_data_result("The agent doesn't exist.")
     page_number = int(request.args.get("page", 1))
@@ -55,7 +61,7 @@ def list_agents(tenant_id):
         desc = False
     else:
         desc = True
-    canvas = UserCanvasService.get_list(tenant_id, page_number, items_per_page, order_by, desc, id, title)
+    canvas = UserCanvasService.get_list(tenant_id, page_number, items_per_page, order_by, desc, id, title, user_id=user_id)
     return get_result(data=canvas)
 
 

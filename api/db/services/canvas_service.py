@@ -44,13 +44,18 @@ class UserCanvasService(CommonService):
     @classmethod
     @DB.connection_context()
     def get_list(cls, tenant_id,
-                 page_number, items_per_page, orderby, desc, id, title, canvas_category=CanvasCategory.Agent):
+                 page_number, items_per_page, orderby, desc, id, title, user_id=None, canvas_category=CanvasCategory.Agent):
         agents = cls.model.select()
         if id:
             agents = agents.where(cls.model.id == id)
         if title:
             agents = agents.where(cls.model.title == title)
-        agents = agents.where(cls.model.user_id == tenant_id)
+        if user_id and user_id != tenant_id:
+            agents = agents.where(
+                (cls.model.user_id == tenant_id) | (cls.model.user_id == user_id)
+            )
+        else:
+            agents = agents.where(cls.model.user_id == tenant_id)
         agents = agents.where(cls.model.canvas_category == canvas_category)
         if desc:
             agents = agents.order_by(cls.model.getter_by(orderby).desc())
