@@ -113,7 +113,7 @@ def compute_sha256_stream(file_obj):
     return sha256_hash.hexdigest()
 
 
-def _classify_document(chat_mdl, content_sample, filename):
+async def _classify_document(chat_mdl, content_sample, filename):
     types_text = "\n".join([f"- {cn} - {en}" for en, cn in DOC_TYPE_MAP])
     system = "你是一个专业的文档分类助手，只返回JSON格式的结果，不要有任何其他内容。"
     prompt_template = f"""你是一个文档分类专家。请根据以下文档内容，判断文档类型，从以下类型列表中选择最匹配的一项：
@@ -134,7 +134,7 @@ def _classify_document(chat_mdl, content_sample, filename):
         content_sample = content_sample[:int(max_content_tokens * 4)]
     prompt = prompt_template + content_sample
     history = [{"role": "user", "content": prompt}]
-    response = chat_mdl.chat(system, history)
+    response = await chat_mdl.async_chat(system, history)
     try:
         json_match = re.search(r'\{[^{}]*\}', response)
         if json_match:
@@ -617,7 +617,7 @@ async def upload(dataset_id, tenant_id):
                                 content_sample = file_obj.filename
                         logging.info("[CLASSIFY] doc=%s file=%s content_len=%s", existing_doc_dict["id"], file_obj.filename, len(content_sample))
                         chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
-                        en_type, cn_type = _classify_document(chat_mdl, content_sample, file_obj.filename)
+                        en_type, cn_type = await _classify_document(chat_mdl, content_sample, file_obj.filename)
                         doc_type_en = en_type
                         logging.info("[CLASSIFY] doc=%s result en_type=%s cn_type=%s", existing_doc_dict["id"], en_type, cn_type)
                         DocumentService.update_by_id(existing_doc_dict["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
@@ -750,7 +750,7 @@ async def upload(dataset_id, tenant_id):
                         content_sample = renamed_doc.get("name", "")
                 logging.info("[CLASSIFY] doc=%s file=%s content_len=%s", doc["id"], renamed_doc.get("name", ""), len(content_sample))
                 chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
-                en_type, cn_type = _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
+                en_type, cn_type = await _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
                 doc_type_en = en_type
                 logging.info("[CLASSIFY] doc=%s result en_type=%s cn_type=%s", doc["id"], en_type, cn_type)
                 DocumentService.update_by_id(doc["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
