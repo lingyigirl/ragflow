@@ -13,6 +13,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 #
+import asyncio
 import datetime
 import hashlib
 import json
@@ -134,7 +135,7 @@ async def _classify_document(chat_mdl, content_sample, filename):
         content_sample = content_sample[:int(max_content_tokens * 4)]
     prompt = prompt_template + content_sample
     history = [{"role": "user", "content": prompt}]
-    response = await chat_mdl.async_chat(system, history)
+    response = await asyncio.wait_for(chat_mdl.async_chat(system, history), timeout=30)
     try:
         json_match = re.search(r'\{[^{}]*\}', response)
         if json_match:
@@ -614,14 +615,12 @@ async def upload(dataset_id, tenant_id):
                             try:
                                 content_sample = file_bin.decode("utf-8")
                             except (UnicodeDecodeError, AttributeError):
-                                content_sample = file_obj.filename
-                        logging.info("[CLASSIFY] doc=%s file=%s content_len=%s", existing_doc_dict["id"], file_obj.filename, len(content_sample))
+                                raw_text = bytes(b for b in file_bin[:200000] if 32 <= b <= 126 or b in (9, 10, 13)).decode("ascii", errors="ignore")
+                                content_sample = raw_text if len(raw_text) >= 50 else file_obj.filename
                         chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
                         en_type, cn_type = await _classify_document(chat_mdl, content_sample, file_obj.filename)
                         doc_type_en = en_type
-                        logging.info("[CLASSIFY] doc=%s result en_type=%s cn_type=%s", existing_doc_dict["id"], en_type, cn_type)
                         DocumentService.update_by_id(existing_doc_dict["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
-                        logging.info("[CLASSIFY] doc=%s DB write done", existing_doc_dict["id"])
                     except Exception as exc:
                         logging.exception("Failed to classify document %s", existing_doc_dict["id"])
 
@@ -747,14 +746,12 @@ async def upload(dataset_id, tenant_id):
                     try:
                         content_sample = file_bin.decode("utf-8")
                     except (UnicodeDecodeError, AttributeError):
-                        content_sample = renamed_doc.get("name", "")
-                logging.info("[CLASSIFY] doc=%s file=%s content_len=%s", doc["id"], renamed_doc.get("name", ""), len(content_sample))
+                        raw_text = bytes(b for b in file_bin[:200000] if 32 <= b <= 126 or b in (9, 10, 13)).decode("ascii", errors="ignore")
+                        content_sample = raw_text if len(raw_text) >= 50 else renamed_doc.get("name", "")
                 chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
                 en_type, cn_type = await _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
                 doc_type_en = en_type
-                logging.info("[CLASSIFY] doc=%s result en_type=%s cn_type=%s", doc["id"], en_type, cn_type)
                 DocumentService.update_by_id(doc["id"], {"doc_type_en": en_type, "doc_type_cn": cn_type})
-                logging.info("[CLASSIFY] doc=%s DB write done", doc["id"])
                 renamed_doc["doc_type_en"] = en_type
                 renamed_doc["doc_type_cn"] = cn_type
             except Exception as exc:
