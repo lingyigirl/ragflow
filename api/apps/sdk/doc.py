@@ -372,7 +372,7 @@ async def upload(dataset_id, tenant_id):
         name: parse
         type: string
         required: false
-        description: Whether to immediately enqueue parsing ("true"/"false"). Defaults to "false".
+        description: Whether to immediately enqueue parsing ("true"/"false"). Defaults to "true".
     responses:
       200:
         description: Successfully uploaded documents.
@@ -424,73 +424,12 @@ async def upload(dataset_id, tenant_id):
     pdf_parser_payload = form.get("pdf_parser")
     llm_analyse_raw = form.get("llm_analyse", "false")
     llm_analyse = llm_analyse_raw.lower() in ("true", "1", "yes")
-    parse_raw = form.get("parse", "false")
+    parse_raw = form.get("parse", "true")
     parse = parse_raw.lower() in ("true", "1", "yes")
-
-    use_old_flow = bool(metadata_payload or tag_payload or chunk_method_payload or pdf_parser_payload or llm_analyse or parse)
 
     e, kb = KnowledgebaseService.get_by_id(dataset_id)
     if not e:
         raise LookupError(f"Can't find the dataset with ID {dataset_id}!")
-
-    if not use_old_flow:
-        err, files_result = FileService.upload_document(kb, file_objs, tenant_id, parent_path=parent_path)
-        if err:
-            return get_result(message="\n".join(err), code=RetCode.SERVER_ERROR)
-        renamed_doc_list = []
-        key_mapping = {
-            "chunk_num": "chunk_count",
-            "kb_id": "dataset_id",
-            "token_num": "token_count",
-            "parser_id": "chunk_method",
-        }
-        for file in files_result:
-            doc = file[0]
-            renamed_doc = {}
-            for key, value in doc.items():
-                new_key = key_mapping.get(key, key)
-                renamed_doc[new_key] = value
-            renamed_doc["run"] = "UNSTART"
-
-            doc_type_en = None
-            try:
-                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
-                file_bin = settings.STORAGE_IMPL.get(bucket, name)
-                content_sample = ""
-                if file_bin:
-                    try:
-                        content_sample = file_bin.decode("utf-8")
-                    except (UnicodeDecodeError, AttributeError):
-                        content_sample = doc.get("name", "")
-                chat_mdl = LLMBundle(kb.tenant_id, LLMType.CHAT)
-                en_type, cn_type = _classify_document(chat_mdl, content_sample, renamed_doc.get("name", ""))
-                doc_type_en = en_type
-            except Exception:
-                logging.exception("Failed to classify document %s", doc["id"])
-
-            if doc_type_en:
-                DocumentService.update_by_id(doc["id"], {"doc_type_en": doc_type_en})
-                target_chunk_method = doc.get("parser_id", "naive")
-                if doc_type_en in ("credit_investigation_of_loan_applicant", "credit_investigation_of_legal_representative", "credit_investigation_of_major_shareholders"):
-                    target_chunk_method = "one"
-                else:
-                    target_chunk_method = "hichunk"
-                target_chunk_method = _resolve_word_chunk_method(target_chunk_method, renamed_doc.get("name", ""), renamed_doc.get("type"))
-
-                parser_config = get_parser_config(target_chunk_method, deepcopy(doc.get("parser_config")) or None)
-                if parser_config is None:
-                    parser_config = {}
-                parser_config["layout_recognize"] = "MinerU"
-
-                DocumentService.update_by_id(doc["id"], {
-                    "parser_id": target_chunk_method,
-                    "parser_config": parser_config,
-                })
-                renamed_doc["chunk_method"] = target_chunk_method
-                renamed_doc["parser_config"] = parser_config
-                renamed_doc["pdf_parser"] = "MinerU"
-            renamed_doc_list.append(renamed_doc)
-        return get_result(data=renamed_doc_list)
 
     def _load_mapping(raw_payload, mapping_name):
         if not raw_payload:
@@ -701,7 +640,7 @@ async def upload(dataset_id, tenant_id):
                 doc_updates = {
                     "parser_id": effective_chunk_method,
                     "parser_config": parser_config,
-                    "run": TaskStatus.RUNNING.value,
+                    "run": TaskStatus.RUNNING.value if parse else TaskStatus.UNSTART.value,
                     "progress": 0,
                     "progress_msg": "",
                     "chunk_num": 0,
@@ -726,24 +665,25 @@ async def upload(dataset_id, tenant_id):
                     renamed_doc["doc_type_en"] = doc_type_en
                     renamed_doc["doc_type_cn"] = cn_type
 
-                current_run_label = TaskStatus.RUNNING.name
-                try:
-                    TaskService.filter_delete([Task.doc_id == existing_doc_dict["id"]])
-                    settings.docStoreConn.delete({"doc_id": existing_doc_dict["id"]}, search.index_name(kb.tenant_id), kb.id)
-                    e_refresh, refreshed_doc = DocumentService.get_by_id(existing_doc_dict["id"])
-                    if not e_refresh:
-                        raise LookupError(f"Document({existing_doc_dict['id']}) not found after update.")
-                    refreshed_doc_dict = refreshed_doc.to_dict()
-                    refreshed_doc_dict["tenant_id"] = tenant_id
-                    if refreshed_doc_dict.get("parser_config") is None:
-                        refreshed_doc_dict["parser_config"] = {}
-                    bucket, name = File2DocumentService.get_storage_address(doc_id=existing_doc_dict["id"])
-                    queue_tasks(refreshed_doc_dict, bucket, name, 0)
-                except Exception as exc:
-                    logging.exception("Failed to queue in-place parsing task for document %s", existing_doc_dict["id"])
-                    parse_failures.append(f"{existing_doc_dict.get('name', file_obj.filename)}: {exc}")
-                    DocumentService.update_by_id(existing_doc_dict["id"], {"run": TaskStatus.UNSTART.value})
-                    current_run_label = TaskStatus.UNSTART.name
+                current_run_label = TaskStatus.RUNNING.name if parse else TaskStatus.UNSTART.name
+                if parse:
+                    try:
+                        TaskService.filter_delete([Task.doc_id == existing_doc_dict["id"]])
+                        settings.docStoreConn.delete({"doc_id": existing_doc_dict["id"]}, search.index_name(kb.tenant_id), kb.id)
+                        e_refresh, refreshed_doc = DocumentService.get_by_id(existing_doc_dict["id"])
+                        if not e_refresh:
+                            raise LookupError(f"Document({existing_doc_dict['id']}) not found after update.")
+                        refreshed_doc_dict = refreshed_doc.to_dict()
+                        refreshed_doc_dict["tenant_id"] = tenant_id
+                        if refreshed_doc_dict.get("parser_config") is None:
+                            refreshed_doc_dict["parser_config"] = {}
+                        bucket, name = File2DocumentService.get_storage_address(doc_id=existing_doc_dict["id"])
+                        queue_tasks(refreshed_doc_dict, bucket, name, 0)
+                    except Exception as exc:
+                        logging.exception("Failed to queue in-place parsing task for document %s", existing_doc_dict["id"])
+                        parse_failures.append(f"{existing_doc_dict.get('name', file_obj.filename)}: {exc}")
+                        DocumentService.update_by_id(existing_doc_dict["id"], {"run": TaskStatus.UNSTART.value})
+                        current_run_label = TaskStatus.UNSTART.name
 
                 renamed_doc["run"] = current_run_label
                 renamed_doc_list.append(renamed_doc)
@@ -835,7 +775,7 @@ async def upload(dataset_id, tenant_id):
         doc_updates = {
             "parser_id": target_chunk_method,
             "parser_config": parser_config,
-            "run": TaskStatus.RUNNING.value,
+            "run": TaskStatus.RUNNING.value if parse else TaskStatus.UNSTART.value,
             "progress": 0,
             "progress_msg": "",
             "chunk_num": 0,
@@ -844,24 +784,25 @@ async def upload(dataset_id, tenant_id):
         }
         DocumentService.update_by_id(doc["id"], doc_updates)
 
-        current_run_label = TaskStatus.RUNNING.name
-        try:
-            TaskService.filter_delete([Task.doc_id == doc["id"]])
-            settings.docStoreConn.delete({"doc_id": doc["id"]}, search.index_name(kb.tenant_id), kb.id)
-            e_refresh, refreshed_doc = DocumentService.get_by_id(doc["id"])
-            if not e_refresh:
-                raise LookupError(f"Document({doc['id']}) not found after update.")
-            refreshed_doc_dict = refreshed_doc.to_dict()
-            refreshed_doc_dict["tenant_id"] = tenant_id
-            if refreshed_doc_dict.get("parser_config") is None:
-                refreshed_doc_dict["parser_config"] = {}
-            bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
-            queue_tasks(refreshed_doc_dict, bucket, name, 0)
-        except Exception as exc:
-            logging.exception("Failed to queue parsing task for document %s", doc["id"])
-            parse_failures.append(f"{doc.get('name')}: {exc}")
-            DocumentService.update_by_id(doc["id"], {"run": TaskStatus.UNSTART.value})
-            current_run_label = TaskStatus.UNSTART.name
+        current_run_label = TaskStatus.RUNNING.name if parse else TaskStatus.UNSTART.name
+        if parse:
+            try:
+                TaskService.filter_delete([Task.doc_id == doc["id"]])
+                settings.docStoreConn.delete({"doc_id": doc["id"]}, search.index_name(kb.tenant_id), kb.id)
+                e_refresh, refreshed_doc = DocumentService.get_by_id(doc["id"])
+                if not e_refresh:
+                    raise LookupError(f"Document({doc['id']}) not found after update.")
+                refreshed_doc_dict = refreshed_doc.to_dict()
+                refreshed_doc_dict["tenant_id"] = tenant_id
+                if refreshed_doc_dict.get("parser_config") is None:
+                    refreshed_doc_dict["parser_config"] = {}
+                bucket, name = File2DocumentService.get_storage_address(doc_id=doc["id"])
+                queue_tasks(refreshed_doc_dict, bucket, name, 0)
+            except Exception as exc:
+                logging.exception("Failed to queue parsing task for document %s", doc["id"])
+                parse_failures.append(f"{doc.get('name')}: {exc}")
+                DocumentService.update_by_id(doc["id"], {"run": TaskStatus.UNSTART.value})
+                current_run_label = TaskStatus.UNSTART.name
 
         renamed_doc["chunk_method"] = target_chunk_method
         renamed_doc["parser_config"] = parser_config
