@@ -2722,7 +2722,7 @@ async def batch_doc_progress(tenant_id):
         for doc_id in normalized_doc_ids:
             e, doc = DocumentService.get_by_id(doc_id)
             if not e or not doc:
-                progress_list.append({"doc_id": doc_id, "progress": 0.0, "name": "", "type": ""})
+                progress_list.append({"doc_id": doc_id, "progress": 0.0, "name": "", "type": "", "doc_type_en": "", "doc_type_cn": ""})
                 continue
             progress_value = float(doc.progress) if doc.progress is not None else 0.0
             progress_list.append({
@@ -2730,6 +2730,8 @@ async def batch_doc_progress(tenant_id):
                 "progress": progress_value,
                 "name": doc.name if getattr(doc, "name", None) is not None else "",
                 "type": doc.suffix if getattr(doc, "suffix", None) is not None else "",
+                "doc_type_en": doc.doc_type_en if getattr(doc, "doc_type_en", None) is not None else "",
+                "doc_type_cn": doc.doc_type_cn if getattr(doc, "doc_type_cn", None) is not None else "",
             })
         return get_json_result(data=progress_list)
     except Exception as e:
