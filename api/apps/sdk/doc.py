@@ -368,7 +368,7 @@ async def upload(dataset_id, tenant_id):
         name: llm_analyse
         type: string
         required: false
-        description: Whether to use LLM to auto-classify document types ("true"/"false"). Defaults to "true".
+        description: Whether to use LLM to auto-classify document types ("true"/"false"). Defaults to "false".
       - in: formData
         name: parse
         type: string
@@ -423,7 +423,7 @@ async def upload(dataset_id, tenant_id):
     tag_payload = form.get("tags")
     chunk_method_payload = form.get("chunk_method")
     pdf_parser_payload = form.get("pdf_parser")
-    llm_analyse_raw = form.get("llm_analyse", "true")
+    llm_analyse_raw = form.get("llm_analyse", "false")
     llm_analyse = llm_analyse_raw.lower() in ("true", "1", "yes")
     parse_raw = form.get("parse", "true")
     parse = parse_raw.lower() in ("true", "1", "yes")
