@@ -547,6 +547,16 @@ async def upload(dataset_id, tenant_id):
             _, existing_doc = DocumentService.get_by_id(existing_docs[0]["id"])
             existing_doc_dict = existing_doc.to_dict() if existing_doc else {}
 
+            if not chunk_override:
+                doc_type_en = existing_doc_dict.get("doc_type_en")
+                if doc_type_en:
+                    if doc_type_en in ("credit_investigation_of_loan_applicant", "credit_investigation_of_legal_representative", "credit_investigation_of_major_shareholders"):
+                        effective_chunk_method = "one"
+                    else:
+                        effective_chunk_method = "hichunk"
+                    if canonical_pdf_parser is None:
+                        canonical_pdf_parser = "MinerU"
+
             old_chunk_method = existing_doc_dict.get("parser_id")
             old_pdf_parser = (existing_doc_dict.get("parser_config") or {}).get("layout_recognize")
             if (effective_chunk_method != old_chunk_method) or (canonical_pdf_parser and canonical_pdf_parser != old_pdf_parser):
