@@ -73,6 +73,16 @@ swagger = Swagger(
     },
 )
 
+@app.before_request
+def _capture_gateway_headers():
+    from rag.llm import set_gateway_headers
+
+    department = request.headers.get("X-Department")
+    user_id = request.headers.get("X-User-Id")
+    if department or user_id:
+        set_gateway_headers(department, user_id)
+
+
 app.url_map.strict_slashes = False
 app.json_encoder = CustomJSONEncoder
 app.errorhandler(Exception)(server_error_response)

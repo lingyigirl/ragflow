@@ -190,9 +190,11 @@ class MinerUParser(RAGFlowPdfParser):
         mineru_path: str = "mineru",
         mineru_api: str = "",
         mineru_server_url: Optional[str] = None,
+        mineru_api_key: str = "",
     ):
         self.mineru_api = mineru_api.rstrip("/") if mineru_api else ""
         self.mineru_server_url = (mineru_server_url or "").rstrip("/")
+        self.mineru_api_key = mineru_api_key
         self.outlines = []
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -356,6 +358,8 @@ class MinerUParser(RAGFlowPdfParser):
         self.logger.info(f"[MinerU] request {options=}")    
 
         headers = {"Accept": "application/json"}
+        if self.mineru_api_key:
+            headers["Authorization"] = f"Bearer {self.mineru_api_key}"
         try:
             self.logger.info(f"[MinerU] invoke api: {self.mineru_api}/file_parse backend={options.backend} server_url={data.get('server_url')}")
             self._emit_callback(callback, 0.20, f"[MinerU] invoke api: {self.mineru_api}/file_parse")

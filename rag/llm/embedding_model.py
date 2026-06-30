@@ -30,6 +30,7 @@ from zhipuai import ZhipuAI
 from common.log_utils import log_exception
 from common.token_utils import num_tokens_from_string, truncate, total_token_count_from_response
 from common import settings
+from rag.llm import get_gateway_headers
 import logging
 import base64
 
@@ -103,8 +104,9 @@ class OpenAIEmbed(Base):
         texts = [truncate(t, 8191) for t in texts]
         ress = []
         total_tokens = 0
+        extra_headers = get_gateway_headers() or None
         for i in range(0, len(texts), batch_size):
-            res = self.client.embeddings.create(input=texts[i : i + batch_size], model=self.model_name, encoding_format="float", extra_body={"drop_params": True})
+            res = self.client.embeddings.create(input=texts[i : i + batch_size], model=self.model_name, encoding_format="float", extra_body={"drop_params": True}, extra_headers=extra_headers)
             try:
                 ress.extend([d.embedding for d in res.data])
                 total_tokens += total_token_count_from_response(res)
@@ -114,7 +116,8 @@ class OpenAIEmbed(Base):
         return np.array(ress), total_tokens
 
     def encode_queries(self, text):
-        res = self.client.embeddings.create(input=[truncate(text, 8191)], model=self.model_name, encoding_format="float",extra_body={"drop_params": True})
+        extra_headers = get_gateway_headers() or None
+        res = self.client.embeddings.create(input=[truncate(text, 8191)], model=self.model_name, encoding_format="float",extra_body={"drop_params": True}, extra_headers=extra_headers)
         try:
             return np.array(res.data[0].embedding), total_token_count_from_response(res)
         except Exception as _e:
@@ -725,10 +728,18 @@ class SILICONFLOWEmbed(Base):
         self.base_url = base_url
         self.model_name = model_name
 
+    def _build_headers(self):
+        headers = dict(self.headers)
+        gw_headers = get_gateway_headers()
+        if gw_headers:
+            headers.update(gw_headers)
+        return headers
+
     def encode(self, texts: list):
         batch_size = 16
         ress = []
         token_count = 0
+        req_headers = self._build_headers()
         for i in range(0, len(texts), batch_size):
             texts_batch = texts[i : i + batch_size]
             if self.model_name in ["BAAI/bge-large-zh-v1.5", "BAAI/bge-large-en-v1.5"]:
@@ -742,7 +753,7 @@ class SILICONFLOWEmbed(Base):
                 "input": texts_batch,
                 "encoding_format": "float",
             }
-            response = requests.post(self.base_url, json=payload, headers=self.headers)
+            response = requests.post(self.base_url, json=payload, headers=req_headers)
             try:
                 res = response.json()
                 ress.extend([d["embedding"] for d in res["data"]])
@@ -759,7 +770,7 @@ class SILICONFLOWEmbed(Base):
             "input": text,
             "encoding_format": "float",
         }
-        response = requests.post(self.base_url, json=payload, headers=self.headers)
+        response = requests.post(self.base_url, json=payload, headers=self._build_headers())
         try:
             res = response.json()
             return np.array(res["data"][0]["embedding"]), total_token_count_from_response(res)
