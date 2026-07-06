@@ -1161,6 +1161,14 @@ class MinerUParser(RAGFlowPdfParser):
                     _table_body = item.get("text")
                 if _table_body is not None and str(_table_body).strip() != "":
                     row["table_body"] = self._mineru_longtext_for_db(_table_body)
+            elif item_type_db_norm == "list":
+                _list_text = self._join_mineru_lines(item.get("list_items"), "\n")
+                if _list_text:
+                    row["text"] = self._mineru_longtext_for_db(_list_text)
+                elif item.get("text") is not None and str(item.get("text")).strip() != "":
+                    row["text"] = self._mineru_longtext_for_db(
+                        normalize_mineru_checkbox_latex(str(item.get("text")))
+                    )
             else:
                 if item_type_db_norm == "image":
                     _img_parts = []
