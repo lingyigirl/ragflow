@@ -16,32 +16,10 @@
 #  AFTER UPDATING THIS FILE, PLEASE ENSURE THAT docs/references/supported_models.mdx IS ALSO UPDATED for consistency!
 #
 
-import contextvars
 import importlib
 import inspect
 
 from strenum import StrEnum
-
-_gateway_department = contextvars.ContextVar("gateway_department", default=None)
-_gateway_user_id = contextvars.ContextVar("gateway_user_id", default=None)
-
-
-def set_gateway_headers(department, user_id):
-    if department:
-        _gateway_department.set(department)
-    if user_id:
-        _gateway_user_id.set(user_id)
-
-
-def get_gateway_headers():
-    headers = {}
-    department = _gateway_department.get(None)
-    user_id = _gateway_user_id.get(None)
-    if department:
-        headers["X-Department"] = department
-    if user_id:
-        headers["X-User-Id"] = user_id
-    return headers
 
 
 class SupportedLiteLLMProvider(StrEnum):
@@ -201,6 +179,4 @@ __all__ = [
     "Seq2txtModel",
     "TTSModel",
     "OcrModel",
-    "set_gateway_headers",
-    "get_gateway_headers",
 ]

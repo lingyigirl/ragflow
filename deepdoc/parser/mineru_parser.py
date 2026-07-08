@@ -259,6 +259,16 @@ class MinerUParser(RAGFlowPdfParser):
             self.logger.warning(reason)
             return False, reason
 
+        if str(os.environ.get("MINERU_SKIP_OPENAPI_CHECK", "")).strip().lower() in ("1", "true", "yes", "on"):
+            self.logger.info("[MinerU] MINERU_SKIP_OPENAPI_CHECK is set, skipping /openapi.json probe.")
+            if backend == "vlm-http-client":
+                resolved_server = server_url or self.mineru_server_url
+                if not resolved_server:
+                    reason = "[MinerU] MINERU_SERVER_URL required for vlm-http-client backend."
+                    self.logger.warning(reason)
+                    return False, reason
+            return True, ""
+
         api_openapi = f"{self.mineru_api}/openapi.json"
         #
         _probe_attempts = int(os.environ.get("MINERU_API_PROBE_ATTEMPTS", "3"))  
@@ -354,16 +364,32 @@ class MinerUParser(RAGFlowPdfParser):
         elif self.mineru_server_url:
             data["server_url"] = self.mineru_server_url
 
-        self.logger.info(f"[MinerU] request {data=}")
-        self.logger.info(f"[MinerU] request {options=}")    
-
         headers = {"Accept": "application/json"}
         if self.mineru_api_key:
             headers["Authorization"] = f"Bearer {self.mineru_api_key}"
+
+        request_url = f"{self.mineru_api}/file_parse"
+        file_info = {
+            "field_name": "files",
+            "filename": files["files"][0],
+            "content_type": files["files"][2],
+        }
+        masked_headers = dict(headers)
+        if "Authorization" in masked_headers:
+            masked_headers["Authorization"] = masked_headers["Authorization"][:15] + "***"
+
+        self.logger.info(
+            "[MinerU] >>> GATEWAY REQUEST >>>\n"
+            "  URL: %s\n"
+            "  Headers: %s\n"
+            "  File: %s\n"
+            "  Data: %s",
+            request_url, masked_headers, file_info, data,
+        )
         try:
             self.logger.info(f"[MinerU] invoke api: {self.mineru_api}/file_parse backend={options.backend} server_url={data.get('server_url')}")
             self._emit_callback(callback, 0.20, f"[MinerU] invoke api: {self.mineru_api}/file_parse")
-            response = requests.post(url=f"{self.mineru_api}/file_parse", files=files, data=data, headers=headers,
+            response = requests.post(url=request_url, files=files, data=data, headers=headers,
                                      timeout=1800)
 
             response.raise_for_status()

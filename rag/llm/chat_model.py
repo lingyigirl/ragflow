@@ -31,7 +31,7 @@ from openai import AsyncOpenAI, OpenAI
 from strenum import StrEnum
 
 from common.token_utils import num_tokens_from_string, total_token_count_from_response
-from rag.llm import FACTORY_DEFAULT_BASE_URL, LITELLM_PROVIDER_PREFIX, SupportedLiteLLMProvider, get_gateway_headers
+from rag.llm import FACTORY_DEFAULT_BASE_URL, LITELLM_PROVIDER_PREFIX, SupportedLiteLLMProvider
 from rag.nlp import is_chinese, is_english
 
 
@@ -104,38 +104,35 @@ class Base(ABC):
         # gpt-5 and gpt-5.1 endpoints have inconsistent parameter support, clear custom generation params to prevent unexpected issues
         if "gpt-5" in model_name_lower:
             gen_conf = {}
-        else:
-            if "max_tokens" in gen_conf:
-                del gen_conf["max_tokens"]
+            return gen_conf
 
-            allowed_conf = {
-                "temperature",
-                "max_completion_tokens",
-                "top_p",
-                "stream",
-                "stream_options",
-                "stop",
-                "n",
-                "presence_penalty",
-                "frequency_penalty",
-                "functions",
-                "function_call",
-                "logit_bias",
-                "user",
-                "response_format",
-                "seed",
-                "tools",
-                "tool_choice",
-                "logprobs",
-                "top_logprobs",
-                "extra_headers",
-            }
+        if "max_tokens" in gen_conf:
+            del gen_conf["max_tokens"]
 
-            gen_conf = {k: v for k, v in gen_conf.items() if k in allowed_conf}
+        allowed_conf = {
+            "temperature",
+            "max_completion_tokens",
+            "top_p",
+            "stream",
+            "stream_options",
+            "stop",
+            "n",
+            "presence_penalty",
+            "frequency_penalty",
+            "functions",
+            "function_call",
+            "logit_bias",
+            "user",
+            "response_format",
+            "seed",
+            "tools",
+            "tool_choice",
+            "logprobs",
+            "top_logprobs",
+            "extra_headers",
+        }
 
-        gw_headers = get_gateway_headers()
-        if gw_headers:
-            gen_conf["extra_headers"] = {**gen_conf.get("extra_headers", {}), **gw_headers}
+        gen_conf = {k: v for k, v in gen_conf.items() if k in allowed_conf}
         return gen_conf
 
     async def _async_chat_streamly(self, history, gen_conf, **kwargs):
@@ -1699,9 +1696,6 @@ class LiteLLMBase(ABC):
         extra_headers = deepcopy(completion_args.get("extra_headers") or {})
         if self.provider == SupportedLiteLLMProvider.Ollama and self.api_key and "Authorization" not in extra_headers:
             extra_headers["Authorization"] = f"Bearer {self.api_key}"
-        gw_headers = get_gateway_headers()
-        if gw_headers:
-            extra_headers.update(gw_headers)
         if extra_headers:
             completion_args["extra_headers"] = extra_headers
         return completion_args

@@ -171,9 +171,8 @@ class TenantLLMService(CommonService):
         if llm_type == LLMType.EMBEDDING.value:
             if model_config["llm_factory"] not in EmbeddingModel:
                 return None
-            base_url = os.environ.get("DEFAULT_EMBEDDING_API_BASE") or model_config["api_base"]
             return EmbeddingModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
-                                                               base_url=base_url)
+                                                               base_url=model_config["api_base"])
 
         elif llm_type == LLMType.RERANK:
             if model_config["llm_factory"] not in RerankModel:
@@ -190,9 +189,8 @@ class TenantLLMService(CommonService):
         elif llm_type == LLMType.CHAT.value:
             if model_config["llm_factory"] not in ChatModel:
                 return None
-            base_url = os.environ.get("DEFAULT_CHAT_API_BASE") or model_config["api_base"]
             return ChatModel[model_config["llm_factory"]](model_config["api_key"], model_config["llm_name"],
-                                                          base_url=base_url, **kwargs)
+                                                          base_url=model_config["api_base"], **kwargs)
 
         elif llm_type == LLMType.SPEECH2TEXT:
             if model_config["llm_factory"] not in Seq2txtModel:

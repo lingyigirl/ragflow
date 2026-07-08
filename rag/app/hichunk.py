@@ -684,7 +684,8 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
 
         mineru_executable = os.environ.get("MINERU_EXECUTABLE", "mineru")
         mineru_api = parser_config.get("mineru_api_base") or resolve_mineru_api_from_env()
-        mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api)
+        mineru_api_key = os.environ.get("MINERU_API_KEY", "")
+        mineru_parser = MinerUParser(mineru_path=mineru_executable, mineru_api=mineru_api, mineru_api_key=mineru_api_key)
 
         backend = (parser_config.get("mineru_backend") or os.environ.get("MINERU_BACKEND", "hybrid-auto-engine")).strip() or "hybrid-auto-engine"
 
@@ -701,6 +702,21 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                     callback(-1, "Excel+MinerU：MinerU 不可用，已禁用 naive 回退，请检查 MINERU_EXECUTABLE / mineru_api_base。")
                 raise RuntimeError("Excel+MinerU: MinerU unavailable, naive fallback disabled for spreadsheet.")
             return _fallback_general_docs(filename, binary, lang, callback, kwargs, "MinerU is unavailable.")
+
+        masked_key = (mineru_api_key[:8] + "***") if mineru_api_key else "(not set)"
+        logging.info(
+            "[MinerU] Gateway request body >>>\n"
+            "  API URL: %s/file_parse\n"
+            "  Backend: %s\n"
+            "  File: %s\n"
+            "  API Key: %s\n"
+            "  Parser Config: %s",
+            mineru_api.rstrip("/") if mineru_api else "(not set)",
+            backend,
+            filename,
+            masked_key,
+            parser_config,
+        )
 
         logging.info("[MinerU] Start parse: file=%s, backend=%s, parser_config=%s", filename, backend, parser_config)
         try:
