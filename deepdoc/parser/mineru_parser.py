@@ -2151,13 +2151,27 @@ class MinerUParser(RAGFlowPdfParser):
                         )
                     else:
                         content_list_for_minio = self._convert_content_list_to_markdown(outputs)
+
+                        # [自定义] 优先使用旋转修正版 PDF（阅读方向和 bbox 坐标系一致）
+                        # MinerU API 返回 zip 中 *_rotated.pdf 为文字方向修正后的版本
+                        display_pdf = pdf
+                        try:
+                            rotated_candidates = list(final_out_dir.glob("*_rotated.pdf"))
+                            if rotated_candidates and rotated_candidates[0].exists():
+                                display_pdf = rotated_candidates[0]
+                                self.logger.info(
+                                    "[MinerU] 使用旋转修正版 PDF 供前端展示: %s", display_pdf
+                                )
+                        except Exception:
+                            pass
+
                         ok = self._upload_mineru_outputs_to_minio(
                             output_dir=final_out_dir,
                             kb_id=kb_id,
                             doc_id=doc_id,
                             content_list=content_list_for_minio,
                             callback=callback,
-                            pdf_path=pdf,
+                            pdf_path=display_pdf,
                         )
                         if ok:
                             self._sync_public_download_img_paths(outputs, content_list_for_minio)
