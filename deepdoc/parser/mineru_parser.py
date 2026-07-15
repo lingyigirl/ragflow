@@ -2190,6 +2190,13 @@ class MinerUParser(RAGFlowPdfParser):
                         e, doc_id, kb_id, exc_info=True,
                     )
 
+                # [自定义] MinerU V2 并行解析 — 读取 content_list_v2.json 写入 mineru_section_v2 表
+                try:
+                    from custom.mineru_v2.hook import mineru_v2_hook
+                    mineru_v2_hook(final_out_dir, pdf.stem, kb_id, doc_id)
+                except Exception:
+                    logging.exception("[MinerU][V2] V2 数据处理失败（不影响主流程）")
+
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
                 "blocks=%s parse_method=%s",

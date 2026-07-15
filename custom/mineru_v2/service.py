@@ -8,7 +8,7 @@ import json
 import logging
 from typing import Any, Optional
 
-from api.db.db_models import MineruSectionV2
+from custom.mineru_v2.models import MineruSectionV2
 
 logger = logging.getLogger(__name__)
 

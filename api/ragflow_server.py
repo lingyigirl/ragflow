@@ -142,6 +142,12 @@ if __name__ == '__main__':
 
     GlobalPluginManager.load_plugins()
 
+    # [自定义] MinerU V2 独立 API 注册 + 建表
+    from custom.mineru_v2.api import register_mineru_v2_api
+    from custom.mineru_v2.models import init_mineru_v2_table
+    register_mineru_v2_api(app)
+    init_mineru_v2_table()
+
     # 注册到 Nacos
     nacos_registry = get_nacos_registry()
     if nacos_registry.is_available():

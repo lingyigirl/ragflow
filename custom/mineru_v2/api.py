@@ -11,7 +11,7 @@ from quart import Blueprint, request
 
 from api.utils.api_utils import get_json_result, server_error_response, get_request_json
 from api.utils.json_encode import normalize_parent_chain_for_storage
-from api.constants import RetCode
+from common.constants import RetCode
 from custom.mineru_v2.service import MineruV2Service
 
 logger = logging.getLogger(__name__)
