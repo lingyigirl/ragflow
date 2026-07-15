@@ -201,3 +201,8 @@ backup
 
 .hypothesis
 docs/
+graspologic-main/
+graspologic-main.zip
+graspologic-bump_beartype/
+pyproject.toml
+uv.lock
