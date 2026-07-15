@@ -775,12 +775,35 @@ class DocumentService(CommonService):
     @DB.connection_context()
     def get_chunk_ids_by_doc_id(cls, doc_id):
         if not doc_id:
+            logging.warning("[mineru_section] get_chunk_ids_by_doc_id: doc_id 为空")
             return []
         try:
             from api.db.db_models import MineruSection
 
             if not MineruSection.table_exists():
+                logging.warning(
+                    "[mineru_section] get_chunk_ids_by_doc_id: mineru_section 表不存在 doc_id=%s", doc_id
+                )
                 return []
+            # 先查总数，辅助排查
+            total_count = (
+                MineruSection
+                .select()
+                .where(MineruSection.doc_id == str(doc_id).strip())
+                .count()
+            )
+            logging.info(
+                "[mineru_section] get_chunk_ids_by_doc_id: doc_id=%s 表中匹配记录数=%s",
+                doc_id, total_count,
+            )
+            if total_count == 0:
+                # 查一下这张表总共多少行，确认表是否完全为空
+                table_total = MineruSection.select().count()
+                logging.warning(
+                    "[mineru_section] get_chunk_ids_by_doc_id: doc_id=%s 无匹配记录（mineru_section 表总行数=%s），"
+                    "请确认该文档是否已用 MinerU 解析完成",
+                    doc_id, table_total,
+                )
             rows = (
                 MineruSection
                 .select(
@@ -798,8 +821,16 @@ class DocumentService(CommonService):
                 .where(MineruSection.doc_id == str(doc_id).strip())
                 .order_by(MineruSection.page_idx.asc(), MineruSection.id.asc())
             )
-            return list(rows.dicts())
+            result = list(rows.dicts())
+            logging.info(
+                "[mineru_section] get_chunk_ids_by_doc_id: doc_id=%s 返回 %s 条记录",
+                doc_id, len(result),
+            )
+            return result
         except Exception:
+            logging.exception(
+                "[mineru_section] get_chunk_ids_by_doc_id: 查询异常 doc_id=%s", doc_id
+            )
             return []
 
     @classmethod
