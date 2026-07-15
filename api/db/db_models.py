@@ -248,7 +248,7 @@ class RetryingPooledMySQLDatabase(PooledMySQLDatabase):
     def execute_sql(self, sql, params=None, commit=True):
         for attempt in range(self.max_retries + 1):
             try:
-                return super().execute_sql(sql, params, commit)
+                return super().execute_sql(sql, params)
             except (OperationalError, InterfaceError) as e:
                 error_codes = [2013, 2006]
                 error_messages = ['', 'Lost connection']
@@ -317,7 +317,7 @@ class RetryingPooledPostgresqlDatabase(PooledPostgresqlDatabase):
     def execute_sql(self, sql, params=None, commit=True):
         for attempt in range(self.max_retries + 1):
             try:
-                return super().execute_sql(sql, params, commit)
+                return super().execute_sql(sql, params)
             except (OperationalError, InterfaceError) as e:
                 # PostgreSQL specific error codes
                 # 57P01: admin_shutdown

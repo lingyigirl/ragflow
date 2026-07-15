@@ -67,7 +67,10 @@ if __name__ == "__main__":
         filename = url[1] if isinstance(url, list) else url.split("/")[-1]
         print(f"Downloading {filename} from {download_url}...")
         if not os.path.exists(filename):
-            urllib.request.urlretrieve(download_url, filename)
+            try:
+                urllib.request.urlretrieve(download_url, filename)
+            except Exception as e:
+                print(f"  [SKIP] Failed to download {filename}: {e}")
 
     local_dir = os.path.abspath("nltk_data")
     for data in ["wordnet", "punkt", "punkt_tab"]:
