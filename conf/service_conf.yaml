@@ -152,3 +152,5 @@ user_default_llm:
 #  secret_id: 'tencent_secret_id'
 #  secret_key: 'tencent_secret_key'
 #  region: 'tencent_region'
+nacos:
+  enabled: false
