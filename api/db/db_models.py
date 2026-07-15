@@ -272,6 +272,10 @@ class RetryingPooledMySQLDatabase(PooledMySQLDatabase):
     def _handle_connection_loss(self):
         # self.close_all()
         # self.connect()
+        # Save ctx stack to avoid IndexError in ConnectionContext.__exit__
+        # when the outer context manager tries to pop from a reset ctx.
+        saved_ctx = list(self._state.ctx) if hasattr(self._state, 'ctx') and self._state.ctx else []
+        saved_transactions = list(self._state.transactions) if hasattr(self._state, 'transactions') and self._state.transactions else []
         try:
             self.close()
         except Exception:
@@ -282,6 +286,8 @@ class RetryingPooledMySQLDatabase(PooledMySQLDatabase):
             logging.error(f"Failed to reconnect: {e}")
             time.sleep(0.1)
             self.connect()
+        self._state.ctx = saved_ctx
+        self._state.transactions = saved_transactions
 
     def begin(self):
         for attempt in range(self.max_retries + 1):
@@ -343,6 +349,10 @@ class RetryingPooledPostgresqlDatabase(PooledPostgresqlDatabase):
         return None
 
     def _handle_connection_loss(self):
+        # Save ctx stack to avoid IndexError in ConnectionContext.__exit__
+        # when the outer context manager tries to pop from a reset ctx.
+        saved_ctx = list(self._state.ctx) if hasattr(self._state, 'ctx') and self._state.ctx else []
+        saved_transactions = list(self._state.transactions) if hasattr(self._state, 'transactions') and self._state.transactions else []
         try:
             self.close()
         except Exception:
@@ -353,6 +363,8 @@ class RetryingPooledPostgresqlDatabase(PooledPostgresqlDatabase):
             logging.error(f"Failed to reconnect to PostgreSQL: {e}")
             time.sleep(0.1)
             self.connect()
+        self._state.ctx = saved_ctx
+        self._state.transactions = saved_transactions
 
     def begin(self):
         for attempt in range(self.max_retries + 1):
