@@ -68,6 +68,65 @@ class MineruV2Service:
             return 0
 
     @classmethod
+    def get_sections_for_hichunk(cls, doc_id: str) -> list:
+        """
+        [自定义] 将 mineru_section_v2 表数据转换为 hichunk 兼容的 section 格式。
+
+        转换格式: (text, pos_tag, title_level, chunk_id)
+        - text: V2 block 的纯文本内容
+        - pos_tag: 与 V1 _line_tag() 同格式的 "@@页码\\tbbox坐标##" 字符串，
+                   供 extract_positions() 解析后存入 ES positions 字段
+        - title_level: 标题层级（title 类型专用，0 表示非标题）
+        - chunk_id: V2 block 的 ID
+
+        用于在 hichunk.chunk() 中将 V2 数据与 V1 数据合并，统一进入智能分块和 ES 索引流程。
+
+        Returns:
+            list of (text, pos_tag, title_level, chunk_id) 元组
+        """
+        rows = cls.get_chunk_ids_by_doc_id(doc_id)
+        if not rows:
+            return []
+        sections = []
+        for row in rows:
+            row_type = str(row.get("type") or "").strip().lower()
+            # 提取文本：按类型选择合适的字段
+            if row_type == "image":
+                # 图片：使用内容描述，也可支持纯图片块
+                text = (row.get("content") or row.get("text") or "").strip()
+            elif row_type == "table":
+                # 表格：使用 table_html（hichunk 中 is_html_table() 会识别并特殊处理）
+                text = (row.get("table_html") or row.get("text") or "").strip()
+            elif row_type == "list":
+                text = (row.get("text") or "").strip()
+            else:
+                # title / paragraph / page_header / page_footer / equation / code 等
+                text = (row.get("text") or row.get("content") or "").strip()
+            if not text:
+                continue
+            # 生成 pos_tag: @@{页码}\t{x0}\t{x1}\t{y0}\t{y1}##（格式与 V1 _line_tag 一致）
+            bbox_val = row.get("bbox")
+            if isinstance(bbox_val, str):
+                try:
+                    bbox_val = json.loads(bbox_val)
+                except (json.JSONDecodeError, TypeError):
+                    bbox_val = None
+            page_num = int(row.get("page_idx") or 0) + 1  # V1 _line_tag 使用 1-based 页码
+            if isinstance(bbox_val, list) and len(bbox_val) >= 4:
+                x0, y0, x1, y1 = float(bbox_val[0]), float(bbox_val[1]), float(bbox_val[2]), float(bbox_val[3])
+            else:
+                x0 = y0 = x1 = y1 = 0.0
+            pos_tag = f"@@{page_num}\t{x0:.1f}\t{x1:.1f}\t{y0:.1f}\t{y1:.1f}##"
+            title_level = row.get("text_level") or 0
+            chunk_id = str(row.get("chunk_id") or "").strip()
+            sections.append((text, pos_tag, title_level, chunk_id))
+        logger.info(
+            "[custom.mineru_v2] get_sections_for_hichunk: doc_id=%s 转换 %d 条 section 供 hichunk 使用",
+            doc_id, len(sections),
+        )
+        return sections
+
+    @classmethod
     def save_blocks(cls, blocks: list[dict], kb_id: str, doc_id: str) -> int:
         """
         批量保存 V2 blocks 到 mineru_section_v2 表。

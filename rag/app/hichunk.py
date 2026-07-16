@@ -849,6 +849,42 @@ def chunk(filename, binary=None, lang="Chinese", callback=None, **kwargs):
                 mineru_sections_with_level.append((text, pos_tag, title_level, chunk_id))
 
         mineru_sections = mineru_sections_with_level
+
+        # [自定义] MinerU V2 数据接入 hichunk 智能分块管线
+        # 将 mineru_section_v2 表中的 block 转换为 section 格式，与 V1 合并后统一分块
+        # V1/V2 对同一 PDF 解析内容有重叠，通过前 64 字符的文本去重避免重复 section
+        try:
+            doc_id_val = kwargs.get("doc_id")
+            if doc_id_val:
+                from custom.mineru_v2.service import MineruV2Service
+                _v2_sections = MineruV2Service.get_sections_for_hichunk(doc_id_val)
+                if _v2_sections:
+                    # 文本去重：V1 已有 → 跳过 V2 对应 block
+                    _v1_text_prefixes = set()
+                    for _s in mineru_sections:
+                        _t = str(_s[0] or "").strip()[:64]
+                        if _t:
+                            _v1_text_prefixes.add(_t)
+                    _v2_added = 0
+                    for _vs in _v2_sections:
+                        _vt = str(_vs[0] or "").strip()[:64]
+                        if _vt and _vt not in _v1_text_prefixes:
+                            mineru_sections.append(_vs)
+                            _v1_text_prefixes.add(_vt)
+                            _v2_added += 1
+                    logging.info(
+                        "[MinerU][V2→hichunk] doc_id=%s V2 共 %d 个 section，去重后合并 %d 个，"
+                        "合并后 section 总数=%d",
+                        doc_id_val, len(_v2_sections), _v2_added, len(mineru_sections),
+                    )
+                else:
+                    logging.info(
+                        "[MinerU][V2→hichunk] doc_id=%s V2 无数据，仅使用 V1 sections",
+                        doc_id_val,
+                    )
+        except Exception:
+            logging.exception("[MinerU][V2→hichunk] V2 数据接入失败（不影响主流程，仅使用 V1）")
+
         levels_display = []
         for item in mineru_sections:
             text = item[0] if len(item) >= 1 else ""
