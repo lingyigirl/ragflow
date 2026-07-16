@@ -438,6 +438,18 @@ class MinerUParser(RAGFlowPdfParser):
         return str(val)  
 
     def _line_tag(self, bx):
+        """将 MinerU block 的 bbox 归一化坐标（0-1000）转换为像素坐标字符串。
+
+        输出格式: @@<页码>-<页码>\t<left>\t<right>\t<top>\t<bottom>##
+        供 extract_positions() 反向解析，最终存入 ES positions 字段用于前端高亮定位。
+
+        [自定义] 像素缩放优先级:
+            1. _display_page_dims（旋转版 PDF 的真实视觉尺寸）—— 当启用 _rotated.pdf 时设置
+            2. page_images[_pi].size（pdfplumber 渲染原 PDF 的视觉尺寸）—— 默认行为
+
+        注意: 本方法调用前，bbox 坐标应已由上游做 /Rotate 变换，确保
+        物理坐标系与视觉页面尺寸一致。详见 parse_pdf() 中的旋转处理逻辑。
+        """
         _pi = bx.get("page_idx", 0)  
         if _pi is None:  
             _pi = 0  
@@ -2155,29 +2167,14 @@ class MinerUParser(RAGFlowPdfParser):
                     else:
                         content_list_for_minio = self._convert_content_list_to_markdown(outputs)
 
-                        # [自定义] 优先使用旋转修正版 PDF（阅读方向和 bbox 坐标系一致）
-                        # MinerU API 返回 zip 中 *_rotated.pdf 为文字方向修正后的版本
+                        # [自定义] 优先使用旋转修正版 PDF
+                        # MinerU API 返回的 *_rotated.pdf 是物理旋转内容 + 移除 /Rotate 的版本，
+                        # 使阅读方向与 bbox 坐标系一致。若不存在则不处理，display_pdf 保持为原始 PDF
                         display_pdf = pdf
                         try:
                             rotated_candidates = list(final_out_dir.rglob("*_rotated.pdf"))
                             if rotated_candidates and rotated_candidates[0].exists():
                                 display_pdf = rotated_candidates[0]
-                                # 读取原始 PDF 的 /Rotate，并记录显示 PDF 的各页尺寸，供 _line_tag 像素转换使用
-                                _rotated_page_dims = []
-                                try:
-                                    import pdfplumber as _plumber2
-                                    with _plumber2.open(str(display_pdf)) as _rpdf:
-                                        for _rp in _rpdf.pages:
-                                            _rotated_page_dims.append((float(_rp.width), float(_rp.height)))
-                                    if _rotated_page_dims:
-                                        self._display_page_dims = _rotated_page_dims
-                                        self.logger.info(
-                                            "[MinerU] 已记录显示 PDF 页面尺寸: %s 页, 首页=%.1f×%.1f",
-                                            len(_rotated_page_dims), _rotated_page_dims[0][0], _rotated_page_dims[0][1],
-                                        )
-                                except Exception:
-                                    logging.exception("[MinerU] 读取显示 PDF 页面尺寸失败")
-
                                 self.logger.info(
                                     "[MinerU] 使用旋转修正版 PDF 供前端展示: %s", display_pdf
                                 )
@@ -2240,36 +2237,71 @@ class MinerUParser(RAGFlowPdfParser):
                 except Exception:
                     logging.exception("[MinerU][V2] V2 数据处理失败（不影响主流程）")
 
-            # [自定义] 使用旋转修正版 PDF 时，将 bbox 坐标从原物理坐标系变换到旋转后坐标系
+            # [自定义] ============================================
+            # 旋转 PDF 处理（解决 MinerU bbox 与显示 PDF 坐标系不匹配问题）
+            #
+            # 背景：
+            #   MinerU API 输出的 bbox 是 PDF 物理坐标系下的归一化坐标（0-1000），
+            #   不随 PDF 的 /Rotate 属性变化。但 pdfplumber 渲染页面时已应用 /Rotate，
+            #   导致物理坐标与视觉像素坐标错位，前端高亮位置不准。
+            #
+            # 两种情况：
+            #   A. MinerU 生成了 _rotated.pdf（物理旋转内容、移除 /Rotate 的版本）：
+            #      显示 PDF 页面尺寸与原始不同，需两处修正：
+            #      - bbox 坐标按 /Rotate 角度做矩阵变换
+            #      - _line_tag 像素缩放使用旋转版 PDF 的真实页面尺寸
+            #   B. 无 _rotated.pdf 但原始 PDF 有 /Rotate：
+            #      bbox 是物理坐标，但 pdfplumber 按视觉尺寸渲染，同样需要变换
+            # ============================================================
+            _orig_rotate_deg = 0
+            try:
+                import pdfplumber as _plumber_rot
+                with _plumber_rot.open(str(pdf)) as _rot_pdf:
+                    if _rot_pdf.pages:
+                        _orig_rotate_deg = getattr(_rot_pdf.pages[0], 'rotation', 0) or 0
+                _orig_rotate_deg = (360 + _orig_rotate_deg) % 360 if _orig_rotate_deg else 0
+                self.logger.info(
+                    "[MinerU] 原始 PDF /Rotate=%s° display_pdf_is_rotated=%s",
+                    _orig_rotate_deg, display_pdf != pdf,
+                )
+            except Exception:
+                logging.exception("[MinerU] 读取原始 PDF /Rotate 失败（不影响主流程）")
+            # 记录显示 PDF 的页面尺寸（有 _rotated.pdf 时以旋转版为准）
             if display_pdf != pdf:
                 try:
-                    import pdfplumber as _plumber3
-                    _rotate_deg = 0
-                    with _plumber3.open(str(pdf)) as _orig_pdf:
-                        if _orig_pdf.pages:
-                            _rotate_deg = getattr(_orig_pdf.pages[0], 'rotation', 0) or 0
-                    # MinerU 的 _rotated.pdf 是物理旋转内容、移除 /Rotate 的结果，效果等同于
-                    # 对原始 bbox 施加原 PDF 的 /Rotate 所对应的坐标变换（以正确映射至视觉展示）
-                    _rotate_deg = (360 + _rotate_deg) % 360 if _rotate_deg else 0
-                    self.logger.info(
-                        "[MinerU] 原始 PDF 的 /Rotate=%s°，对 bbox 施加对应坐标变换", _rotate_deg,
-                    )
+                    import pdfplumber as _plumber_dims
+                    _dims = []
+                    with _plumber_dims.open(str(display_pdf)) as _dpdf:
+                        for _rp in _dpdf.pages:
+                            _dims.append((float(_rp.width), float(_rp.height)))
+                    if _dims:
+                        self._display_page_dims = _dims
+                        self.logger.info(
+                            "[MinerU] 已记录显示 PDF 页面尺寸: %s 页 首页=%.1f×%.1f",
+                            len(_dims), _dims[0][0], _dims[0][1],
+                        )
+                except Exception:
+                    logging.exception("[MinerU] 读取显示 PDF 页面尺寸失败（不影响主流程）")
+            # [自定义] 根据原始 PDF 的 /Rotate 角度变换所有 block 的 bbox 坐标
+            if _orig_rotate_deg not in (0, 360):
+                try:
                     for _blk in outputs:
                         _bbox = _blk.get("bbox")
-                        if isinstance(_bbox, (list, tuple)) and len(_bbox) >= 4:
-                            _x0, _y0, _x1, _y1 = float(_bbox[0]), float(_bbox[1]), float(_bbox[2]), float(_bbox[3])
-                            if _rotate_deg == 90:
-                                _blk["bbox"] = [_y0, 1000.0 - _x1, _y1, 1000.0 - _x0]
-                            elif _rotate_deg == 180:
-                                _blk["bbox"] = [1000.0 - _x1, 1000.0 - _y1, 1000.0 - _x0, 1000.0 - _y0]
-                            elif _rotate_deg == 270:
-                                _blk["bbox"] = [1000.0 - _y1, _x0, 1000.0 - _y0, _x1]
+                        if not isinstance(_bbox, (list, tuple)) or len(_bbox) < 4:
+                            continue
+                        _x0, _y0, _x1, _y1 = float(_bbox[0]), float(_bbox[1]), float(_bbox[2]), float(_bbox[3])
+                        if _orig_rotate_deg == 90:
+                            _blk["bbox"] = [_y0, 1000.0 - _x1, _y1, 1000.0 - _x0]
+                        elif _orig_rotate_deg == 180:
+                            _blk["bbox"] = [1000.0 - _x1, 1000.0 - _y1, 1000.0 - _x0, 1000.0 - _y0]
+                        elif _orig_rotate_deg == 270:
+                            _blk["bbox"] = [1000.0 - _y1, _x0, 1000.0 - _y0, _x1]
                     self.logger.info(
-                        "[MinerU] 已对 %s 个 block 的 bbox 做旋转变换（%s°），适配旋转版 PDF 坐标系",
-                        len(outputs), _rotate_deg,
+                        "[MinerU] 已对 %s 个 block 的 bbox 做 %s° 旋转变换",
+                        len(outputs), _orig_rotate_deg,
                     )
                 except Exception:
-                    logging.exception("[MinerU] bbox 旋转变换失败，高亮位置可能不准确（不影响主流程）")
+                    logging.exception("[MinerU] bbox 旋转变换失败（不影响主流程）")
 
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
