@@ -462,11 +462,14 @@ class MinerUParser(RAGFlowPdfParser):
             positions = (0.0, 0.0, 0.0, 0.0)  
         x0, top, x1, bott = positions  
 
-        if hasattr(self, "page_images") and self.page_images and 0 <= _pi < len(self.page_images):  
-            page_width, page_height = self.page_images[_pi].size  
-            x0 = (x0 / 1000.0) * page_width  
-            x1 = (x1 / 1000.0) * page_width  
-            top = (top / 1000.0) * page_height  
+        if hasattr(self, "page_images") and self.page_images and 0 <= _pi < len(self.page_images):
+            page_width, page_height = self.page_images[_pi].size
+            if getattr(self, '_is_rotated_display', False):
+                # 旋转版 PDF 页宽=原高，页高=原宽，像素缩放需交换尺寸
+                page_width, page_height = page_height, page_width
+            x0 = (x0 / 1000.0) * page_width
+            x1 = (x1 / 1000.0) * page_width
+            top = (top / 1000.0) * page_height
             bott = (bott / 1000.0) * page_height  
 
         return "@@{}\t{:.1f}\t{:.1f}\t{:.1f}\t{:.1f}##".format("-".join([str(p) for p in pn]), x0, x1, top, bott)  #
@@ -2160,6 +2163,7 @@ class MinerUParser(RAGFlowPdfParser):
                             rotated_candidates = list(final_out_dir.rglob("*_rotated.pdf"))
                             if rotated_candidates and rotated_candidates[0].exists():
                                 display_pdf = rotated_candidates[0]
+                                self._is_rotated_display = True
                                 self.logger.info(
                                     "[MinerU] 使用旋转修正版 PDF 供前端展示: %s", display_pdf
                                 )
@@ -2221,6 +2225,46 @@ class MinerUParser(RAGFlowPdfParser):
                     mineru_v2_hook(final_out_dir, pdf.stem, kb_id, doc_id)
                 except Exception:
                     logging.exception("[MinerU][V2] V2 数据处理失败（不影响主流程）")
+
+            # [自定义] 使用旋转修正版 PDF 时，将 bbox 坐标从原方向变换到旋转后方向，保证前端高亮位置准确
+            if display_pdf != pdf:
+                try:
+                    import pdfplumber as _plumber
+                    _orig_w, _orig_h = None, None
+                    with _plumber.open(str(pdf)) as _orig_pdf:
+                        if _orig_pdf.pages:
+                            _op = _orig_pdf.pages[0]
+                            _orig_w = float(_op.width or 0)
+                            _orig_h = float(_op.height or 0)
+                    _rot_w, _rot_h = None, None
+                    with _plumber.open(str(display_pdf)) as _rot_pdf:
+                        if _rot_pdf.pages:
+                            _rp = _rot_pdf.pages[0]
+                            _rot_w = float(_rp.width or 0)
+                            _rot_h = float(_rp.height or 0)
+                    self.logger.info(
+                        "[MinerU] 页面尺寸对比: 原始(%.1f x %.1f) vs 旋转(%.1f x %.1f)",
+                        _orig_w or -1, _orig_h or -1, _rot_w or -1, _rot_h or -1,
+                    )
+                    _is_swapped = (
+                        _orig_w and _orig_h and _rot_w and _rot_h
+                        and abs(_rot_w - _orig_h) < 5
+                        and abs(_rot_h - _orig_w) < 5
+                    )
+                    if _is_swapped:
+                        for _blk in outputs:
+                            _bbox = _blk.get("bbox")
+                            if isinstance(_bbox, (list, tuple)) and len(_bbox) >= 4:
+                                _x0, _y0, _x1, _y1 = float(_bbox[0]), float(_bbox[1]), float(_bbox[2]), float(_bbox[3])
+                                _blk["bbox"] = [1000.0 - _y1, _x0, 1000.0 - _y0, _x1]
+                        self.logger.info(
+                            "[MinerU] 已对 %s 个 block 的 bbox 做旋转变换（90° CCW），适配旋转版 PDF 坐标系",
+                            len(outputs),
+                        )
+                    else:
+                        self.logger.info("[MinerU] 页面尺寸未发生互换，跳过 bbox 旋转变换")
+                except Exception:
+                    logging.exception("[MinerU] bbox 旋转变换失败，高亮位置可能不准确（不影响主流程）")
 
             self.logger.info(
                 "[MinerU] 解析与（如有）解析产物 MinIO/入库阶段已完成，开始 _transfer_to_sections / _transfer_to_tables，"
