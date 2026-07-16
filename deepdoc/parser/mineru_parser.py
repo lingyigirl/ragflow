@@ -464,9 +464,8 @@ class MinerUParser(RAGFlowPdfParser):
 
         if hasattr(self, "page_images") and self.page_images and 0 <= _pi < len(self.page_images):
             page_width, page_height = self.page_images[_pi].size
-            if getattr(self, '_is_rotated_display', False):
-                # 旋转版 PDF 页宽=原高，页高=原宽，像素缩放需交换尺寸
-                page_width, page_height = page_height, page_width
+            if getattr(self, '_display_page_dims', None) and _pi < len(self._display_page_dims):
+                page_width, page_height = self._display_page_dims[_pi]
             x0 = (x0 / 1000.0) * page_width
             x1 = (x1 / 1000.0) * page_width
             top = (top / 1000.0) * page_height
@@ -2163,7 +2162,22 @@ class MinerUParser(RAGFlowPdfParser):
                             rotated_candidates = list(final_out_dir.rglob("*_rotated.pdf"))
                             if rotated_candidates and rotated_candidates[0].exists():
                                 display_pdf = rotated_candidates[0]
-                                self._is_rotated_display = True
+                                # 读取原始 PDF 的 /Rotate，并记录显示 PDF 的各页尺寸，供 _line_tag 像素转换使用
+                                _rotated_page_dims = []
+                                try:
+                                    import pdfplumber as _plumber2
+                                    with _plumber2.open(str(display_pdf)) as _rpdf:
+                                        for _rp in _rpdf.pages:
+                                            _rotated_page_dims.append((float(_rp.width), float(_rp.height)))
+                                    if _rotated_page_dims:
+                                        self._display_page_dims = _rotated_page_dims
+                                        self.logger.info(
+                                            "[MinerU] 已记录显示 PDF 页面尺寸: %s 页, 首页=%.1f×%.1f",
+                                            len(_rotated_page_dims), _rotated_page_dims[0][0], _rotated_page_dims[0][1],
+                                        )
+                                except Exception:
+                                    logging.exception("[MinerU] 读取显示 PDF 页面尺寸失败")
+
                                 self.logger.info(
                                     "[MinerU] 使用旋转修正版 PDF 供前端展示: %s", display_pdf
                                 )
@@ -2226,43 +2240,34 @@ class MinerUParser(RAGFlowPdfParser):
                 except Exception:
                     logging.exception("[MinerU][V2] V2 数据处理失败（不影响主流程）")
 
-            # [自定义] 使用旋转修正版 PDF 时，将 bbox 坐标从原方向变换到旋转后方向，保证前端高亮位置准确
+            # [自定义] 使用旋转修正版 PDF 时，将 bbox 坐标从原物理坐标系变换到旋转后坐标系
             if display_pdf != pdf:
                 try:
-                    import pdfplumber as _plumber
-                    _orig_w, _orig_h = None, None
-                    with _plumber.open(str(pdf)) as _orig_pdf:
+                    import pdfplumber as _plumber3
+                    _rotate_deg = 0
+                    with _plumber3.open(str(pdf)) as _orig_pdf:
                         if _orig_pdf.pages:
-                            _op = _orig_pdf.pages[0]
-                            _orig_w = float(_op.width or 0)
-                            _orig_h = float(_op.height or 0)
-                    _rot_w, _rot_h = None, None
-                    with _plumber.open(str(display_pdf)) as _rot_pdf:
-                        if _rot_pdf.pages:
-                            _rp = _rot_pdf.pages[0]
-                            _rot_w = float(_rp.width or 0)
-                            _rot_h = float(_rp.height or 0)
+                            _rotate_deg = getattr(_orig_pdf.pages[0], 'rotation', 0) or 0
+                    # MinerU 的 _rotated.pdf 是物理旋转内容、移除 /Rotate 的结果，效果等同于
+                    # 对原始 bbox 施加原 PDF 的 /Rotate 所对应的坐标变换（以正确映射至视觉展示）
+                    _rotate_deg = (360 + _rotate_deg) % 360 if _rotate_deg else 0
                     self.logger.info(
-                        "[MinerU] 页面尺寸对比: 原始(%.1f x %.1f) vs 旋转(%.1f x %.1f)",
-                        _orig_w or -1, _orig_h or -1, _rot_w or -1, _rot_h or -1,
+                        "[MinerU] 原始 PDF 的 /Rotate=%s°，对 bbox 施加对应坐标变换", _rotate_deg,
                     )
-                    _is_swapped = (
-                        _orig_w and _orig_h and _rot_w and _rot_h
-                        and abs(_rot_w - _orig_h) < 5
-                        and abs(_rot_h - _orig_w) < 5
-                    )
-                    if _is_swapped:
-                        for _blk in outputs:
-                            _bbox = _blk.get("bbox")
-                            if isinstance(_bbox, (list, tuple)) and len(_bbox) >= 4:
-                                _x0, _y0, _x1, _y1 = float(_bbox[0]), float(_bbox[1]), float(_bbox[2]), float(_bbox[3])
+                    for _blk in outputs:
+                        _bbox = _blk.get("bbox")
+                        if isinstance(_bbox, (list, tuple)) and len(_bbox) >= 4:
+                            _x0, _y0, _x1, _y1 = float(_bbox[0]), float(_bbox[1]), float(_bbox[2]), float(_bbox[3])
+                            if _rotate_deg == 90:
+                                _blk["bbox"] = [_y0, 1000.0 - _x1, _y1, 1000.0 - _x0]
+                            elif _rotate_deg == 180:
+                                _blk["bbox"] = [1000.0 - _x1, 1000.0 - _y1, 1000.0 - _x0, 1000.0 - _y0]
+                            elif _rotate_deg == 270:
                                 _blk["bbox"] = [1000.0 - _y1, _x0, 1000.0 - _y0, _x1]
-                        self.logger.info(
-                            "[MinerU] 已对 %s 个 block 的 bbox 做旋转变换（90° CCW），适配旋转版 PDF 坐标系",
-                            len(outputs),
-                        )
-                    else:
-                        self.logger.info("[MinerU] 页面尺寸未发生互换，跳过 bbox 旋转变换")
+                    self.logger.info(
+                        "[MinerU] 已对 %s 个 block 的 bbox 做旋转变换（%s°），适配旋转版 PDF 坐标系",
+                        len(outputs), _rotate_deg,
+                    )
                 except Exception:
                     logging.exception("[MinerU] bbox 旋转变换失败，高亮位置可能不准确（不影响主流程）")
 
