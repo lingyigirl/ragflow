@@ -355,6 +355,7 @@ class MinerUParser(RAGFlowPdfParser):
             "return_content_list": True,
             "return_images": True,
             "response_format_zip": True,
+            "return_original_file": True,
             "start_page_id": 0,
             "end_page_id": 99999,
         }
@@ -2156,7 +2157,7 @@ class MinerUParser(RAGFlowPdfParser):
                         # MinerU API 返回 zip 中 *_rotated.pdf 为文字方向修正后的版本
                         display_pdf = pdf
                         try:
-                            rotated_candidates = list(final_out_dir.glob("*_rotated.pdf"))
+                            rotated_candidates = list(final_out_dir.rglob("*_rotated.pdf"))
                             if rotated_candidates and rotated_candidates[0].exists():
                                 display_pdf = rotated_candidates[0]
                                 self.logger.info(
@@ -2175,6 +2176,30 @@ class MinerUParser(RAGFlowPdfParser):
                         )
                         if ok:
                             self._sync_public_download_img_paths(outputs, content_list_for_minio)
+                            # [自定义] 旋转修正版 PDF 替换原始文件，使前端展示方向正确的版本
+                            if display_pdf != pdf:
+                                try:
+                                    from api.db.db_models import File2Document, File as _FileModel
+                                    from api.db.services.document_service import DocumentService
+                                    _f2d = File2Document.select().where(
+                                        File2Document.document_id == doc_id
+                                    ).first()
+                                    _new_loc = f"{doc_id}/{display_pdf.name}"
+                                    if _f2d:
+                                        _FileModel.update(location=_new_loc).where(
+                                            _FileModel.id == _f2d.file_id
+                                        ).execute()
+                                        self.logger.info(
+                                            "[MinerU] 已切换 File.location: file_id=%s new_loc=%s",
+                                            _f2d.file_id, _new_loc,
+                                        )
+                                    DocumentService.update_by_id(doc_id, {"location": _new_loc})
+                                    self.logger.info(
+                                        "[MinerU] 已切换 Document.location 指向旋转修正版 PDF: doc_id=%s new_loc=%s",
+                                        doc_id, _new_loc,
+                                    )
+                                except Exception:
+                                    logging.exception("[MinerU] 更新 PDF location 失败（不影响主流程）")
                         else:
                             self.logger.warning(
                                 "[MinerU] 解析产物上传 MinIO 返回失败（见上文日志），doc_id=%s, kb_id=%s",
