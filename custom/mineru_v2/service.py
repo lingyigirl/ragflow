@@ -150,9 +150,8 @@ class MineruV2Service:
             count = 0
             for idx, row in enumerate(blocks):
                 try:
-                    # 自动生成 chunk_id
-                    if not row.get("chunk_id"):
-                        row["chunk_id"] = f"{doc_id}_v2_{idx:04d}"
+                    # chunk_id 留空，与 V1 的 mineru_section 表行为保持一致
+                    # （MinerU 原始输出不包含 chunk_id，由 hichunk 分块时通过 xxhash 生成）
 
                     # JSON 字段序列化
                     for json_field in ("bbox", "image_caption", "image_footnote",
