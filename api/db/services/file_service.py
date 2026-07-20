@@ -529,13 +529,13 @@ class FileService(CommonService):
 
     @staticmethod
     def parse(filename, blob, img_base64=True, tenant_id=None, pdf_parser_config=None):
-        from rag.app import audio, email, naive, picture, presentation
+        from rag.app import audio, email, naive, one, picture, presentation
         from api.apps import current_user
 
         def dummy(prog=None, msg=""):
             pass
 
-        FACTORY = {ParserType.PRESENTATION.value: presentation, ParserType.PICTURE.value: picture, ParserType.AUDIO.value: audio, ParserType.EMAIL.value: email}
+        FACTORY = {ParserType.PRESENTATION.value: presentation, ParserType.PICTURE.value: picture, ParserType.AUDIO.value: audio, ParserType.EMAIL.value: email, ParserType.ONE.value: one}
         parser_config = {"chunk_token_num": 16096, "delimiter": "\n!?;。；！？", "layout_recognize": "Plain Text"}
 
         if pdf_parser_config:
@@ -594,7 +594,7 @@ class FileService(CommonService):
     @staticmethod
     def get_parser(doc_type, filename, default):
         if doc_type == FileType.VISUAL and default not in ("one", "hichunk", "financial"):
-            return ParserType.PICTURE.value
+            return ParserType.ONE.value
         if doc_type == FileType.AURAL:
             return ParserType.AUDIO.value
         if re.search(r"\.(ppt|pptx|pages)$", filename):

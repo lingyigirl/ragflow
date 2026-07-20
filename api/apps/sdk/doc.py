@@ -526,6 +526,8 @@ async def upload(dataset_id, tenant_id):
         file_type = filename_type(file_obj.filename)
         effective_chunk_method = chunk_override or dataset_default_chunk
         effective_chunk_method = _resolve_word_chunk_method(effective_chunk_method, file_obj.filename, file_type)
+        if not chunk_override and file_type == FileType.VISUAL.value and dataset_default_chunk not in ("one", "hichunk", "financial"):
+            effective_chunk_method = "one"
         chunk_override = _resolve_word_chunk_method(chunk_override, file_obj.filename, file_type)
         try:
             _validate_chunk_method_for_file(chunk_override, file_obj.filename)
