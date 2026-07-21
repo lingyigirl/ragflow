@@ -66,7 +66,7 @@ async def mineru_v2_doc_chunk_datas():
         for row in rows:
             row_type = str(row.get("type") or "").strip().lower()
 
-            # 按类型决定 data 字段的值
+            # 按类型决定 data 字段的值（便捷字段，供前端快速展示）
             if row_type == "table":
                 data = row.get("table_html") or row.get("text")
             elif row_type == "image":
@@ -80,31 +80,42 @@ async def mineru_v2_doc_chunk_datas():
                 "chunk_id": row.get("chunk_id"),
                 "type": row.get("type"),
                 "data": data,
-                "bbox": row.get("bbox"),
+                "bbox": row.get("bbox"),          # 原始 bbox（MinerU 输出，原生 list[int]）
+                "is_rotated": bool(row.get("is_rotated", False)),  # MinerU 是否对 PDF 做了自动摆正
                 "page_idx": row.get("page_idx"),
             }
 
-            # 可选字段
+            # bbox_rotated：旋转修正后的 bbox（仅当 PDF 有 /Rotate 时非空）
+            if row.get("bbox_rotated") is not None:
+                item["bbox_rotated"] = row.get("bbox_rotated")
+
+            # 可选字段 — 使用 is not None 判断，因为空 list/空字符串是合法值
             if row.get("text_level") is not None:
                 item["text_level"] = row.get("text_level")
             if row.get("img_path"):
                 item["img_path"] = row.get("img_path")
-            if row.get("content"):
+            if row.get("content") is not None:
                 item["content"] = row.get("content")
-            if row.get("table_html"):
+            if row.get("table_html") is not None:
                 item["table_html"] = row.get("table_html")
-            if row.get("table_caption"):
+            if row.get("table_caption") is not None:
                 item["table_caption"] = row.get("table_caption")
-            if row.get("table_footnote"):
+            if row.get("table_footnote") is not None:
                 item["table_footnote"] = row.get("table_footnote")
-            if row.get("list_items"):
+            if row.get("list_items") is not None:
                 item["list_items"] = row.get("list_items")
-            if row.get("list_type"):
+            if row.get("list_type") is not None:
                 item["list_type"] = row.get("list_type")
-            if row.get("inline_formula"):
+            if row.get("inline_formula") is not None:
                 item["inline_formula"] = row.get("inline_formula")
-            if row.get("span_json"):
+            if row.get("span_json") is not None:
                 item["span_json"] = row.get("span_json")
+            if row.get("sub_type") is not None:
+                item["sub_type"] = row.get("sub_type")
+            if row.get("image_caption") is not None:
+                item["image_caption"] = row.get("image_caption")
+            if row.get("image_footnote") is not None:
+                item["image_footnote"] = row.get("image_footnote")
 
             result.append(item)
 
