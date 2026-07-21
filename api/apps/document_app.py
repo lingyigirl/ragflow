@@ -1132,6 +1132,22 @@ async def get(doc_id):
 
         b, n = File2DocumentService.get_storage_address(doc_id=doc_id)
         data = await asyncio.to_thread(settings.STORAGE_IMPL.get, b, n)
+
+        # [自定义] 优先使用 MinerU 旋转修正版 PDF 供前端展示
+        # _rotated.pdf 存储在 {kb_id}/{doc_id}/{name}_rotated.pdf
+        if data is not None:
+            _orig_name = str(n).split("/")[-1]
+            _rotated_n = f"{doc_id}/{re.sub(r'(?i)\.pdf$', '_rotated.pdf', _orig_name)}"
+            if _rotated_n != str(n):
+                try:
+                    _rotated_data = await asyncio.to_thread(
+                        settings.STORAGE_IMPL.get, b, _rotated_n
+                    )
+                    if _rotated_data is not None and len(_rotated_data) > 0:
+                        data = _rotated_data
+                        logging.info("[MinerU] 使用旋转修正版 PDF 供前端展示: %s/%s", b, _rotated_n)
+                except Exception:
+                    pass  # 旋转版不存在则使用原始 PDF
         if data is None:
             return get_json_result(data=False, message="File not found.", code=RetCode.NOT_FOUND)
         response = await make_response(data)

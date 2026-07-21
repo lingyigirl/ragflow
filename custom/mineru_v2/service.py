@@ -152,16 +152,7 @@ class MineruV2Service:
                 try:
                     # chunk_id 留空，与 V1 的 mineru_section 表行为保持一致
                     # （MinerU 原始输出不包含 chunk_id，由 hichunk 分块时通过 xxhash 生成）
-
-                    # JSON 字段序列化
-                    for json_field in ("bbox", "image_caption", "image_footnote",
-                                       "table_caption", "table_footnote",
-                                       "list_items", "inline_formula", "span_json"):
-                        val = row.get(json_field)
-                        if isinstance(val, (dict, list)):
-                            row[json_field] = json.dumps(val, ensure_ascii=False)
-                        elif val is None:
-                            row[json_field] = None
+                    # JSON 字段由 JSONField.db_value() 统一序列化，此处不再预序列化
 
                     MineruSectionV2.create(**row)
                     count += 1

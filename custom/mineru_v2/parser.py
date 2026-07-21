@@ -70,7 +70,9 @@ class V2Block:
     type: str = ""                    # paragraph/title/list/table/image/page_header/page_footer
     text: Optional[str] = None        # 纯文本聚合（span 拼接结果）
     content: Optional[str] = None     # 描述性内容（如图片描述）
-    bbox: Optional[list] = None       # [x0, y0, x1, y1] 千分比坐标
+    bbox: Optional[list] = None       # [x0, y0, x1, y1] 千分比坐标（MinerU 原始输出）
+    bbox_rotated: Optional[list] = None  # 旋转修正后的 bbox（仅当 PDF 有 /Rotate 时非空）
+    is_rotated: bool = False             # MinerU 是否生成了 _rotated.pdf（内容自动摆正）
     page_idx: Optional[int] = None    # 页码（来自外层数组索引）
 
     # 标题
@@ -96,7 +98,11 @@ class V2Block:
     sub_type: Optional[str] = None          # 子类型
 
     def to_db_row(self, kb_id: str, doc_id: str) -> dict[str, Any]:
-        """转换为数据库行 dict。"""
+        """转换为数据库行 dict。
+
+        JSON 字段直接传原生 list/dict，由 JSONField.db_value() 统一序列化，
+        避免双重编码导致 API 返回 JSON 字符串而非 JSON 数组。
+        """
         return {
             "kb_id": str(kb_id),
             "doc_id": str(doc_id),
@@ -104,19 +110,21 @@ class V2Block:
             "type": self.type,
             "text": self.text,
             "content": self.content,
-            "bbox": json.dumps(self.bbox, ensure_ascii=False) if self.bbox else None,
+            "bbox": self.bbox,
+            "bbox_rotated": self.bbox_rotated,
+            "is_rotated": self.is_rotated,
             "page_idx": self.page_idx,
             "text_level": self.text_level,
             "img_path": self.img_path,
-            "image_caption": json.dumps(self.image_caption, ensure_ascii=False) if self.image_caption else None,
-            "image_footnote": json.dumps(self.image_footnote, ensure_ascii=False) if self.image_footnote else None,
+            "image_caption": self.image_caption or None,
+            "image_footnote": self.image_footnote or None,
             "table_html": self.table_html,
-            "table_caption": json.dumps(self.table_caption, ensure_ascii=False) if self.table_caption else None,
-            "table_footnote": json.dumps(self.table_footnote, ensure_ascii=False) if self.table_footnote else None,
-            "list_items": json.dumps(self.list_items, ensure_ascii=False) if self.list_items else None,
+            "table_caption": self.table_caption or None,
+            "table_footnote": self.table_footnote or None,
+            "list_items": self.list_items or None,
             "list_type": self.list_type,
-            "inline_formula": json.dumps(self.inline_formula, ensure_ascii=False) if self.inline_formula else None,
-            "span_json": json.dumps(self.span_json, ensure_ascii=False) if self.span_json else None,
+            "inline_formula": self.inline_formula or None,
+            "span_json": self.span_json or None,
             "sub_type": self.sub_type,
         }
 
@@ -230,6 +238,166 @@ class MinerUV2Parser:
         logger.info("[custom.mineru_v2] 解析完成: %d 页, %d 个 block", total_pages, len(blocks))
         return blocks
 
+    # ─── 旋转变换 ───
+
+    @staticmethod
+    def rotate_bbox(bbox: list, rotate_deg: int) -> list:
+        """对 MinerU 归一化 bbox (0-1000) 做 PDF /Rotate 矩阵变换。
+
+        变换公式与 mineru_parser.py 中 V1 的 bbox 变换一致：
+        - 90° CW:  [y0, 1000-x1, y1, 1000-x0]
+        - 180°:    [1000-x1, 1000-y1, 1000-x0, 1000-y0]
+        - 270° CW: [1000-y1, x0, 1000-y0, x1]
+
+        Args:
+            bbox: [x0, y0, x1, y1] 归一化坐标
+            rotate_deg: PDF /Rotate 角度 (90/180/270)
+
+        Returns:
+            变换后的 [x0, y0, x1, y1]，保留 int 类型
+        """
+        if rotate_deg not in (90, 180, 270) or not bbox or len(bbox) < 4:
+            return list(bbox) if bbox else []
+        x0, y0, x1, y1 = int(bbox[0]), int(bbox[1]), int(bbox[2]), int(bbox[3])
+        if rotate_deg == 90:
+            return [y0, 1000 - x1, y1, 1000 - x0]
+        elif rotate_deg == 180:
+            return [1000 - x1, 1000 - y1, 1000 - x0, 1000 - y0]
+        else:  # 270
+            return [1000 - y1, x0, 1000 - y0, x1]
+
+    @classmethod
+    def apply_rotation(cls, blocks: list[V2Block], rotate_deg: int) -> list[V2Block]:
+        """对所有 block 应用旋转变换，设置 bbox_rotated 字段。
+
+        bbox 保留原始值，bbox_rotated 存储变换后的坐标。
+        当 rotate_deg 为 0 或 360 时，不设置 bbox_rotated（保持 None）。
+
+        Args:
+            blocks: V2Block 列表
+            rotate_deg: PDF /Rotate 角度
+
+        Returns:
+            更新了 bbox_rotated 的同一批 blocks（in-place 修改）
+        """
+        if rotate_deg in (0, 360):
+            return blocks
+        for block in blocks:
+            if block.bbox and len(block.bbox) >= 4:
+                block.bbox_rotated = cls.rotate_bbox(block.bbox, rotate_deg)
+        logger.info(
+            "[custom.mineru_v2] 已对 %d 个 block 应用 %s° 旋转变换（bbox_rotated）",
+            len(blocks), rotate_deg,
+        )
+        return blocks
+
+    @staticmethod
+    def detect_auto_rotation(output_dir: str, rotate_deg: int = 0,
+                             orig_pdf_path: str = "") -> int:
+        """检测 MinerU 自动摆正的旋转角度（0/90/180/270）。
+
+        判定优先级：
+        1. PDF /Rotate 元数据（rotate_deg 参数，已是 90/180/270 则直接返回）
+        2. MinerU _rotated.pdf 自动摆正（通过比较原始 PDF 和 _rotated.pdf 的
+           页面尺寸及 /Rotate 属性综合判断）
+
+        对于 MinerU 自动摆正，通过 pdfplumber 读取原始 PDF 的页面尺寸和 /Rotate：
+        - 宽高互换 → 90° CW（MinerU 行为：将横版内容旋转为竖版阅读方向）
+        - 宽高相同但 /Rotate=180 → 返回 180（PDF 标准旋转，极少数情况）
+
+        Args:
+            output_dir: MinerU 输出目录（包含 _origin.pdf 和 _rotated.pdf）
+            rotate_deg: PDF /Rotate 角度（元数据，0/90/180/270。非 0 时优先返回）
+            orig_pdf_path: 原始 PDF 路径（退路，output_dir 内找不到 _origin.pdf 时使用）
+
+        Returns:
+            最终旋转角度（0/90/180/270）。
+        """
+        # ── 优先级 1: PDF /Rotate 元数据 ──
+        if rotate_deg in (90, 180, 270):
+            return rotate_deg
+
+        try:
+            import pdfplumber as _p
+            from pathlib import Path as _Path
+            _dir = _Path(output_dir)
+
+            # 找 _rotated.pdf
+            _rotated = None
+            for _f in _dir.rglob("*_rotated.pdf"):
+                _rotated = _f
+                break
+            if _rotated is None:
+                return 0
+
+            # 找 _origin.pdf（MinerU 的 return_original_file 产物）
+            _origin = None
+            for _f in _dir.rglob("*_origin.pdf"):
+                if "_rotated" not in _f.name:
+                    _origin = _f
+                    break
+            if _origin is None:
+                for _f in _dir.rglob("*.pdf"):
+                    if "_rotated" not in _f.name and _f != _rotated:
+                        _origin = _f
+                        break
+            if _origin is None and orig_pdf_path:
+                _origin = _Path(orig_pdf_path)
+
+            if _origin is None or not _origin.exists():
+                logger.warning(
+                    "[custom.mineru_v2] 找到 _rotated.pdf 但无法找到原始 PDF 做尺寸对比"
+                )
+                return 0
+
+            # ── 读取原始 PDF 和 _rotated.pdf 的尺寸与旋转属性 ──
+            with _p.open(str(_origin)) as _opdf:
+                _op = _opdf.pages[0]
+                _ow, _oh = float(_op.width), float(_op.height)
+                _orig_rot = getattr(_op, "rotation", 0) or 0
+            with _p.open(str(_rotated)) as _rpdf:
+                _rw, _rh = float(_rpdf.pages[0].width), float(_rpdf.pages[0].height)
+
+            # ── 优先级 2: 原始 PDF 自身就有 /Rotate（pdfplumber 可读取） ──
+            if _orig_rot in (90, 180, 270):
+                logger.info(
+                    "[custom.mineru_v2] 从原始 PDF _origin.pdf 读取到 /Rotate=%s°",
+                    _orig_rot,
+                )
+                return int(_orig_rot)
+
+            # ── 优先级 3: MinerU 自动摆正（/Rotate=0 但有 _rotated.pdf） ──
+            # 通过宽高比判断 90° CW 旋转（origin.pdf 和 _rotated.pdf 可能 DPI 不同）：
+            # origin 宽高比 ≈ _rotated 高宽比 → 90° CW
+            _o_aspect = _ow / max(_oh, 1)    # origin 宽高比
+            _r_aspect = _rw / max(_rh, 1)    # rotated 宽高比
+            _aspect_swapped = (
+                # 宽高比互换：origin_w/h ≈ rotated_h/w（即 1/_r_aspect）
+                abs(_o_aspect - (1.0 / max(_r_aspect, 0.001))) < 0.05
+            ) or (
+                # 同 DPI 时的绝对尺寸对比（退化情况，精确度高时走此分支）
+                abs(_ow - _rh) / max(_ow, _rh, 1) < 0.05
+                and abs(_oh - _rw) / max(_oh, _rw, 1) < 0.05
+            )
+
+            if _aspect_swapped:
+                logger.info(
+                    "[custom.mineru_v2] MinerU 90° CW: "
+                    "origin=%.0fx%.0f(%.3f) → rotated=%.0fx%.0f(%.3f)",
+                    _ow, _oh, _o_aspect, _rw, _rh, _r_aspect,
+                )
+                return 90
+            else:
+                logger.info(
+                    "[custom.mineru_v2] _rotated.pdf "
+                    "origin=%.0fx%.0f(%.3f) rotated=%.0fx%.0f(%.3f) orig_rot=%s",
+                    _ow, _oh, _o_aspect, _rw, _rh, _r_aspect, _orig_rot,
+                )
+                return 0
+        except Exception:
+            logger.exception("[custom.mineru_v2] 检测自动旋转角度失败")
+            return 0
+
     # ─── 单块解析 ───
 
     @classmethod
@@ -245,7 +413,7 @@ class MinerUV2Parser:
 
         bbox = raw.get("bbox")
         if isinstance(bbox, list) and len(bbox) == 4:
-            bbox = [float(v) for v in bbox]
+            bbox = [int(v) if v == int(v) else v for v in bbox]
         else:
             bbox = None
 
