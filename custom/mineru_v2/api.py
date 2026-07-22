@@ -80,14 +80,10 @@ async def mineru_v2_doc_chunk_datas():
                 "chunk_id": row.get("chunk_id"),
                 "type": row.get("type"),
                 "data": data,
-                "bbox": row.get("bbox"),          # 原始 bbox（MinerU 输出，原生 list[int]）
-                "is_rotated": bool(row.get("is_rotated", False)),  # MinerU 是否对 PDF 做了自动摆正
+                "bbox": row.get("bbox"),
+                "is_rotated": bool(row.get("is_rotated", False)),
                 "page_idx": row.get("page_idx"),
             }
-
-            # bbox_rotated：旋转修正后的 bbox（仅当 PDF 有 /Rotate 时非空）
-            if row.get("bbox_rotated") is not None:
-                item["bbox_rotated"] = row.get("bbox_rotated")
 
             # 可选字段 — 使用 is not None 判断，因为空 list/空字符串是合法值
             if row.get("text_level") is not None:

@@ -2280,11 +2280,10 @@ class MinerUParser(RAGFlowPdfParser):
                 except Exception:
                     logging.exception("[MinerU] bbox 旋转变换失败（不影响主流程）")
 
-            # [自定义] MinerU V2 并行解析 — 在旋转变换之后调用，使 V2 blocks 也获得 bbox_rotated
+            # [自定义] MinerU V2 并行解析
             try:
                 from custom.mineru_v2.hook import mineru_v2_hook
                 mineru_v2_hook(final_out_dir, pdf.stem, kb_id, doc_id,
-                               rotate_deg=_orig_rotate_deg,
                                orig_pdf_path=pdf)
             except Exception:
                 logging.exception("[MinerU][V2] V2 数据处理失败（不影响主流程）")

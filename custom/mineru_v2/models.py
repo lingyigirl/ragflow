@@ -31,9 +31,8 @@ class MineruSectionV2(DataBaseModel):
     # 基本内容
     text = LongTextField(null=True)        # span 聚合后的纯文本
     content = LongTextField(null=True)     # 图片描述等非 span 内容
-    bbox = JSONField(null=True)            # 原始边界框 [x0, y0, x1, y1]（千分比坐标，MinerU 原始输出）
-    bbox_rotated = JSONField(null=True)    # 旋转修正后的边界框（仅当原始 PDF 有 /Rotate 时非空）
-    is_rotated = BooleanField(null=False, default=False)  # MinerU 是否生成了 _rotated.pdf（内容自动摆正）
+    bbox = JSONField(null=True)            # 边界框 [x0, y0, x1, y1]（千分比坐标，MinerU 输出，已方向正确）
+    is_rotated = BooleanField(null=False, default=False)  # 原始 PDF 包含 /Rotate 元数据（即内容存在非 0° 旋转）
     page_idx = IntegerField(null=True)     # 页码（来自 V2 顶层数组下标）
 
     # 标题层级（title 类型专用）
@@ -84,7 +83,6 @@ def init_mineru_v2_table():
         MineruSectionV2._meta.database
     )
     for _col in [
-        ("bbox_rotated", JSONField(null=True)),
         ("is_rotated", BooleanField(null=False, default=False)),
     ]:
         try:
