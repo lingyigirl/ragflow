@@ -42,7 +42,8 @@ dependencies = [
     "google-genai>=1.41.0,<2.0.0",
     "google-generativeai>=0.8.1,<0.9.0", # Needed for cv_model and embedding_model
     "google-search-results==2.4.2",
-    "graspologic @ git+https://github.com/yuzhichang/graspologic.git@38e680cab72bc9fb68a7992c3bcc2d53b24e42fd",
+    #   "graspologic @ git+https://github.com/yuzhichang/graspologic.git@38e680cab72bc9fb68a7992c3bcc2d53b24e42fd",
+    "graspologic @ file:///d:/Projects/ragflow-0.23.1/graspologic-bump_beartype",
     "groq==0.9.0",
     "grpcio-status==1.67.1",
     "html-text==0.6.2",
@@ -51,6 +52,7 @@ dependencies = [
     "jira==3.10.5",
     "json-repair==0.35.0",
     "langfuse>=2.60.0",
+    "loguru>=0.7.2",
     "mammoth>=1.11.0",
     "markdown==3.6",
     "markdown-to-json==2.1.1",
