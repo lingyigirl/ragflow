@@ -1,5 +1,6 @@
 import { Collapse } from '@/components/collapse';
 import { CrossLanguageFormField } from '@/components/cross-language-form-field';
+import { DocumentFormField } from '@/components/document-select-item';
 import { FormContainer } from '@/components/form-container';
 import { KnowledgeBaseFormField } from '@/components/knowledge-base-item';
 import { MemoriesFormField } from '@/components/memories-form-field';
@@ -47,6 +48,7 @@ export const RetrievalPartialSchema = {
   top_n: z.coerce.number(),
   top_k: z.coerce.number(),
   kb_ids: z.array(z.string()),
+  document_ids: z.array(z.string()).optional(),
   rerank_id: z.string(),
   empty_response: z.string(),
   cross_languages: z.array(z.string()),
@@ -85,7 +87,10 @@ export function MemoryDatasetForm() {
       {retrievalFrom === RetrievalFrom.Memory ? (
         <MemoriesFormField label={t('header.memories')}></MemoriesFormField>
       ) : (
-        <KnowledgeBaseFormField showVariable></KnowledgeBaseFormField>
+        <>
+          <KnowledgeBaseFormField showVariable></KnowledgeBaseFormField>
+          <DocumentFormField />
+        </>
       )}
     </>
   );

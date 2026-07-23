@@ -148,6 +148,7 @@ export interface IRetrievalForm {
   rerank_id?: string;
   empty_response?: string;
   kb_ids: string[];
+  document_ids?: string[];
 }
 
 export interface ICodeForm {

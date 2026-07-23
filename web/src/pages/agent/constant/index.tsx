@@ -86,6 +86,7 @@ export const initialRetrievalValues = {
   top_n: 8,
   top_k: 1024,
   kb_ids: [],
+  document_ids: [],
   rerank_id: '',
   empty_response: '',
   ...initialSimilarityThresholdValue,

@@ -59,6 +59,7 @@ class RetrievalParam(ToolParamBase):
         self.top_n = 8
         self.top_k = 1024
         self.kb_ids = []
+        self.document_ids = []
         self.memory_ids = []
         self.kb_vars = []
         self.rerank_id = ""
@@ -126,8 +127,7 @@ class Retrieval(ToolBase, ABC):
         query = self.string_format(query_text, vars)
 
         doc_ids = []
-        # 若指定了 document_ids，则作为检索文档白名单起点（后续元数据过滤可在此基础上继续收窄）
-        sys_doc_ids = self._canvas.globals.get("sys.document_ids")
+        sys_doc_ids = self._canvas.globals.get("sys.document_ids") or self._param.document_ids
         if sys_doc_ids:
             doc_ids = list(sys_doc_ids)
         if self._param.meta_data_filter != {}:

@@ -727,6 +727,10 @@ This auto-tagging feature enhances retrieval by adding another layer of domain-s
       knowledgeBasesMessage: 'Please select',
       knowledgeBasesTip:
         'Select the datasets to associate with this chat assistant. An empty knowledge base will not appear in the dropdown list.',
+      documents: 'Documents',
+      documentsMessage: 'Please select documents',
+      documentsTip:
+        'Select specific documents from the associated datasets to narrow the retrieval scope. Leave empty to search all documents.',
       system: 'System prompt',
       systemInitialValue: `You are an intelligent assistant. Your primary function is to answer questions based strictly on the provided knowledge base.
 
