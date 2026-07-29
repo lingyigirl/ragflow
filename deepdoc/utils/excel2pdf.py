@@ -113,19 +113,9 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
     utils_dir = Path(__file__).resolve().parent
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_path = Path(tmp_dir)
-        input_path = tmp_path / f"input{normalized_suffix}"
         libreoffice_home = tmp_path / "libreoffice-home"
         libreoffice_home.mkdir(parents=True, exist_ok=True)
         libreoffice_profile = (tmp_path / "libreoffice-profile").resolve()
-
-        try:
-            wb = openpyxl.load_workbook(BytesIO(excel_bytes))
-            fix_excel_layout_for_pdf(wb)
-            optimized_bytes = BytesIO()
-            wb.save(optimized_bytes)
-            input_path.write_bytes(optimized_bytes.getvalue())
-        except Exception:
-            input_path.write_bytes(excel_bytes)
 
         env = os.environ.copy()
         env["LANG"] = "C.UTF-8"
@@ -155,26 +145,24 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
             )
             raise RuntimeError("未找到 LibreOffice/soffice 可执行文件，请在容器内安装 libreoffice。")
 
-        command = [
-            office_bin,
-            "--headless",
-            "--invisible",
-            "--nologo",
-            "--nodefault",
-            "--nolockcheck",
-            "--nofirststartwizard",
-            f"-env:UserInstallation=file://{libreoffice_profile.as_posix()}",
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            str(tmp_path),
-            str(input_path),
-        ]
+        def _make_command(output_format, output_dir, input_file):
+            return [
+                office_bin,
+                "--headless",
+                "--invisible",
+                "--nologo",
+                "--nodefault",
+                "--nolockcheck",
+                "--nofirststartwizard",
+                f"-env:UserInstallation=file://{libreoffice_profile.as_posix()}",
+                "--convert-to",
+                output_format,
+                "--outdir",
+                str(output_dir),
+                str(input_file),
+            ]
 
-        def _run_convert(run_env, run_command=None):
-            return subprocess.run(run_command or command, check=True, capture_output=True, text=True, env=run_env)
-
-        def _run_convert_with_xvfb(detail):
+        def _run_convert_with_xvfb(detail, command):
             xvfb_run = shutil.which("xvfb-run")
             if not xvfb_run:
                 raise RuntimeError(
@@ -194,7 +182,46 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
                 "-screen 0 1024x768x24",
                 *command,
             ]
-            return _run_convert(xvfb_env, xvfb_command)
+            return subprocess.run(xvfb_command, check=True, capture_output=True, text=True, env=xvfb_env)
+
+        if normalized_suffix == ".xls":
+            xls_input_path = tmp_path / "input.xls"
+            xls_input_path.write_bytes(excel_bytes)
+            xls_to_xlsx_command = _make_command("xlsx", tmp_path, xls_input_path)
+            try:
+                subprocess.run(xls_to_xlsx_command, check=True, capture_output=True, text=True, env=env)
+            except subprocess.CalledProcessError as exc:
+                stderr = (exc.stderr or "").strip()
+                stdout = (exc.stdout or "").strip()
+                detail = stderr or stdout or "无额外输出"
+                if _should_try_xvfb(detail, exc.returncode):
+                    _run_convert_with_xvfb(detail, xls_to_xlsx_command)
+                else:
+                    raise RuntimeError(
+                        f"Excel .xls 转 .xlsx 失败(exit={exc.returncode})。"
+                        f"输出: {detail}。"
+                    ) from exc
+            xlsx_output = tmp_path / "input.xlsx"
+            if not xlsx_output.exists():
+                raise RuntimeError("Excel .xls 转 .xlsx 失败，未生成输出文件。")
+            excel_bytes = xlsx_output.read_bytes()
+            normalized_suffix = ".xlsx"
+
+        input_path = tmp_path / f"input{normalized_suffix}"
+
+        try:
+            wb = openpyxl.load_workbook(BytesIO(excel_bytes))
+            fix_excel_layout_for_pdf(wb)
+            optimized_bytes = BytesIO()
+            wb.save(optimized_bytes)
+            input_path.write_bytes(optimized_bytes.getvalue())
+        except Exception:
+            input_path.write_bytes(excel_bytes)
+
+        command = _make_command("pdf", tmp_path, input_path)
+
+        def _run_convert(run_env, run_command=None):
+            return subprocess.run(run_command or command, check=True, capture_output=True, text=True, env=run_env)
 
         try:
             result = _run_convert(env)
@@ -204,7 +231,7 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
             detail = stderr or stdout or "无额外输出"
             if _should_try_xvfb(detail, exc.returncode):
                 try:
-                    result = _run_convert_with_xvfb(detail)
+                    result = _run_convert_with_xvfb(detail, command)
                 except subprocess.CalledProcessError as retry_exc:
                     retry_stderr = (retry_exc.stderr or "").strip()
                     retry_stdout = (retry_exc.stdout or "").strip()
@@ -238,7 +265,7 @@ def convert_excel_bytes_to_pdf_bytes(excel_bytes: bytes, excel_suffix: str = ".x
         detail = output_text or "无额外输出"
         if _should_try_xvfb(detail):
             try:
-                retry_result = _run_convert_with_xvfb(detail)
+                retry_result = _run_convert_with_xvfb(detail, command)
             except subprocess.CalledProcessError as retry_exc:
                 retry_stderr = (retry_exc.stderr or "").strip()
                 retry_stdout = (retry_exc.stdout or "").strip()
