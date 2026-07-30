@@ -1,0 +1,20 @@
+Windows 系统本地部署 RAGFlow v0.23.1 教程
+===========================================
+
+完整的 Windows 部署教程已迁移至:
+  docs/windows-deployment-guide.md
+
+该教程包含:
+  - WSL2 + Docker Desktop 环境搭建
+  - 基础设施服务 (MySQL, Redis, Elasticsearch, MinIO) 的 Docker 启动
+  - Python 依赖安装与 Windows 特殊处理 (PyICU)
+  - service_conf.yaml 的 Windows 本地开发配置
+  - 后端 API 服务 & 任务执行器的分别启动
+  - 前端 Node.js 开发服务启动
+  - 常见问题排查
+
+快速启动命令:
+  1. cd docker && docker compose -f docker-compose-base.yml up -d
+  2. cd .. && $env:PYTHONPATH = (Get-Location).Path && uv run python api/ragflow_server.py
+  3. (新终端) $env:PYTHONPATH = (Get-Location).Path && uv run python rag/svr/task_executor.py 0
+  4. cd web && npm install && npm run dev

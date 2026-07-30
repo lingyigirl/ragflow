@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git config *)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(git -c core.sparseCheckout=false add pyproject.toml)",
+      "Bash(git hash-object *)",
+      "Bash(git update-index *)",
+      "Bash(git commit -m 'refactor: 日志系统从stdlib logging迁移到Loguru，支持源码定位与自动轮转 *)",
+      "Bash(git fetch *)",
+      "Bash(git rebase *)",
+      "Bash(git stash *)",
+      "Bash(git push *)",
+      "Bash(git commit -m 'refactor: 移除bbox_rotated，is_rotated改为读取/Rotate元数据 *)"
+    ]
+  }
+}

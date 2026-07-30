@@ -18,7 +18,9 @@
       "Bash(tail *)",
       "Bash(python3 -c 'import *)",
       "Bash(uv --version *)",
-      "Bash(node --version *)"
+      "Bash(node --version *)",
+      "Bash(uv sync *)",
+      "Bash(python -c ' *)"
     ]
   }
 }
