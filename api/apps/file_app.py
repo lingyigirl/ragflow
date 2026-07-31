@@ -357,27 +357,10 @@ async def get(file_id):
         if not check_file_team_permission(file, current_user.id):
             return get_json_result(data=False, message='No authorization.', code=RetCode.AUTHENTICATION_ERROR)
 
-        blob = None
-        if file.name.lower().endswith('.pdf'):
-            try:
-                f2d = File2DocumentService.get_by_file_id(file_id)
-                if f2d:
-                    doc_id = f2d[0].document_id
-                    e, doc = DocumentService.get_by_id(doc_id)
-                    if e and doc:
-                        doc_name_no_ext = re.sub(r"\.\w+$", "", doc.name)
-                        rotated_key = f"{doc_id}/{doc_name_no_ext}_rotated.pdf"
-                        rotated_blob = await asyncio.to_thread(settings.STORAGE_IMPL.get, doc.kb_id, rotated_key)
-                        if rotated_blob:
-                            blob = rotated_blob
-            except Exception:
-                pass
-
+        blob = await asyncio.to_thread(settings.STORAGE_IMPL.get, file.parent_id, file.location)
         if not blob:
-            blob = await asyncio.to_thread(settings.STORAGE_IMPL.get, file.parent_id, file.location)
-            if not blob:
-                b, n = File2DocumentService.get_storage_address(file_id=file_id)
-                blob = await asyncio.to_thread(settings.STORAGE_IMPL.get, b, n)
+            b, n = File2DocumentService.get_storage_address(file_id=file_id)
+            blob = await asyncio.to_thread(settings.STORAGE_IMPL.get, b, n)
 
         # [自定义] 优先使用 MinerU 旋转修正版 PDF 供前端展示
         # _rotated.pdf 存储在 {kb_id}/{doc_id}/{name}_rotated.pdf
