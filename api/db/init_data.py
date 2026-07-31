@@ -93,6 +93,50 @@ def init_superuser(nickname=DEFAULT_SUPERUSER_NICKNAME, email=DEFAULT_SUPERUSER_
                 tenant["embd_id"]))
 
 
+def init_default_user():
+    email = "user@163.com"
+    if UserService.query(email=email):
+        return
+    user_info = {
+        "id": uuid.uuid1().hex,
+        "password": encode_to_base64("123456"),
+        "nickname": "user",
+        "is_superuser": False,
+        "email": email,
+        "status": "1",
+    }
+    tenant = {
+        "id": user_info["id"],
+        "name": user_info["nickname"] + "'s Kingdom",
+        "llm_id": settings.CHAT_MDL,
+        "embd_id": settings.EMBEDDING_MDL,
+        "asr_id": settings.ASR_MDL,
+        "parser_ids": settings.PARSERS,
+        "img2txt_id": settings.IMAGE2TEXT_MDL
+    }
+    usr_tenant = {
+        "tenant_id": user_info["id"],
+        "user_id": user_info["id"],
+        "invited_by": user_info["id"],
+        "role": UserTenantRole.OWNER
+    }
+    tenant_llm = get_init_tenant_llm(user_info["id"])
+    if not UserService.save(**user_info):
+        logging.error("can't init default user.")
+        return
+    TenantService.insert(**tenant)
+    UserTenantService.insert(**usr_tenant)
+    TenantLLMService.insert_many(tenant_llm)
+    logging.info(f"Default user initialized. email: {email}, password: 123456")
+    e, kb = KnowledgebaseService.create_with_name(
+        name="user",
+        tenant_id=user_info["id"],
+        embd_id=tenant["embd_id"],
+    )
+    if e:
+        KnowledgebaseService.save(**kb)
+
+
 def init_llm_factory():
     LLMFactoriesService.filter_delete([1 == 1])
     factory_llm_infos = settings.FACTORY_LLM_INFOS
@@ -169,9 +213,7 @@ def init_web_data():
     init_table()
 
     init_llm_factory()
-    # if not UserService.get_all().count():
-    #    init_superuser()
-
+    init_default_user()
     add_graph_templates()
     init_message_id_sequence()
     init_memory_size_cache()
