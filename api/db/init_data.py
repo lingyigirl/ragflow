@@ -131,7 +131,14 @@ def init_default_user():
     e, kb = KnowledgebaseService.create_with_name(
         name="user",
         tenant_id=user_info["id"],
+        parser_id="hichunk",
         embd_id=tenant["embd_id"],
+        parser_config={
+            "layout_recognize": "MinerU",
+            "mineru_backend": "hybrid-auto-engine",
+            "mineru_parse_method": "auto",
+            "mineru_lang": "Chinese",
+        },
     )
     if e:
         KnowledgebaseService.save(**kb)

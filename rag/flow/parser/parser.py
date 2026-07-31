@@ -239,49 +239,53 @@ class Parser(ProcessBase):
             lines, _ = PlainParser()(blob)
             bboxes = [{"text": t} for t, _ in lines]
         elif parse_method.lower() == "mineru":
-            def resolve_mineru_llm_name():
-                configured = parser_model_name or conf.get("mineru_llm_name")
-                if configured:
-                    return configured
+            try:
+                def resolve_mineru_llm_name():
+                    configured = parser_model_name or conf.get("mineru_llm_name")
+                    if configured:
+                        return configured
+
+                    tenant_id = self._canvas._tenant_id
+                    if not tenant_id:
+                        return None
+
+                    from api.db.services.tenant_llm_service import TenantLLMService
+
+                    env_name = TenantLLMService.ensure_mineru_from_env(tenant_id)
+                    candidates = TenantLLMService.query(tenant_id=tenant_id, llm_factory="MinerU", model_type=LLMType.OCR.value)
+                    if candidates:
+                        return candidates[0].llm_name
+                    return env_name
+
+                parser_model_name = resolve_mineru_llm_name()
+                if not parser_model_name:
+                    raise RuntimeError("MinerU model not configured. Please add MinerU in Model Providers or set MINERU_* env.")
 
                 tenant_id = self._canvas._tenant_id
-                if not tenant_id:
-                    return None
+                ocr_model = LLMBundle(tenant_id, LLMType.OCR, llm_name=parser_model_name, lang=conf.get("lang", "Chinese"))
+                pdf_parser = ocr_model.mdl
 
-                from api.db.services.tenant_llm_service import TenantLLMService
-
-                env_name = TenantLLMService.ensure_mineru_from_env(tenant_id)
-                candidates = TenantLLMService.query(tenant_id=tenant_id, llm_factory="MinerU", model_type=LLMType.OCR.value)
-                if candidates:
-                    return candidates[0].llm_name
-                return env_name
-
-            parser_model_name = resolve_mineru_llm_name()
-            if not parser_model_name:
-                raise RuntimeError("MinerU model not configured. Please add MinerU in Model Providers or set MINERU_* env.")
-
-            tenant_id = self._canvas._tenant_id
-            ocr_model = LLMBundle(tenant_id, LLMType.OCR, llm_name=parser_model_name, lang=conf.get("lang", "Chinese"))
-            pdf_parser = ocr_model.mdl
-
-            lines, _ = pdf_parser.parse_pdf(
-                filepath=name,
-                binary=blob,
-                callback=self.callback,
-                parse_method=conf.get("mineru_parse_method", "raw"),
-                lang=conf.get("lang", "Chinese"),
-                kb_id=str(self._canvas._kb_id) if getattr(self._canvas, "_kb_id", None) else None,
-                doc_id=self._canvas._doc_id if getattr(self._canvas, "_doc_id", None) else None,
-                parser_config=conf,
-            )
-            bboxes = []
-            for t, poss in lines:
-                box = {
-                    "image": pdf_parser.crop(poss, 1),
-                    "positions": [[pos[0][-1], *pos[1:]] for pos in pdf_parser.extract_positions(poss)],
-                    "text": t,
-                }
-                bboxes.append(box)
+                lines, _ = pdf_parser.parse_pdf(
+                    filepath=name,
+                    binary=blob,
+                    callback=self.callback,
+                    parse_method=conf.get("mineru_parse_method", "raw"),
+                    lang=conf.get("lang", "Chinese"),
+                    kb_id=str(self._canvas._kb_id) if getattr(self._canvas, "_kb_id", None) else None,
+                    doc_id=self._canvas._doc_id if getattr(self._canvas, "_doc_id", None) else None,
+                    parser_config=conf,
+                )
+                bboxes = []
+                for t, poss in lines:
+                    box = {
+                        "image": pdf_parser.crop(poss, 1),
+                        "positions": [[pos[0][-1], *pos[1:]] for pos in pdf_parser.extract_positions(poss)],
+                        "text": t,
+                    }
+                    bboxes.append(box)
+            except Exception:
+                logging.exception("MinerU failed, falling back to DeepDOC.")
+                bboxes = RAGFlowPdfParser().parse_into_bboxes(blob, callback=self.callback)
         elif parse_method.lower() == "tcadp parser":
             # ADP is a document parsing tool using Tencent Cloud API
             table_result_type = conf.get("table_result_type", "1")
