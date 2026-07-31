@@ -1925,11 +1925,11 @@ async def mineru_download(file_type):
                         file_location = key
                         break
             elif file_type == "pdf":
-                doc_name_no_ext = re.sub(r"\.\w+$", "", doc.name)
-                target_pdf = f"{doc_id}/{doc_name_no_ext}_rotated.pdf"
-                if settings.STORAGE_IMPL.obj_exist(kb_id, target_pdf):
-                    file_location = target_pdf
-                else:
+                for key in keys:
+                    if key.lower().endswith("_rotated.pdf"):
+                        file_location = key
+                        break
+                if not file_location:
                     for key in keys:
                         if key.lower().endswith(".pdf"):
                             file_location = key

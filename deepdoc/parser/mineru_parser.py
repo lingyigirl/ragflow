@@ -641,40 +641,63 @@ class MinerUParser(RAGFlowPdfParser):
             return sanitized or "unnamed"
 
         safe_stem = _sanitize_filename(file_stem)
-        allowed_names = {f"{file_stem}_content_list.json", f"{safe_stem}_content_list.json"}
-        self.logger.info(f"[MinerU] Expected output files: {', '.join(sorted(allowed_names))}")
+        compat_names = {f"{file_stem}_content_list_compatibility.json", f"{safe_stem}_content_list_compatibility.json"}
+        original_names = {f"{file_stem}_content_list.json", f"{safe_stem}_content_list.json"}
+        self.logger.info(f"[MinerU] Expected output files: {', '.join(sorted(compat_names | original_names))}")
         self.logger.info(f"[MinerU] Searching output in: {output_dir}")
 
-        jf = output_dir / f"{file_stem}_content_list.json"
-        self.logger.info(f"[MinerU] Trying original path: {jf}")
+        jf = output_dir / f"{file_stem}_content_list_compatibility.json"
+        self.logger.info(f"[MinerU] Trying compat path: {jf}")
         attempted.append(jf)
         if jf.exists():
             subdir = output_dir
             json_file = jf
         else:
-            alt = output_dir / f"{safe_stem}_content_list.json"
-            self.logger.info(f"[MinerU] Trying sanitized filename: {alt}")
+            alt = output_dir / f"{safe_stem}_content_list_compatibility.json"
+            self.logger.info(f"[MinerU] Trying sanitized compat path: {alt}")
             attempted.append(alt)
             if alt.exists():
                 subdir = output_dir
                 json_file = alt
             else:
-                nested_alt = output_dir / safe_stem / f"{safe_stem}_content_list.json"
-                self.logger.info(f"[MinerU] Trying sanitized nested path: {nested_alt}")
+                nested_alt = output_dir / safe_stem / f"{safe_stem}_content_list_compatibility.json"
+                self.logger.info(f"[MinerU] Trying sanitized nested compat path: {nested_alt}")
                 attempted.append(nested_alt)
                 if nested_alt.exists():
                     subdir = nested_alt.parent
                     json_file = nested_alt
+                else:
+                    jf_orig = output_dir / f"{file_stem}_content_list.json"
+                    self.logger.info(f"[MinerU] Fallback original path: {jf_orig}")
+                    attempted.append(jf_orig)
+                    if jf_orig.exists():
+                        subdir = output_dir
+                        json_file = jf_orig
+                    else:
+                        alt_orig = output_dir / f"{safe_stem}_content_list.json"
+                        self.logger.info(f"[MinerU] Fallback sanitized original path: {alt_orig}")
+                        attempted.append(alt_orig)
+                        if alt_orig.exists():
+                            subdir = output_dir
+                            json_file = alt_orig
+                        else:
+                            nested_orig = output_dir / safe_stem / f"{safe_stem}_content_list.json"
+                            self.logger.info(f"[MinerU] Fallback sanitized nested original path: {nested_orig}")
+                            attempted.append(nested_orig)
+                            if nested_orig.exists():
+                                subdir = nested_orig.parent
+                                json_file = nested_orig
 
         if not json_file:
-            fallback_candidates: list[Path] = [] 
+            fallback_candidates: list[Path] = []
             try:
-                for candidate_name in ("content_list.json", "*_content_list.json"): 
-                    for p in output_dir.rglob(candidate_name): 
+                for candidate_name in ("content_list_compatibility.json", "*_content_list_compatibility.json",
+                                       "content_list.json", "*_content_list.json"):
+                    for p in output_dir.rglob(candidate_name):
                         if p.is_file():
                             fallback_candidates.append(p)
             except Exception as scan_err:
-                self.logger.warning(  
+                self.logger.warning(
                     "[MinerU] Fallback scan for content_list.json failed: %s", scan_err, exc_info=True
                 )
 
@@ -1539,7 +1562,6 @@ class MinerUParser(RAGFlowPdfParser):
         doc_id: str,
         content_list: list[dict[str, Any]],
         callback: Optional[Callable] = None,
-        pdf_path: Optional[Path] = None,
     ) -> bool:
         try:
             if not output_dir or not output_dir.exists():
@@ -1577,7 +1599,6 @@ class MinerUParser(RAGFlowPdfParser):
             image_files_to_upload: list[dict] = []
             img_path_to_minio_url: dict[str, str] = {}
             _IMG_KEYS = ("img_path", "table_img_path", "equation_img_path")
-            content_list_file: Optional[Path] = None
             other_files_to_upload: list[Path] = []
 
             files_by_name = {}
@@ -1589,14 +1610,8 @@ class MinerUParser(RAGFlowPdfParser):
 
             for f in all_files_in_dir:
                 fname = f.name.lower()
-                if any(fname.endswith(s + "_content_list.json") or fname.endswith(s + "_content_list_compatibility.json")
-                       for s in ("", Path(output_dir).name)):
-                    if content_list_file is None:
-                        content_list_file = f
-                    continue
-                if fname == "content_list.json" or fname == "content_list_compatibility.json":
-                    if content_list_file is None:
-                        content_list_file = f
+                if (fname.endswith("_content_list.json") or fname == "content_list.json"
+                        or fname.endswith("_content_list_compatibility.json") or fname == "content_list_compatibility.json"):
                     continue
                 if f.suffix.lower() in image_extensions:
                     try:
@@ -1726,6 +1741,9 @@ class MinerUParser(RAGFlowPdfParser):
             for f in other_files_to_upload:
                 try:
                     rel_path = str(f.relative_to(output_dir))
+                    parts = rel_path.split("/", 1)
+                    if len(parts) > 1:
+                        rel_path = parts[1]
                     other_location = f"{base_prefix}/{rel_path}"
                     settings.STORAGE_IMPL.put(kb_id, other_location, f.read_bytes())
                     other_uploaded += 1
@@ -1766,21 +1784,9 @@ class MinerUParser(RAGFlowPdfParser):
                 self._emit_callback(callback, -1, f"[MinerU] 上传 content_list.json 失败: {e}")
                 return False
 
-            pdf_uploaded = False
-            if pdf_path and pdf_path.exists() and pdf_path.is_file():
-                try:
-                    pdf_location = f"{base_prefix}/{pdf_path.name}"
-                    settings.STORAGE_IMPL.put(kb_id, pdf_location, pdf_path.read_bytes())
-                    self.logger.info(f"[MinerU] 已上传PDF文件: bucket={kb_id}, location={pdf_location}")
-                    pdf_uploaded = True
-                    self._emit_callback(callback, 0.87, f"[MinerU] 已上传PDF文件")
-                except Exception as e:
-                    self.logger.warning(f"[MinerU] 上传PDF文件失败: {e}")
-
             self.logger.info(
                 f"[MinerU] 解析产物上传完成: bucket={kb_id}, prefix={base_prefix}, "
-                f"json={'已上传' if json_uploaded else '失败'}, other_files={other_uploaded}个, 图片={uploaded_image_count}张, "
-                f"pdf={'已上传' if pdf_uploaded else '未上传'}"
+                f"json={'已上传' if json_uploaded else '失败'}, other_files={other_uploaded}个, 图片={uploaded_image_count}张"
             )
             self._emit_callback(callback, 0.90, f"[MinerU] 解析产物上传完成")
             return True
@@ -2199,7 +2205,6 @@ class MinerUParser(RAGFlowPdfParser):
                             doc_id=doc_id,
                             content_list=content_list_for_minio,
                             callback=callback,
-                            pdf_path=display_pdf,
                         )
                         if ok:
                             self._sync_public_download_img_paths(outputs, content_list_for_minio)
