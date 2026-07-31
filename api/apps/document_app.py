@@ -73,7 +73,10 @@ from urllib.parse import quote
 async def _classify_voucher_type_for_mineru_doc(kb_id: str, doc_id: str):
     failed_payload = get_failed_voucher_payload()
     try:
-        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, f"{doc_id}/content_list.json")
+        key = f"{doc_id}/content_list_compatibility.json"
+        if not settings.STORAGE_IMPL.obj_exist(kb_id, key):
+            key = f"{doc_id}/content_list.json"
+        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, kb_id, key)
         content_list = json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
     except Exception:
         content_list = []
@@ -105,7 +108,10 @@ async def _classify_voucher_type_for_mineru_doc(kb_id: str, doc_id: str):
 
 async def _fetch_doc_content_for_voucher_classify(doc, tenant_id: str) -> str:
     try:
-        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, doc.kb_id, f"{doc.id}/content_list.json")
+        key = f"{doc.id}/content_list_compatibility.json"
+        if not settings.STORAGE_IMPL.obj_exist(doc.kb_id, key):
+            key = f"{doc.id}/content_list.json"
+        content_bin = await asyncio.to_thread(settings.STORAGE_IMPL.get, doc.kb_id, key)
         content_list = json.loads((content_bin or b"[]").decode("utf-8")) if content_bin else []
     except Exception:
         content_list = []
@@ -1424,7 +1430,9 @@ async def mineru_parse():
                 return get_json_result(data=False, message="文档不存在", code=RetCode.NOT_FOUND)
             if str(doc.kb_id) != str(kb_id):
                 return get_json_result(data=False, message="文档不属于该知识库", code=RetCode.ARGUMENT_ERROR)
-            content_list_location = f"{doc_id}/content_list.json"
+            content_list_location = f"{doc_id}/content_list_compatibility.json"
+            if not settings.STORAGE_IMPL.obj_exist(kb_id, content_list_location):
+                content_list_location = f"{doc_id}/content_list.json"
             if not settings.STORAGE_IMPL.obj_exist(kb_id, content_list_location):
                 return get_json_result(
                     data=False,
@@ -1904,23 +1912,32 @@ async def mineru_download(file_type):
             keys = list_fn(kb_id, f"{doc_id}/")
 
             if file_type == "json":
-                target_file = f"{doc_id}/content_list.json"
+                target_file = f"{doc_id}/content_list_compatibility.json"
                 if settings.STORAGE_IMPL.obj_exist(kb_id, target_file):
                     file_location = target_file
+                else:
+                    target_file = f"{doc_id}/content_list.json"
+                    if settings.STORAGE_IMPL.obj_exist(kb_id, target_file):
+                        file_location = target_file
             elif file_type == "markdown":
                 for key in keys:
                     if key.lower().endswith(".md"):
                         file_location = key
                         break
             elif file_type == "pdf":
-                for key in keys:
-                    if key.lower().endswith(".pdf"):
-                        file_location = key
-                        break
+                doc_name_no_ext = re.sub(r"\.\w+$", "", doc.name)
+                target_pdf = f"{doc_id}/{doc_name_no_ext}_rotated.pdf"
+                if settings.STORAGE_IMPL.obj_exist(kb_id, target_pdf):
+                    file_location = target_pdf
+                else:
+                    for key in keys:
+                        if key.lower().endswith(".pdf"):
+                            file_location = key
+                            break
             elif file_type == "original":
                 for key in keys:
                     name = key[len(doc_id)+1:]
-                    if name == "content_list.json" or name.startswith("images/"):
+                    if name in ("content_list_compatibility.json", "content_list.json") or name.startswith("images/"):
                         continue
                     if name.lower().endswith((".md", ".pdf")):
                         continue
@@ -1944,7 +1961,7 @@ async def mineru_download(file_type):
 
         download_filename = Path(file_location).name
         if not download_filename:
-            download_filename = {"json": "content_list.json", "markdown": "document.md", "pdf": "document.pdf"}.get(file_type, "download")
+            download_filename = {"json": "content_list_compatibility.json", "markdown": "document.md", "pdf": "document.pdf"}.get(file_type, "download")
 
         ext_for_type = {"json": "json", "markdown": "markdown", "pdf": "pdf"}
         ext = ext_for_type.get(file_type, file_type)
@@ -2326,7 +2343,8 @@ async def submit_mineru_section():
         if not first_page:
             return get_json_result(data=False, message="未找到可提交的 mineru_section 数据", code=RetCode.NOT_FOUND)
 
-        target_key = f"{doc_id}/content_list.json"
+        target_key = f"{doc_id}/content_list_compatibility.json"
+        fallback_key = f"{doc_id}/content_list.json"
         temp_file = tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".json")
         temp_file_path = temp_file.name
         temp_file.write(b"[")
@@ -2366,8 +2384,13 @@ async def submit_mineru_section():
         old_payload = None
         try:
             old_payload = settings.STORAGE_IMPL.get(kb_id, target_key)
+            if not old_payload:
+                old_payload = settings.STORAGE_IMPL.get(kb_id, fallback_key)
         except Exception:
-            old_payload = None
+            try:
+                old_payload = settings.STORAGE_IMPL.get(kb_id, fallback_key)
+            except Exception:
+                old_payload = None
         content_changed = old_payload != payload
         if content_changed:
             settings.STORAGE_IMPL.put(kb_id, target_key, payload)
